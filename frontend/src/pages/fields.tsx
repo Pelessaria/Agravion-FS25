@@ -42,7 +42,6 @@ type DrawnField = {
 }
 
 const LABEL_HEIGHT = 2.7
-const LABEL_SCREEN_PX = 15
 
 function CropMark({ kind }: { kind: string }) {
   if (kind === "wheat" || kind === "barley" || kind === "oat" || kind === "rice" || kind === "ricelonggrain") {
@@ -353,10 +352,14 @@ function labelWidth(digits: number) {
   return 2.4 + digits * 1.15 + 0.7
 }
 
-/** Screen-sized labels, kept only when the field can hold one without covering a neighbour. */
+/** Labels stay large enough to read and grow when zooming in, without covering a neighbour. */
+function labelScreenPx(zoom: number) {
+  return Math.min(48, 34 * Math.sqrt(Math.max(zoom, 1)))
+}
+
 function visibleLabels(fields: DrawnField[], zoom: number, sidePx: number, pinnedId: number | null) {
   if (sidePx <= 0) return { scale: 0, ids: new Set<number>() }
-  const scale = (LABEL_SCREEN_PX / (sidePx * Math.max(zoom, 1))) * 100 / LABEL_HEIGHT
+  const scale = (labelScreenPx(zoom) / (sidePx * Math.max(zoom, 1))) * 100 / LABEL_HEIGHT
   const ranked = [...fields].sort((a, b) => {
     if (a.id === pinnedId) return -1
     if (b.id === pinnedId) return 1
@@ -614,7 +617,7 @@ function FieldMap({
                       <CropMark kind={field.mark} />
                     </g>
                   )}
-                  <text x={iconX + 2.45 + (digits * 1.15) / 2} y="0.48" textAnchor="middle" fontSize="1.45">
+                  <text x={iconX + 2.45 + (digits * 1.15) / 2} y="0.55" textAnchor="middle" fontSize="1.9">
                     {field.label}
                   </text>
                 </g>
