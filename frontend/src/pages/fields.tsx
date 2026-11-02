@@ -174,8 +174,10 @@ export function FieldsPage() {
   const mapSize = effectiveMapSize(source?.mapSize ?? null, fields)
   const reported = source?.mapFrame ?? null
   const frame = useMemo(() => {
-    if (contentBox) return frameFromContentBox(mapSize, contentBox)
-    if (reported) {
+    // The connector reads the PDA placement from the running map. That frame
+    // covers the playable terrain. A brightness box also includes the painted
+    // border around the terrain, so it is only the fallback.
+    if (reported && reported.worldX > 0 && reported.worldZ > 0 && reported.scaleX > 0 && reported.scaleZ > 0) {
       return {
         originX: reported.originX,
         originZ: reported.originZ,
@@ -187,6 +189,7 @@ export function FieldsPage() {
         padZ: reported.padZ,
       }
     }
+    if (contentBox) return frameFromContentBox(mapSize, contentBox)
     return terrainFrame(mapSize)
   }, [contentBox, mapSize, reported])
   const drawn = useMemo(

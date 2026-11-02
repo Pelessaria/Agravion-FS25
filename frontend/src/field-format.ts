@@ -92,9 +92,10 @@ export function projectPoint(x: number, z: number, frame: MapFrame) {
 }
 
 /**
- * PDA overview images often include a dark border or vignette, and that border
- * is not the same size on every map. Returns the bright region, or null when
- * the picture is already full-bleed (or too dark to trust).
+ * Fallback when the connector has not reported the PDA frame. Overview images
+ * often include a dark border, and that border is not the same size on every
+ * map. Returns the bright region, or null when the picture is already
+ * full-bleed (or too dark to trust).
  */
 export function measureMapContent(pixels: Uint8ClampedArray, width: number, height: number) {
   if (width < 8 || height < 8 || pixels.length < width * height * 4) return null
