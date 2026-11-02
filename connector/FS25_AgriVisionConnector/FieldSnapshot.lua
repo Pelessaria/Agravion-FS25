@@ -683,6 +683,51 @@ local function collectState(connector, field, id)
     return record
 end
 
+local function readNumber(object, name)
+    if object == nil then
+        return nil
+    end
+    local ok, value = pcall(function()
+        return object[name]
+    end)
+    if not ok then
+        return nil
+    end
+    return num(value)
+end
+
+local function mapFrameAttrs(connector)
+    local mission = g_currentMission
+    if mission == nil or mission.hud == nil or mission.hud.ingameMap == nil then
+        return ""
+    end
+    local map = mission.hud.ingameMap
+    local worldX = readNumber(map, "worldSizeX")
+    local worldZ = readNumber(map, "worldSizeZ")
+    if worldX == nil or worldZ == nil or worldX <= 1 or worldZ <= 1 then
+        return ""
+    end
+    local originX = readNumber(map, "worldCenterOffsetX") or (worldX * 0.5)
+    local originZ = readNumber(map, "worldCenterOffsetZ") or (worldZ * 0.5)
+    local scaleX = readNumber(map, "mapExtensionScaleFactor")
+    local scaleZ = readNumber(map, "mapExtensionScaleFactorZ") or scaleX
+    local padX = readNumber(map, "mapExtensionOffsetX")
+    local padZ = readNumber(map, "mapExtensionOffsetZ")
+    if scaleX == nil or scaleZ == nil or padX == nil or padZ == nil then
+        return ""
+    end
+    return table.concat({
+        attr(connector, "mapWorldX", string.format("%.1f", worldX)),
+        attr(connector, "mapWorldZ", string.format("%.1f", worldZ)),
+        attr(connector, "mapOriginX", string.format("%.1f", originX)),
+        attr(connector, "mapOriginZ", string.format("%.1f", originZ)),
+        attr(connector, "mapScaleX", string.format("%.4f", scaleX)),
+        attr(connector, "mapScaleZ", string.format("%.4f", scaleZ)),
+        attr(connector, "mapPadX", string.format("%.4f", padX)),
+        attr(connector, "mapPadZ", string.format("%.4f", padZ)),
+    }, "")
+end
+
 local function writeGeometry(connector, ids, records)
     local lines = {}
     for _, id in ipairs(ids) do
@@ -699,10 +744,11 @@ local function writeGeometry(connector, ids, records)
         end
     end
     local body = string.format(
-        '<?xml version="1.0" encoding="utf-8"?>\n<fieldsGeometry schema="1" generation="%s" writtenAtUtc="%s"%s>\n%s\n</fieldsGeometry>\n',
+        '<?xml version="1.0" encoding="utf-8"?>\n<fieldsGeometry schema="1" generation="%s" writtenAtUtc="%s"%s%s>\n%s\n</fieldsGeometry>\n',
         tostring(connector:nextGeneration()),
         xmlEscape(connector, (getDate ~= nil and getDate("%Y-%m-%dT%H:%M:%SZ")) or "unknown"),
         attr(connector, "mapSize", terrainSize() ~= nil and math.floor(terrainSize()) or nil),
+        mapFrameAttrs(connector),
         table.concat(lines, "\n")
     )
     connector:writeTextFile(connector.stateDir .. "fields_geometry.xml", body)
@@ -819,7 +865,7 @@ local function writeFruitManifest(connector)
     connector.fruitManifestFingerprint = fingerprint
 end
 
-local function geometryFingerprint(ids, records)
+local function geometryFingerprint(connector, ids, records)
     local parts = {}
     for _, id in ipairs(ids) do
         local row = records[id]
@@ -827,7 +873,7 @@ local function geometryFingerprint(ids, records)
             parts[#parts + 1] = tostring(row.id) .. ":" .. tostring(row.points or "")
         end
     end
-    return table.concat(parts, "|")
+    return table.concat(parts, "|") .. "#" .. mapFrameAttrs(connector)
 end
 
 function FieldSnapshot.writeIfDue(connector)
@@ -865,7 +911,7 @@ function FieldSnapshot.writeIfDue(connector)
             budget = budget - 1
         end
         if connector.fieldGeoIndex > #ids then
-            local fingerprint = geometryFingerprint(ids, connector.fieldGeoRecords)
+            local fingerprint = geometryFingerprint(connector, ids, connector.fieldGeoRecords)
             if fingerprint ~= connector.fieldGeometryFingerprint then
                 writeGeometry(connector, ids, connector.fieldGeoRecords)
                 connector.fieldGeometryFingerprint = fingerprint

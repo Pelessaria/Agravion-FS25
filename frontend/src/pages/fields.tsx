@@ -14,9 +14,13 @@ import {
   formatHa,
   formatTarget,
   formatWindow,
+  frameFromContentBox,
   levelLabel,
+  measureMapContent,
   namedValue,
   projectPoint,
+  terrainFrame,
+  type MapFrame,
 } from "../field-format"
 import { useStore } from "../store"
 import type { FieldSnapshot, FieldsResponse } from "../types"
@@ -91,13 +95,13 @@ function CropMark({ kind }: { kind: string }) {
   return <path d="M8 14 V7 M8 9 C5 8 4 5 6 4 M8 8 C11 7 12 4 10 3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
 }
 
-function projectFields(fields: FieldSnapshot[], mapSize: number, farmId: number | null): DrawnField[] {
+function projectFields(fields: FieldSnapshot[], frame: MapFrame, farmId: number | null): DrawnField[] {
   return fields.map((field) => {
     const center =
       field.centerX != null && field.centerZ != null
-        ? projectPoint(field.centerX, field.centerZ, mapSize)
+        ? projectPoint(field.centerX, field.centerZ, frame)
         : null
-    const projected = field.points.map(([x, z]) => projectPoint(x, z, mapSize))
+    const projected = field.points.map(([x, z]) => projectPoint(x, z, frame))
     const label = center ?? (projected.length > 0 ? projected[0] : null)
     const key = cropKey(field.fruitName)
     return {
@@ -128,6 +132,7 @@ export function FieldsPage() {
   const [onlyMine, setOnlyMine] = useState(false)
   const [query, setQuery] = useState("")
   const [focusToken, setFocusToken] = useState(0)
+  const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
   useEffect(() => {
     if (!workspace || !allowed || !access || !liveMode) return
@@ -167,9 +172,26 @@ export function FieldsPage() {
   const source = liveMode ? payload : demo
   const fields = source?.fields ?? EMPTY_FIELDS
   const mapSize = effectiveMapSize(source?.mapSize ?? null, fields)
+  const reported = source?.mapFrame ?? null
+  const frame = useMemo(() => {
+    if (contentBox) return frameFromContentBox(mapSize, contentBox)
+    if (reported) {
+      return {
+        originX: reported.originX,
+        originZ: reported.originZ,
+        sizeX: reported.worldX,
+        sizeZ: reported.worldZ,
+        scaleX: reported.scaleX,
+        scaleZ: reported.scaleZ,
+        padX: reported.padX,
+        padZ: reported.padZ,
+      }
+    }
+    return terrainFrame(mapSize)
+  }, [contentBox, mapSize, reported])
   const drawn = useMemo(
-    () => projectFields(fields, mapSize, farm?.gameFarmId ?? null),
-    [farm?.gameFarmId, fields, mapSize],
+    () => projectFields(fields, frame, farm?.gameFarmId ?? null),
+    [farm?.gameFarmId, fields, frame],
   )
   const visible = useMemo(
     () => (onlyMine && farm ? drawn.filter((field) => field.mine) : drawn),
@@ -289,6 +311,7 @@ export function FieldsPage() {
               focusToken={focusToken}
               label={workspace.mapName ?? t("fields.mapLabel")}
               onSelect={(nextId) => choose(nextId, false)}
+              onContentBox={setContentBox}
             />
           </div>
           <FieldDetail
@@ -315,6 +338,7 @@ function FieldMap({
   focusToken,
   label,
   onSelect,
+  onContentBox,
 }: {
   fields: DrawnField[]
   mapUrl: string | null
@@ -322,6 +346,7 @@ function FieldMap({
   focusToken: number
   label: string
   onSelect: (id: number) => void
+  onContentBox: (box: { x: number; y: number; w: number; h: number } | null) => void
 }) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -403,6 +428,7 @@ function FieldMap({
         className={dragging ? "fields-viewport is-drag" : "fields-viewport"}
         onPointerDown={(event) => {
           if (event.button !== 0) return
+          event.preventDefault()
           event.currentTarget.setPointerCapture(event.pointerId)
           drag.current = {
             x: event.clientX,
@@ -415,10 +441,11 @@ function FieldMap({
         }}
         onPointerMove={(event) => {
           const current = drag.current
-          if (!current || cam.current.k <= 1) return
+          if (!current) return
           const dx = event.clientX - current.x
           const dy = event.clientY - current.y
           if (Math.abs(dx) + Math.abs(dy) > 4) current.moved = true
+          if (cam.current.k <= 1) return
           cam.current.x = current.cx + dx
           cam.current.y = current.cy + dy
           apply()
@@ -428,18 +455,47 @@ function FieldMap({
           drag.current = null
           setDragging(false)
           if (!current || current.moved) return
-          const node = (event.target as Element).closest("[data-field]")
+          const hit = document
+            .elementsFromPoint(event.clientX, event.clientY)
+            .find((node) => node instanceof Element && node.closest("[data-field]"))
+          const node = hit instanceof Element ? hit.closest("[data-field]") : null
           const nextId = Number(node?.getAttribute("data-field"))
           if (Number.isFinite(nextId)) onSelect(nextId)
         }}
       >
         <div ref={stageRef} className="fields-stage">
           {mapUrl && !mapFailed ? (
-            <img src={mapUrl} alt="" onError={() => setMapFailed(true)} draggable={false} />
+            <img
+              src={mapUrl}
+              alt=""
+              draggable={false}
+              onError={() => {
+                setMapFailed(true)
+                onContentBox(null)
+              }}
+              onLoad={(event) => {
+                const image = event.currentTarget
+                const canvas = document.createElement("canvas")
+                const sample = Math.min(image.naturalWidth, image.naturalHeight, 512)
+                canvas.width = sample
+                canvas.height = sample
+                const ctx = canvas.getContext("2d", { willReadFrequently: true })
+                if (!ctx) {
+                  onContentBox(null)
+                  return
+                }
+                try {
+                  ctx.drawImage(image, 0, 0, sample, sample)
+                  onContentBox(measureMapContent(ctx.getImageData(0, 0, sample, sample).data, sample, sample))
+                } catch {
+                  onContentBox(null)
+                }
+              }}
+            />
           ) : (
             <div className="fields-terrain" aria-hidden="true" />
           )}
-          <svg viewBox="0 0 100 100" role="img" aria-label={label}>
+          <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label={label}>
             {fields.map((field) => {
               const className = [
                 "field-shape",

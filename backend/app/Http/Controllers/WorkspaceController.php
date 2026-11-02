@@ -147,6 +147,7 @@ class WorkspaceController extends Controller
                 'ok' => false,
                 'error' => 'disabled',
                 'mapSize' => null,
+                'mapFrame' => null,
                 'precisionFarming' => null,
                 'geometryAt' => null,
                 'stateAt' => null,

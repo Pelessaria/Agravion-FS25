@@ -2698,6 +2698,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   touch-action: none;
   background: #121814;
   cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .fields-viewport.is-drag { cursor: grabbing; }
 .fields-stage {
@@ -2719,6 +2721,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
     linear-gradient(165deg, #243226, #141c16 58%, #1c2418);
 }
 .fields-stage svg { overflow: visible; }
+.fields-stage svg text, .fields-stage svg image { pointer-events: none; }
 .field-shape {
   fill-opacity: 0.46;
   stroke: rgba(255, 255, 255, 0.9);

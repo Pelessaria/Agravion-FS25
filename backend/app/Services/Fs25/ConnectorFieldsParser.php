@@ -11,6 +11,7 @@ final class ConnectorFieldsParser
     /**
      * @return array{
      *   mapSize: int|null,
+     *   mapFrame: array{worldX: float, worldZ: float, originX: float, originZ: float, scaleX: float, scaleZ: float, padX: float, padZ: float}|null,
      *   precisionFarming: bool|null,
      *   geometryAt: string|null,
      *   stateAt: string|null,
@@ -82,6 +83,7 @@ final class ConnectorFieldsParser
 
         return [
             'mapSize' => self::intRoot($geometryXml, 'mapSize'),
+            'mapFrame' => self::mapFrame($geometryXml),
             'precisionFarming' => self::boolRoot($stateXml, 'precisionFarming'),
             'geometryAt' => self::root($geometryXml, 'writtenAtUtc'),
             'stateAt' => self::root($stateXml, 'writtenAtUtc'),
@@ -202,6 +204,49 @@ final class ConnectorFieldsParser
         }
 
         return self::attr($m[1], $name);
+    }
+
+    /**
+     * @return array{worldX: float, worldZ: float, originX: float, originZ: float, scaleX: float, scaleZ: float, padX: float, padZ: float}|null
+     */
+    private static function mapFrame(string $xml): ?array
+    {
+        $worldX = self::floatRoot($xml, 'mapWorldX');
+        $worldZ = self::floatRoot($xml, 'mapWorldZ');
+        $scaleX = self::floatRoot($xml, 'mapScaleX');
+        $scaleZ = self::floatRoot($xml, 'mapScaleZ');
+        $padX = self::floatRoot($xml, 'mapPadX');
+        $padZ = self::floatRoot($xml, 'mapPadZ');
+        if ($worldX === null || $worldZ === null || $worldX <= 1 || $worldZ <= 1) {
+            return null;
+        }
+        if ($scaleX === null || $scaleZ === null || $padX === null || $padZ === null) {
+            return null;
+        }
+        if ($scaleX <= 0 || $scaleZ <= 0 || $scaleX > 1.5 || $scaleZ > 1.5) {
+            return null;
+        }
+
+        return [
+            'worldX' => $worldX,
+            'worldZ' => $worldZ,
+            'originX' => self::floatRoot($xml, 'mapOriginX') ?? ($worldX / 2),
+            'originZ' => self::floatRoot($xml, 'mapOriginZ') ?? ($worldZ / 2),
+            'scaleX' => $scaleX,
+            'scaleZ' => $scaleZ,
+            'padX' => $padX,
+            'padZ' => $padZ,
+        ];
+    }
+
+    private static function floatRoot(string $xml, string $name): ?float
+    {
+        $raw = self::root($xml, $name);
+        if ($raw === null || ! is_numeric($raw)) {
+            return null;
+        }
+
+        return (float) $raw;
     }
 
     private static function intRoot(string $xml, string $name): ?int

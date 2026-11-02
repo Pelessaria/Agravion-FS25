@@ -41,12 +41,89 @@ export function cropColor(field: Pick<FieldSnapshot, "fruitName" | "owned">) {
   return "#8d9792"
 }
 
-export function projectPoint(x: number, z: number, mapSize: number) {
+/** How world metres sit on the PDA image. A full-bleed map uses scale 1 and pad 0. */
+export type MapFrame = {
+  originX: number
+  originZ: number
+  sizeX: number
+  sizeZ: number
+  scaleX: number
+  scaleZ: number
+  padX: number
+  padZ: number
+}
+
+export function terrainFrame(mapSize: number): MapFrame {
   const half = mapSize / 2
   return {
-    x: ((x + half) / mapSize) * 100,
-    y: (1 - (z + half) / mapSize) * 100,
+    originX: half,
+    originZ: half,
+    sizeX: mapSize,
+    sizeZ: mapSize,
+    scaleX: 1,
+    scaleZ: 1,
+    padX: 0,
+    padZ: 0,
   }
+}
+
+/**
+ * `box` is the visible map inside the image, in 0..1, origin top-left.
+ * North stays up: padZ is the margin under the south edge.
+ */
+export function frameFromContentBox(
+  mapSize: number,
+  box: { x: number; y: number; w: number; h: number },
+): MapFrame {
+  const base = terrainFrame(mapSize)
+  return {
+    ...base,
+    scaleX: box.w,
+    scaleZ: box.h,
+    padX: box.x,
+    padZ: 1 - (box.y + box.h),
+  }
+}
+
+export function projectPoint(x: number, z: number, frame: MapFrame) {
+  const nx = ((x + frame.originX) / frame.sizeX) * frame.scaleX + frame.padX
+  const nz = ((z + frame.originZ) / frame.sizeZ) * frame.scaleZ + frame.padZ
+  return { x: nx * 100, y: (1 - nz) * 100 }
+}
+
+/**
+ * PDA overview images often include a dark border or vignette, and that border
+ * is not the same size on every map. Returns the bright region, or null when
+ * the picture is already full-bleed (or too dark to trust).
+ */
+export function measureMapContent(pixels: Uint8ClampedArray, width: number, height: number) {
+  if (width < 8 || height < 8 || pixels.length < width * height * 4) return null
+  let minX = width
+  let maxX = -1
+  let minY = height
+  let maxY = -1
+  const step = Math.max(1, Math.floor(Math.min(width, height) / 180))
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const i = (y * width + x) * 4
+      const lum = pixels[i] * 0.2126 + pixels[i + 1] * 0.7152 + pixels[i + 2] * 0.0722
+      if (lum <= 16) continue
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
+  }
+  if (maxX < minX || maxY < minY) return null
+  const box = {
+    x: minX / width,
+    y: minY / height,
+    w: (maxX - minX + step) / width,
+    h: (maxY - minY + step) / height,
+  }
+  if (box.w < 0.45 || box.h < 0.45) return null
+  if (box.w > 0.97 && box.h > 0.97) return null
+  return box
 }
 
 /** Fit outlines when the feed has not reported a map size yet. */

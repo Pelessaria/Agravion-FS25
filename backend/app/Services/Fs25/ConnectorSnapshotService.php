@@ -214,6 +214,7 @@ final class ConnectorSnapshotService
      *   ok: bool,
      *   error: string|null,
      *   mapSize: int|null,
+     *   mapFrame: array{worldX: float, worldZ: float, originX: float, originZ: float, scaleX: float, scaleZ: float, padX: float, padZ: float}|null,
      *   precisionFarming: bool|null,
      *   geometryAt: string|null,
      *   stateAt: string|null,

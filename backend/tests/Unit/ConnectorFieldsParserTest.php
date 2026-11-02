@@ -26,6 +26,7 @@ class ConnectorFieldsParserTest extends TestCase
         $merged = ConnectorFieldsParser::merge($geometry, $state);
 
         $this->assertSame(2048, $merged['mapSize']);
+        $this->assertNull($merged['mapFrame']);
         $this->assertTrue($merged['precisionFarming']);
         $this->assertSame('2026-11-02T18:00:00Z', $merged['geometryAt']);
         $this->assertCount(3, $merged['fields']);
@@ -44,6 +45,21 @@ class ConnectorFieldsParserTest extends TestCase
         $this->assertSame([], $merged['fields'][2]['points']);
         $this->assertFalse($merged['fields'][2]['owned']);
         $this->assertNull($merged['fields'][2]['scanned']);
+    }
+
+    public function test_map_frame_is_read_when_the_connector_reports_the_pda_placement(): void
+    {
+        $geometry = <<<'XML'
+        <fieldsGeometry schema="1" mapSize="4096" mapWorldX="4096.0" mapWorldZ="4096.0" mapOriginX="2048.0" mapOriginZ="2048.0" mapScaleX="0.8340" mapScaleZ="0.8420" mapPadX="0.0820" mapPadZ="0.0800" writtenAtUtc="2026-11-02T18:00:00Z">
+          <field id="1" cx="0" cz="0" points="0,0 1,0 1,1" />
+        </fieldsGeometry>
+        XML;
+
+        $merged = ConnectorFieldsParser::merge($geometry, '');
+
+        $this->assertEqualsWithDelta(0.834, $merged['mapFrame']['scaleX'], 0.0001);
+        $this->assertEqualsWithDelta(0.08, $merged['mapFrame']['padZ'], 0.0001);
+        $this->assertEqualsWithDelta(2048.0, $merged['mapFrame']['originX'], 0.0001);
     }
 
     public function test_fruit_manifest_rejects_paths_outside_the_fruit_folder(): void

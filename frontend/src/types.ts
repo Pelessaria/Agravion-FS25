@@ -221,6 +221,17 @@ export interface FieldsResponse {
   ok: boolean
   error?: string | null
   mapSize: number | null
+  /** PDA placement reported by the connector. Absent on older snapshots. */
+  mapFrame?: {
+    worldX: number
+    worldZ: number
+    originX: number
+    originZ: number
+    scaleX: number
+    scaleZ: number
+    padX: number
+    padZ: number
+  } | null
   precisionFarming: boolean | null
   geometryAt: string | null
   stateAt: string | null
