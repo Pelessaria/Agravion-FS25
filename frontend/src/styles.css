@@ -2723,14 +2723,15 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-stage svg { overflow: visible; }
 .fields-stage svg text, .fields-stage svg image { pointer-events: none; }
 .field-shape {
-  fill-opacity: 0.46;
-  stroke: rgba(255, 255, 255, 0.9);
-  stroke-width: 0.28;
+  fill-opacity: 0.16;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 1.35px;
+  vector-effect: non-scaling-stroke;
   cursor: pointer;
 }
-.field-shape.is-other { fill-opacity: 0.18; stroke: rgba(255, 255, 255, 0.35); }
-.field-shape.is-selected { stroke: #c6e88a; stroke-width: 0.55; fill-opacity: 0.68; }
-.field-shape:hover { fill-opacity: 0.62; }
+.field-shape.is-other { fill-opacity: 0.08; stroke: rgba(255, 255, 255, 0.5); }
+.field-shape.is-selected { stroke: #d4f09a; stroke-width: 2.2px; fill-opacity: 0.42; }
+.field-shape:hover { fill-opacity: 0.34; }
 .field-label { cursor: pointer; }
 .field-label rect { fill: rgba(8, 12, 10, 0.78); }
 .field-label text { fill: #f3f5f4; font-weight: 600; }

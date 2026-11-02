@@ -639,7 +639,7 @@ export const de = {
     signedInAs: "Angemeldet als",
   },
   fields: {
-    lead: "Karte mit allen Feldumrissen. In der Fläche stehen Nummer und Fruchtsymbol. Ein Klick öffnet die Werte aus Basispiel und Precision Farming.",
+    lead: "Karte mit allen Feldumrissen. Nummer und Fruchtsymbol stehen in der Fläche, sobald sie hineinpassen. Ein Klick öffnet die Werte aus Basispiel und Precision Farming.",
     loading: "Felder werden geladen",
     updated: "Feldstand {{time}}",
     count: "Felder",

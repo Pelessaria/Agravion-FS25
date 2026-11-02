@@ -641,7 +641,7 @@ export const en = {
     signedInAs: "Signed in as",
   },
   fields: {
-    lead: "Map of every field outline. The number and crop symbol sit on the area. A click lists base-game and Precision Farming values.",
+    lead: "Map of every field outline. The number and crop symbol appear on an area once it is large enough to hold them. A click lists base-game and Precision Farming values.",
     loading: "Loading fields",
     updated: "Field state {{time}}",
     count: "Fields",

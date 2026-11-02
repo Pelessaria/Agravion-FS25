@@ -34,11 +34,15 @@ type DrawnField = {
   polygon: string | null
   x: number
   y: number
+  box: { x: number; y: number; w: number; h: number } | null
   mine: boolean
   iconUrl: string | null
   mark: string
   label: string
 }
+
+const LABEL_HEIGHT = 2.7
+const LABEL_SCREEN_PX = 15
 
 function CropMark({ kind }: { kind: string }) {
   if (kind === "wheat" || kind === "barley" || kind === "oat" || kind === "rice" || kind === "ricelonggrain") {
@@ -104,12 +108,23 @@ function projectFields(fields: FieldSnapshot[], frame: MapFrame, farmId: number 
     const projected = field.points.map(([x, z]) => projectPoint(x, z, frame))
     const label = center ?? (projected.length > 0 ? projected[0] : null)
     const key = cropKey(field.fruitName)
+    let minX = Infinity
+    let maxX = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
+    for (const point of projected) {
+      minX = Math.min(minX, point.x)
+      maxX = Math.max(maxX, point.x)
+      minY = Math.min(minY, point.y)
+      maxY = Math.max(maxY, point.y)
+    }
     return {
       id: field.id,
       color: cropColor(field),
       polygon: projected.length >= 3 ? projected.map((point) => `${point.x},${point.y}`).join(" ") : null,
       x: label?.x ?? 50,
       y: label?.y ?? 50,
+      box: projected.length > 0 ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : null,
       mine: farmId == null || field.farmId === farmId,
       iconUrl: field.iconUrl,
       mark: key,
@@ -334,6 +349,44 @@ export function FieldsPage() {
   )
 }
 
+function labelWidth(digits: number) {
+  return 2.4 + digits * 1.15 + 0.7
+}
+
+/** Screen-sized labels, kept only when the field can hold one without covering a neighbour. */
+function visibleLabels(fields: DrawnField[], zoom: number, sidePx: number, pinnedId: number | null) {
+  if (sidePx <= 0) return { scale: 0, ids: new Set<number>() }
+  const scale = (LABEL_SCREEN_PX / (sidePx * Math.max(zoom, 1))) * 100 / LABEL_HEIGHT
+  const ranked = [...fields].sort((a, b) => {
+    if (a.id === pinnedId) return -1
+    if (b.id === pinnedId) return 1
+    const area = (field: DrawnField) => (field.box ? field.box.w * field.box.h : 0)
+    return area(b) - area(a)
+  })
+  const placed: { x: number; y: number; w: number; h: number }[] = []
+  const ids = new Set<number>()
+  for (const field of ranked) {
+    const width = labelWidth(field.label.length) * scale
+    const height = LABEL_HEIGHT * scale
+    const labelBox = { x: field.x - width / 2, y: field.y - height / 2, w: width, h: height }
+    const pinned = field.id === pinnedId
+    const fits = field.box != null && field.box.w >= width && field.box.h >= height
+    if (!pinned && !fits) continue
+    const gap = 0.15 * scale
+    const blocked = placed.some(
+      (other) =>
+        labelBox.x < other.x + other.w + gap &&
+        labelBox.x + labelBox.w + gap > other.x &&
+        labelBox.y < other.y + other.h + gap &&
+        labelBox.y + labelBox.h + gap > other.y,
+    )
+    if (blocked && !pinned) continue
+    placed.push(labelBox)
+    ids.add(field.id)
+  }
+  return { scale, ids }
+}
+
 function FieldMap({
   fields,
   mapUrl,
@@ -358,14 +411,19 @@ function FieldMap({
   const { t } = useTranslation()
   const [dragging, setDragging] = useState(false)
   const [mapFailed, setMapFailed] = useState(false)
+  const [zoom, setZoom] = useState(1)
+  const [sidePx, setSidePx] = useState(0)
+  const [hoverId, setHoverId] = useState<number | null>(null)
   const fieldsRef = useRef(fields)
   const selectedRef = useRef(selectedId)
+  const labels = useMemo(() => visibleLabels(fields, zoom, sidePx, selectedId), [fields, selectedId, sidePx, zoom])
 
   function apply() {
     const el = stageRef.current
     if (!el) return
     const { x, y, k } = cam.current
     el.style.transform = `translate(${x}px, ${y}px) scale(${k})`
+    setZoom((prev) => (prev === k ? prev : k))
   }
 
   function zoomAt(next: number, px: number, py: number) {
@@ -414,6 +472,19 @@ function FieldMap({
   useEffect(() => {
     const viewport = viewportRef.current
     if (!viewport) return
+    const measure = () => {
+      const next = Math.min(viewport.clientWidth, viewport.clientHeight)
+      setSidePx((prev) => (prev === next ? prev : next))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
       const rect = viewport.getBoundingClientRect()
@@ -444,15 +515,25 @@ function FieldMap({
         }}
         onPointerMove={(event) => {
           const current = drag.current
-          if (!current) return
-          const dx = event.clientX - current.x
-          const dy = event.clientY - current.y
-          if (Math.abs(dx) + Math.abs(dy) > 4) current.moved = true
-          if (cam.current.k <= 1) return
-          cam.current.x = current.cx + dx
-          cam.current.y = current.cy + dy
-          apply()
+          if (current) {
+            const dx = event.clientX - current.x
+            const dy = event.clientY - current.y
+            if (Math.abs(dx) + Math.abs(dy) > 4) current.moved = true
+            if (cam.current.k <= 1) return
+            cam.current.x = current.cx + dx
+            cam.current.y = current.cy + dy
+            apply()
+            return
+          }
+          const hit = document
+            .elementsFromPoint(event.clientX, event.clientY)
+            .find((node) => node instanceof Element && node.closest("[data-field]"))
+          const node = hit instanceof Element ? hit.closest("[data-field]") : null
+          const nextId = Number(node?.getAttribute("data-field"))
+          const hover = Number.isFinite(nextId) ? nextId : null
+          setHoverId((prev) => (prev === hover ? prev : hover))
         }}
+        onPointerLeave={() => setHoverId(null)}
         onPointerUp={(event) => {
           const current = drag.current
           drag.current = null
@@ -514,17 +595,18 @@ function FieldMap({
               )
             })}
             {fields.map((field) => {
+              if (labels.scale <= 0 || (!labels.ids.has(field.id) && field.id !== hoverId)) return null
               const digits = field.label.length
-              const width = 2.4 + digits * 1.15 + 0.7
+              const width = labelWidth(digits)
               const iconX = -width / 2 + 0.28
               return (
                 <g
                   key={`label-${field.id}`}
                   data-field={field.id}
                   className={field.mine ? "field-label" : "field-label is-other"}
-                  transform={`translate(${field.x} ${field.y})`}
+                  transform={`translate(${field.x} ${field.y}) scale(${labels.scale})`}
                 >
-                  <rect x={-width / 2} y={-1.35} width={width} height={2.7} rx="0.45" />
+                  <rect x={-width / 2} y={-1.35} width={width} height={LABEL_HEIGHT} rx="0.45" />
                   {field.iconUrl ? (
                     <image href={field.iconUrl} x={iconX} y={-1.05} width="2.1" height="2.1" />
                   ) : (
