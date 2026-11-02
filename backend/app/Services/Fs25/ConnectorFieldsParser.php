@@ -1,0 +1,286 @@
+<?php
+
+namespace App\Services\Fs25;
+
+/**
+ * Parse connector field geometry, field state, and fruit-icon manifest.
+ * Missing attributes stay null — the UI shows them as unavailable.
+ */
+final class ConnectorFieldsParser
+{
+    /**
+     * @return array{
+     *   mapSize: int|null,
+     *   precisionFarming: bool|null,
+     *   geometryAt: string|null,
+     *   stateAt: string|null,
+     *   fields: list<array<string, mixed>>
+     * }
+     */
+    public static function merge(string $geometryXml, string $stateXml): array
+    {
+        $geometry = self::fields($geometryXml);
+        $state = self::fields($stateXml);
+        $ids = array_values(array_unique(array_merge(array_keys($geometry), array_keys($state))));
+        usort($ids, static fn (int $a, int $b): int => $a <=> $b);
+
+        $fields = [];
+        foreach ($ids as $id) {
+            $geo = $geometry[$id] ?? [];
+            $row = $state[$id] ?? [];
+            $points = $geo['points'] ?? [];
+            $centerX = $geo['centerX'] ?? null;
+            $centerZ = $geo['centerZ'] ?? null;
+            if (($centerX === null || $centerZ === null) && is_array($points) && count($points) >= 3) {
+                $sx = 0.0;
+                $sz = 0.0;
+                foreach ($points as $point) {
+                    $sx += $point[0];
+                    $sz += $point[1];
+                }
+                $centerX ??= $sx / count($points);
+                $centerZ ??= $sz / count($points);
+            }
+
+            $fields[] = [
+                'id' => $id,
+                'centerX' => $centerX,
+                'centerZ' => $centerZ,
+                'areaHa' => $row['areaHa'] ?? $geo['areaHa'] ?? null,
+                'points' => is_array($points) ? $points : [],
+                'farmId' => $row['farmId'] ?? null,
+                'farmlandId' => $row['farmlandId'] ?? null,
+                'owned' => $row['owned'] ?? null,
+                'fruitName' => $row['fruitName'] ?? null,
+                'fruitTitle' => $row['fruitTitle'] ?? null,
+                'fruitIcon' => $row['fruitIcon'] ?? null,
+                'growth' => $row['growth'] ?? null,
+                'growthMax' => $row['growthMax'] ?? null,
+                'harvestMin' => $row['harvestMin'] ?? null,
+                'harvestMax' => $row['harvestMax'] ?? null,
+                'crop' => $row['crop'] ?? null,
+                'ground' => $row['ground'] ?? null,
+                'weed' => $row['weed'] ?? null,
+                'weedFactor' => $row['weedFactor'] ?? null,
+                'stones' => $row['stones'] ?? null,
+                'spray' => $row['spray'] ?? null,
+                'sprayType' => $row['sprayType'] ?? null,
+                'lime' => $row['lime'] ?? null,
+                'roller' => $row['roller'] ?? null,
+                'plow' => $row['plow'] ?? null,
+                'stubble' => $row['stubble'] ?? null,
+                'water' => $row['water'] ?? null,
+                'scanned' => $row['scanned'] ?? null,
+                'nitrogen' => $row['nitrogen'] ?? null,
+                'nitrogenTarget' => $row['nitrogenTarget'] ?? null,
+                'ph' => $row['ph'] ?? null,
+                'phTarget' => $row['phTarget'] ?? null,
+                'soil' => $row['soil'] ?? null,
+                'soilName' => $row['soilName'] ?? null,
+            ];
+        }
+
+        return [
+            'mapSize' => self::intRoot($geometryXml, 'mapSize'),
+            'precisionFarming' => self::boolRoot($stateXml, 'precisionFarming'),
+            'geometryAt' => self::root($geometryXml, 'writtenAtUtc'),
+            'stateAt' => self::root($stateXml, 'writtenAtUtc'),
+            'fields' => $fields,
+        ];
+    }
+
+    /**
+     * @return list<array{key: string, iconFile: string}>
+     */
+    public static function fruitIcons(string $xml): array
+    {
+        if (! preg_match_all('/<fruit\b([^>]*)\/?>/i', $xml, $matches)) {
+            return [];
+        }
+
+        $icons = [];
+        foreach ($matches[1] as $blob) {
+            $key = self::safeKey(self::attr($blob, 'key') ?? '');
+            $iconFile = self::attr($blob, 'iconFile');
+            if ($key === null || $iconFile === null || str_contains($iconFile, '..')) {
+                continue;
+            }
+            $iconFile = ltrim(str_replace('\\', '/', $iconFile), '/');
+            if (! str_starts_with($iconFile, 'icons/fruits/')) {
+                continue;
+            }
+            $icons[] = ['key' => $key, 'iconFile' => $iconFile];
+        }
+
+        return $icons;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private static function fields(string $xml): array
+    {
+        $xml = trim($xml);
+        if ($xml === '' || ! preg_match_all('/<field\b([^>]*)\/?>/i', $xml, $matches)) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($matches[1] as $blob) {
+            $id = self::intAttr($blob, 'id');
+            if ($id === null || $id <= 0) {
+                continue;
+            }
+            $rows[$id] = [
+                'centerX' => self::floatAttr($blob, 'cx'),
+                'centerZ' => self::floatAttr($blob, 'cz'),
+                'areaHa' => self::floatAttr($blob, 'areaHa'),
+                'points' => self::points(self::attr($blob, 'points')),
+                'farmId' => self::positiveInt(self::intAttr($blob, 'farmId')),
+                'farmlandId' => self::positiveInt(self::intAttr($blob, 'farmlandId')),
+                'owned' => self::boolAttr($blob, 'owned'),
+                'fruitName' => self::attr($blob, 'fruit'),
+                'fruitTitle' => self::attr($blob, 'fruitTitle'),
+                'fruitIcon' => self::safeKey(self::attr($blob, 'fruitIcon') ?? ''),
+                'growth' => self::intAttr($blob, 'growth'),
+                'growthMax' => self::intAttr($blob, 'growthMax'),
+                'harvestMin' => self::intAttr($blob, 'harvestMin'),
+                'harvestMax' => self::intAttr($blob, 'harvestMax'),
+                'crop' => self::attr($blob, 'crop'),
+                'ground' => self::intAttr($blob, 'ground'),
+                'weed' => self::intAttr($blob, 'weed'),
+                'weedFactor' => self::floatAttr($blob, 'weedFactor'),
+                'stones' => self::intAttr($blob, 'stones'),
+                'spray' => self::intAttr($blob, 'spray'),
+                'sprayType' => self::intAttr($blob, 'sprayType'),
+                'lime' => self::intAttr($blob, 'lime'),
+                'roller' => self::intAttr($blob, 'roller'),
+                'plow' => self::intAttr($blob, 'plow'),
+                'stubble' => self::intAttr($blob, 'stubble'),
+                'water' => self::intAttr($blob, 'water'),
+                'scanned' => self::boolAttr($blob, 'scanned'),
+                'nitrogen' => self::floatAttr($blob, 'n'),
+                'nitrogenTarget' => self::floatAttr($blob, 'nTarget'),
+                'ph' => self::floatAttr($blob, 'ph'),
+                'phTarget' => self::floatAttr($blob, 'phTarget'),
+                'soil' => self::intAttr($blob, 'soil'),
+                'soilName' => self::attr($blob, 'soilName'),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return list<array{0: float, 1: float}>
+     */
+    private static function points(?string $raw): array
+    {
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        $points = [];
+        foreach (preg_split('/\s+/', trim($raw)) ?: [] as $pair) {
+            $bits = explode(',', $pair, 2);
+            if (count($bits) < 2 || ! is_numeric($bits[0]) || ! is_numeric($bits[1])) {
+                continue;
+            }
+            $points[] = [(float) $bits[0], (float) $bits[1]];
+            if (count($points) >= 64) {
+                break;
+            }
+        }
+
+        return $points;
+    }
+
+    private static function root(string $xml, string $name): ?string
+    {
+        if (! preg_match('/<(?:fieldsGeometry|fieldsState|fruitsManifest)\b([^>]*)>/i', $xml, $m)) {
+            return null;
+        }
+
+        return self::attr($m[1], $name);
+    }
+
+    private static function intRoot(string $xml, string $name): ?int
+    {
+        $raw = self::root($xml, $name);
+        if ($raw === null || ! is_numeric($raw)) {
+            return null;
+        }
+        $value = (int) $raw;
+
+        return $value > 0 ? $value : null;
+    }
+
+    private static function boolRoot(string $xml, string $name): ?bool
+    {
+        $raw = self::root($xml, $name);
+        if ($raw === null) {
+            return null;
+        }
+
+        return $raw === '1' || strcasecmp($raw, 'true') === 0;
+    }
+
+    private static function attr(string $blob, string $key): ?string
+    {
+        if (! preg_match('/\b'.preg_quote($key, '/').'="([^"]*)"/i', $blob, $m)) {
+            return null;
+        }
+        $value = trim(html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+
+        return $value === '' ? null : $value;
+    }
+
+    private static function intAttr(string $blob, string $key): ?int
+    {
+        $raw = self::attr($blob, $key);
+        if ($raw === null || ! is_numeric($raw)) {
+            return null;
+        }
+
+        return (int) $raw;
+    }
+
+    private static function floatAttr(string $blob, string $key): ?float
+    {
+        $raw = self::attr($blob, $key);
+        if ($raw === null || ! is_numeric($raw)) {
+            return null;
+        }
+
+        return (float) $raw;
+    }
+
+    private static function boolAttr(string $blob, string $key): ?bool
+    {
+        $raw = self::attr($blob, $key);
+        if ($raw === null) {
+            return null;
+        }
+
+        return $raw === '1' || strcasecmp($raw, 'true') === 0;
+    }
+
+    private static function positiveInt(?int $value): ?int
+    {
+        if ($value === null || $value <= 0) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    private static function safeKey(string $key): ?string
+    {
+        $key = strtolower($key);
+        if (! preg_match('/^[a-z0-9_-]{1,64}$/', $key)) {
+            return null;
+        }
+
+        return $key;
+    }
+}

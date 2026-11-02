@@ -178,6 +178,55 @@ export interface Vehicle {
   observedAt: string
 }
 
+export interface FieldSnapshot {
+  id: number
+  centerX: number | null
+  centerZ: number | null
+  areaHa: number | null
+  /** World X/Z pairs. Empty when the connector has not sent an outline. */
+  points: [number, number][]
+  farmId: number | null
+  farmlandId: number | null
+  owned: boolean | null
+  fruitName: string | null
+  fruitTitle: string | null
+  fruitIcon: string | null
+  iconUrl: string | null
+  growth: number | null
+  growthMax: number | null
+  harvestMin: number | null
+  harvestMax: number | null
+  crop: string | null
+  ground: number | null
+  weed: number | null
+  weedFactor: number | null
+  stones: number | null
+  spray: number | null
+  sprayType: number | null
+  lime: number | null
+  roller: number | null
+  plow: number | null
+  stubble: number | null
+  water: number | null
+  scanned: boolean | null
+  nitrogen: number | null
+  nitrogenTarget: number | null
+  ph: number | null
+  phTarget: number | null
+  soil: number | null
+  soilName: string | null
+}
+
+export interface FieldsResponse {
+  ok: boolean
+  error?: string | null
+  mapSize: number | null
+  precisionFarming: boolean | null
+  geometryAt: string | null
+  stateAt: string | null
+  fields: FieldSnapshot[]
+}
+
 export interface ActivityItem {
   id: string
   workspaceId: string

@@ -1,4 +1,4 @@
-import type { AppUser, Farm, HostProtocol, Vehicle, Workspace, WorkspaceSavegame } from "./types"
+import type { AppUser, Farm, FieldsResponse, HostProtocol, Vehicle, Workspace, WorkspaceSavegame } from "./types"
 
 export class ApiError extends Error {
   status: number
@@ -159,6 +159,10 @@ export type IconSyncResult = {
   errors?: number
   listed?: number
   detail?: string | null
+}
+
+export async function apiWorkspaceFields(id: string): Promise<FieldsResponse> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(id)}/fields`)
 }
 
 export async function apiWorkspaceVehicles(

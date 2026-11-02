@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
 <modDesc descVersion="114">
     <author>AgriVision</author>
-    <version>0.1.2.11</version>
+    <version>0.1.3.0</version>
     <title>
         <en>AgriVision Connector</en>
         <de>AgriVision Connector</de>
     </title>
     <description>
-        <en>Writes farm and vehicle snapshots for the AgriVision dashboard under modSettings. No credentials. No money commands in v0.</en>
-        <de>Schreibt Hof- und Fahrzeug-Snapshots für das AgriVision-Dashboard unter modSettings. Keine Zugangsdaten. Keine Geldbefehle in v0.</de>
+        <en>Writes farm, vehicle, and field snapshots for the dashboard under modSettings. No credentials. No money commands in v0.</en>
+        <de>Schreibt Hof-, Fahrzeug- und Feld-Snapshots für das Dashboard unter modSettings. Keine Zugangsdaten. Keine Geldbefehle in v0.</de>
     </description>
     <iconFilename>icon.png</iconFilename>
     <multiplayer supported="true" />
     <extraSourceFiles>
+        <sourceFile filename="FieldSnapshot.lua" />
         <sourceFile filename="AgriVisionConnector.lua" />
     </extraSourceFiles>
 </modDesc>

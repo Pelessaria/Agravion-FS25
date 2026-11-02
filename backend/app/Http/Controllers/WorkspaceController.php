@@ -139,6 +139,45 @@ class WorkspaceController extends Controller
         ]);
     }
 
+    public function fields(string $workspace, ConnectorSnapshotService $connector): JsonResponse
+    {
+        $row = $this->findWorkspace($workspace);
+        if ($row->lifecycle === 'disabled') {
+            return response()->json([
+                'ok' => false,
+                'error' => 'disabled',
+                'mapSize' => null,
+                'precisionFarming' => null,
+                'geometryAt' => null,
+                'stateAt' => null,
+                'fields' => [],
+            ]);
+        }
+
+        return response()->json($connector->readFields($row));
+    }
+
+    public function fruitIcon(string $workspace, string $fruitKey, ConnectorSnapshotService $connector): BinaryFileResponse|Response
+    {
+        $row = $this->findWorkspace($workspace);
+        $path = $connector->fruitIconPath($row, $fruitKey);
+        if ($path === null) {
+            return response('', 404);
+        }
+
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'webp' => 'image/webp',
+            default => 'image/png',
+        };
+
+        return response()->file($path, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
+    }
+
     public function vehicles(string $workspace, WorkspaceFeedService $feeds): JsonResponse
     {
         $row = $this->findWorkspace($workspace);
@@ -275,12 +314,14 @@ class WorkspaceController extends Controller
         ]);
     }
 
-    public function map(string $workspace, WorkspaceFeedService $feeds): Response
+    public function map(Request $request, string $workspace, WorkspaceFeedService $feeds): Response
     {
         $row = $this->findWorkspace($workspace);
+        $size = max(128, min(1024, (int) $request->query('size', 384)));
+        $quality = max(30, min(80, (int) $request->query('quality', 45)));
 
         try {
-            $jpeg = $feeds->fetchMapJpeg($row);
+            $jpeg = $feeds->fetchMapJpeg($row, $quality, $size);
         } catch (Throwable $e) {
             return response($e->getMessage(), 502)
                 ->header('Content-Type', 'text/plain; charset=UTF-8');
@@ -288,7 +329,7 @@ class WorkspaceController extends Controller
 
         return response($jpeg, 200, [
             'Content-Type' => 'image/jpeg',
-            'Cache-Control' => 'private, max-age=60',
+            'Cache-Control' => 'private, max-age='.($size >= 512 ? '120' : '60'),
         ]);
     }
 

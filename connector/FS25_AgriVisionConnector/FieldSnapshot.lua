@@ -1,0 +1,925 @@
+--[[
+  Field geometry + state for the dashboard.
+
+  Geometry (polygon outlines) is collected once per field set and written to
+  state/fields_geometry.xml. Crop / ground / Precision Farming state is swept
+  in small batches and written about once a minute to state/fields_state.xml.
+
+  Read patterns for field state and Precision Farming samples follow
+  FS25_LiveDataConnector FieldProvider. Polygon points are read from the
+  field's polygonPoints nodes or a density-map polygon when the engine
+  exposes one. Missing values are omitted — the dashboard shows them as
+  unavailable.
+
+  Dedicated-server sandbox: no io.open reads, no per-frame scans.
+]]
+
+FieldSnapshot = {}
+
+FieldSnapshot.STATE_EVERY_MS = 60000
+FieldSnapshot.GEOMETRY_BUDGET = 20
+FieldSnapshot.STATE_BUDGET_PF = 12
+FieldSnapshot.STATE_BUDGET = 48
+FieldSnapshot.MAX_POINTS = 48
+
+local function log(msg)
+    print("AgriVisionConnector: " .. tostring(msg))
+end
+
+local function safeCall(fn, ...)
+    if fn == nil then
+        return nil
+    end
+    local ok, a, b, c = pcall(fn, ...)
+    if ok then
+        return a, b, c
+    end
+    return nil
+end
+
+local function safeMethod(object, methodName, ...)
+    if object == nil or object[methodName] == nil then
+        return nil
+    end
+    return safeCall(object[methodName], object, ...)
+end
+
+local function num(value)
+    return tonumber(value)
+end
+
+local function round(value, places)
+    local n = tonumber(value)
+    if n == nil then
+        return nil
+    end
+    local scale = 10 ^ (places or 1)
+    return math.floor(n * scale + 0.5) / scale
+end
+
+local function xmlEscape(connector, value)
+    if connector ~= nil and connector.xmlEscape ~= nil then
+        return connector:xmlEscape(value)
+    end
+    return tostring(value or "")
+end
+
+local function attr(connector, name, value)
+    if value == nil then
+        return ""
+    end
+    return string.format(' %s="%s"', name, xmlEscape(connector, value))
+end
+
+local function decodeNitrogen(value)
+    value = tonumber(value)
+    if value == nil then
+        return nil
+    end
+    -- Precision Farming may expose the density-map index instead of kg/ha.
+    if value >= 1 and value <= 45 and value % 1 == 0 then
+        return math.max(0, (value - 1) * 5)
+    end
+    return value
+end
+
+local function decodePh(value)
+    value = tonumber(value)
+    if value == nil then
+        return nil
+    end
+    -- Precision Farming pH density-map index 1..31 -> actual pH.
+    if value >= 1 and value <= 31 and value % 1 == 0 then
+        return (value * 0.125) + 4.375
+    end
+    return value
+end
+
+local function getPrecisionFarming()
+    if type(FS25_precisionFarming) == "table" and FS25_precisionFarming.g_precisionFarming ~= nil then
+        return FS25_precisionFarming.g_precisionFarming
+    end
+    if g_precisionFarming ~= nil then
+        return g_precisionFarming
+    end
+    return nil
+end
+
+local function terrainSize()
+    if g_currentMission == nil then
+        return nil
+    end
+    local size = num(g_currentMission.terrainSize)
+    if size ~= nil and size > 64 then
+        return size
+    end
+    return nil
+end
+
+local function pushPoint(points, x, z)
+    x = num(x)
+    z = num(z)
+    if x == nil or z == nil then
+        return
+    end
+    local n = #points
+    if n > 0 then
+        local last = points[n]
+        if math.abs(last.x - x) < 0.05 and math.abs(last.z - z) < 0.05 then
+            return
+        end
+    end
+    if n >= 512 then
+        return
+    end
+    points[n + 1] = { x = x, z = z }
+end
+
+local function pointsFromNode(node)
+    local points = {}
+    if node == nil or node == 0 or getNumOfChildren == nil or getChildAt == nil or getWorldTranslation == nil then
+        return points
+    end
+    local count = safeCall(getNumOfChildren, node)
+    count = num(count)
+    if count == nil or count <= 0 then
+        return points
+    end
+    local limit = math.min(count, 512)
+    for i = 0, limit - 1 do
+        local child = safeCall(getChildAt, node, i)
+        if child ~= nil then
+            local x, _, z = safeCall(getWorldTranslation, child)
+            pushPoint(points, x, z)
+        end
+    end
+    return points
+end
+
+local function findPolygonNode(root)
+    if root == nil or root == 0 or getName == nil or getNumOfChildren == nil or getChildAt == nil then
+        return nil
+    end
+    local stack = { root }
+    local seen = 0
+    while #stack > 0 and seen < 64 do
+        local node = table.remove(stack)
+        seen = seen + 1
+        local name = safeCall(getName, node)
+        if name == "polygonPoints" then
+            return node
+        end
+        local count = num(safeCall(getNumOfChildren, node))
+        if count ~= nil and count > 0 then
+            local limit = math.min(count, 16)
+            for i = 0, limit - 1 do
+                local child = safeCall(getChildAt, node, i)
+                if child ~= nil then
+                    stack[#stack + 1] = child
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function pointsFromVertices(vertices)
+    local points = {}
+    if type(vertices) ~= "table" then
+        return points
+    end
+    if type(vertices[1]) == "number" and type(vertices[2]) == "number" then
+        local i = 1
+        while type(vertices[i]) == "number" and type(vertices[i + 1]) == "number" and #points < 512 do
+            pushPoint(points, vertices[i], vertices[i + 1])
+            i = i + 2
+        end
+        return points
+    end
+    local limit = math.min(#vertices, 512)
+    for i = 1, limit do
+        local v = vertices[i]
+        if type(v) == "table" then
+            pushPoint(points, v.x or v[1], v.z or v.y or v[2])
+        end
+    end
+    return points
+end
+
+local function pointsFromTable(candidate)
+    if type(candidate) ~= "table" then
+        return {}
+    end
+    if type(candidate.vertices) == "table" then
+        local fromVertices = pointsFromVertices(candidate.vertices)
+        if #fromVertices >= 3 then
+            return fromVertices
+        end
+    end
+    if type(candidate.points) == "table" then
+        local fromPoints = pointsFromTable(candidate.points)
+        if #fromPoints >= 3 then
+            return fromPoints
+        end
+    end
+    return pointsFromVertices(candidate)
+end
+
+local function collectPolygon(field)
+    local roots = {
+        field.rootNode,
+        field.fieldNode,
+        field.node,
+        field.i3dNode,
+    }
+    if field.nameIndicator ~= nil and getParent ~= nil then
+        local parent = safeCall(getParent, field.nameIndicator)
+        roots[#roots + 1] = parent
+    end
+
+    for _, root in ipairs(roots) do
+        local node = findPolygonNode(root)
+        local points = pointsFromNode(node)
+        if #points >= 3 then
+            return points
+        end
+    end
+
+    if type(field.polygonPoints) == "number" then
+        local points = pointsFromNode(field.polygonPoints)
+        if #points >= 3 then
+            return points
+        end
+    end
+
+    local tables = {
+        field.densityMapPolygon,
+        field.polygon,
+        field.points,
+        field.fieldPoints,
+        field.polygonPoints,
+    }
+    for _, candidate in ipairs(tables) do
+        local points = pointsFromTable(candidate)
+        if #points >= 3 then
+            return points
+        end
+    end
+
+    return {}
+end
+
+local function polygonArea(points)
+    if #points < 3 then
+        return nil
+    end
+    local sum = 0
+    local count = #points
+    for i = 1, count do
+        local p1 = points[i]
+        local p2 = points[(i % count) + 1]
+        sum = sum + (p1.x * p2.z - p2.x * p1.z)
+    end
+    local area = math.abs(sum) * 0.5
+    if area > 0 then
+        return area
+    end
+    return nil
+end
+
+local function fieldAreaHa(field, points)
+    if field ~= nil then
+        local ha = num(field.areaHa) or num(field.fieldAreaHa) or num(field.hectares)
+        if ha ~= nil and ha > 0 then
+            return ha
+        end
+        local sqm = num(field.areaSqm) or num(field.fieldAreaSqm) or num(field.fieldArea) or num(field.sizeSqm)
+        if sqm ~= nil and sqm > 0 then
+            return sqm / 10000
+        end
+        if field.getArea ~= nil then
+            local value = num(safeMethod(field, "getArea"))
+            if value ~= nil and value > 0 then
+                return value / 10000
+            end
+        end
+    end
+    local area = polygonArea(points)
+    if area ~= nil then
+        return area / 10000
+    end
+    return nil
+end
+
+local function simplify(points)
+    local count = #points
+    if count <= FieldSnapshot.MAX_POINTS then
+        return points
+    end
+    local out = {}
+    local step = (count - 1) / (FieldSnapshot.MAX_POINTS - 1)
+    for i = 0, FieldSnapshot.MAX_POINTS - 1 do
+        local index = math.floor(i * step) + 1
+        if index > count then
+            index = count
+        end
+        out[#out + 1] = points[index]
+    end
+    return out
+end
+
+local function pointString(points)
+    local parts = {}
+    for _, point in ipairs(points) do
+        parts[#parts + 1] = string.format("%.1f,%.1f", point.x, point.z)
+    end
+    if #parts == 0 then
+        return nil
+    end
+    return table.concat(parts, " ")
+end
+
+local function centroid(points)
+    if #points == 0 then
+        return nil, nil
+    end
+    local sx, sz = 0, 0
+    for _, point in ipairs(points) do
+        sx = sx + point.x
+        sz = sz + point.z
+    end
+    return sx / #points, sz / #points
+end
+
+local function indexFields()
+    local ids = {}
+    local byId = {}
+    if g_fieldManager == nil or g_fieldManager.fields == nil then
+        return ids, byId
+    end
+    for _, field in pairs(g_fieldManager.fields) do
+        if field ~= nil and field.getId ~= nil then
+            local id = num(safeMethod(field, "getId"))
+            if id ~= nil then
+                ids[#ids + 1] = id
+                byId[id] = field
+            end
+        end
+    end
+    table.sort(ids, function(a, b)
+        return a < b
+    end)
+    return ids, byId
+end
+
+local function collectGeometry(field, id)
+    local points = {}
+    local cx, cz = nil, nil
+    if field ~= nil then
+        points = collectPolygon(field)
+        if field.getCenterOfFieldWorldPosition ~= nil then
+            local a, b = safeMethod(field, "getCenterOfFieldWorldPosition")
+            cx = num(a)
+            cz = num(b)
+        end
+    end
+    local area = fieldAreaHa(field, points)
+    if cx == nil or cz == nil then
+        cx, cz = centroid(points)
+    end
+    return {
+        id = id,
+        cx = round(cx, 1),
+        cz = round(cz, 1),
+        areaHa = round(area, 2),
+        points = pointString(simplify(points)),
+    }
+end
+
+local function fruitKey(name)
+    if name == nil then
+        return nil
+    end
+    local key = string.lower(tostring(name))
+    key = string.gsub(key, "[^a-z0-9]", "")
+    if key == "" then
+        return nil
+    end
+    return key
+end
+
+local function fruitInfo(fruitTypeIndex)
+    if fruitTypeIndex == nil or g_fruitTypeManager == nil or g_fruitTypeManager.getFruitTypeByIndex == nil then
+        return nil, nil, nil
+    end
+    local fruit = safeMethod(g_fruitTypeManager, "getFruitTypeByIndex", fruitTypeIndex)
+    if fruit == nil then
+        return nil, nil, nil
+    end
+    local title = nil
+    if type(fruit.fillType) == "table" then
+        title = fruit.fillType.title or fruit.fillType.name
+    end
+    return fruit.name, title, fruit
+end
+
+local function fruitIconSource(fruit)
+    if type(fruit) ~= "table" or type(fruit.fillType) ~= "table" then
+        return nil
+    end
+    local fill = fruit.fillType
+    return fill.hudOverlayFilename or fill.hudOverlayFilenameSmall or fill.iconFilename
+end
+
+local function queueFruitIcon(connector, fruit)
+    local key = fruitKey(fruit ~= nil and fruit.name or nil)
+    local src = fruitIconSource(fruit)
+    if key == nil or src == nil or src == "" or connector.fruitsIconsDir == nil then
+        return key
+    end
+    connector.pendingFruitIcons = connector.pendingFruitIcons or {}
+    if connector.copiedFruitIcons ~= nil and connector.copiedFruitIcons[key] then
+        return key
+    end
+    connector.pendingFruitIcons[key] = src
+    return key
+end
+
+local function classifyCrop(fruit, growthState)
+    if fruit == nil then
+        return "noCrop"
+    end
+    growthState = num(growthState) or 0
+    if fruit.getIsWithered ~= nil then
+        local withered = safeMethod(fruit, "getIsWithered", growthState)
+        if withered == true then
+            return "withered"
+        end
+    end
+    if fruit.getIsCut ~= nil then
+        local cut = safeMethod(fruit, "getIsCut", growthState)
+        if cut == true then
+            return "cut"
+        end
+    end
+    local minHarvest = num(fruit.minHarvestingGrowthState)
+    local maxHarvest = num(fruit.maxHarvestingGrowthState)
+    if minHarvest ~= nil and maxHarvest ~= nil and growthState >= minHarvest and growthState <= maxHarvest then
+        return "harvestReady"
+    end
+    if growthState > 0 then
+        return "growing"
+    end
+    return "planted"
+end
+
+local function resolveFarmland(x, z)
+    if x == nil or z == nil or g_farmlandManager == nil or g_farmlandManager.getFarmlandAtWorldPosition == nil then
+        return nil
+    end
+    return safeMethod(g_farmlandManager, "getFarmlandAtWorldPosition", x, z)
+end
+
+local function ownership(field, fieldState, cx, cz)
+    local farmlandId, farmId = nil, nil
+    if field ~= nil and type(field.farmland) == "table" then
+        farmlandId = num(field.farmland.id)
+        farmId = num(field.farmland.farmId)
+    end
+    if fieldState ~= nil then
+        if farmlandId == nil then
+            farmlandId = num(fieldState.farmlandId)
+        end
+        if farmId == nil then
+            farmId = num(fieldState.ownerFarmId)
+        end
+    end
+    if g_farmlandManager ~= nil and farmlandId ~= nil and g_farmlandManager.getFarmlandById ~= nil then
+        local farmland = safeMethod(g_farmlandManager, "getFarmlandById", farmlandId)
+        if farmland ~= nil and num(farmland.farmId) ~= nil then
+            farmId = num(farmland.farmId)
+        end
+    end
+    if farmId == nil then
+        local farmland = resolveFarmland(cx, cz)
+        if farmland ~= nil then
+            farmlandId = num(farmland.id) or farmlandId
+            farmId = num(farmland.farmId)
+        end
+    end
+    if farmId ~= nil and farmId <= 0 then
+        farmId = nil
+    end
+    return farmlandId, farmId
+end
+
+local function samplePrecision(precisionFarming, farmlandId, cx, cz, fruitTypeIndex)
+    if precisionFarming == nil or cx == nil or cz == nil then
+        return { available = precisionFarming ~= nil }
+    end
+    local soilMap = precisionFarming.soilMap
+    local nitrogenMap = precisionFarming.nitrogenMap
+    local phMap = precisionFarming.pHMap
+    if soilMap == nil or nitrogenMap == nil or phMap == nil then
+        return { available = true }
+    end
+
+    local function sampleAt(x, z)
+        if farmlandId ~= nil then
+            local farmland = resolveFarmland(x, z)
+            if farmland == nil or num(farmland.id) ~= farmlandId then
+                return nil
+            end
+        end
+        local soilType = num(safeMethod(soilMap, "getTypeIndexAtWorldPos", x, z))
+        if soilType == nil or soilType <= 0 then
+            return nil
+        end
+        local n = decodeNitrogen(safeMethod(nitrogenMap, "getLevelAtWorldPos", x, z))
+        local nTarget = decodeNitrogen(safeMethod(nitrogenMap, "getTargetLevelAtWorldPos", x, z))
+        if (nTarget == nil or nTarget <= 0) and fruitTypeIndex ~= nil then
+            nTarget = decodeNitrogen(safeMethod(nitrogenMap, "getTargetLevelAtWorldPos", x, z, fruitTypeIndex))
+        end
+        local ph = decodePh(safeMethod(phMap, "getLevelAtWorldPos", x, z))
+        local phTarget = decodePh(safeMethod(phMap, "getOptimalPHValueForSoilTypeIndex", soilType))
+        return soilType, n, nTarget, ph, phTarget
+    end
+
+    local soil, n, nTarget, ph, phTarget = sampleAt(cx, cz)
+    if soil == nil then
+        return { available = true, scanned = false }
+    end
+
+    local sumN, countN = 0, 0
+    local sumNt, countNt = 0, 0
+    local sumPh, countPh = 0, 0
+    local sumPht, countPht = 0, 0
+    local soils = {}
+
+    local function take(soilType, nitrogen, nitrogenTarget, phValue, phTarget)
+        if soilType == nil then
+            return
+        end
+        soils[soilType] = (soils[soilType] or 0) + 1
+        if nitrogen ~= nil and nitrogen >= 0 then
+            sumN = sumN + nitrogen
+            countN = countN + 1
+        end
+        if nitrogenTarget ~= nil and nitrogenTarget > 0 then
+            sumNt = sumNt + nitrogenTarget
+            countNt = countNt + 1
+        end
+        if phValue ~= nil and phValue > 0 then
+            sumPh = sumPh + phValue
+            countPh = countPh + 1
+        end
+        if phTarget ~= nil and phTarget > 0 then
+            sumPht = sumPht + phTarget
+            countPht = countPht + 1
+        end
+    end
+
+    take(soil, n, nTarget, ph, phTarget)
+    local offsets = { { 18, 0 }, { -18, 0 }, { 0, 18 }, { 0, -18 } }
+    for _, offset in ipairs(offsets) do
+        local soilType, nitrogen, nitrogenTarget, phValue, phTargetValue = sampleAt(cx + offset[1], cz + offset[2])
+        take(soilType, nitrogen, nitrogenTarget, phValue, phTargetValue)
+    end
+
+    local bestSoil, bestCount = soil, 0
+    for soilType, count in pairs(soils) do
+        if count > bestCount then
+            bestSoil = soilType
+            bestCount = count
+        end
+    end
+
+    local soilName = nil
+    local types = soilMap.soilTypes or soilMap.types
+    if type(types) == "table" then
+        local entry = types[bestSoil]
+        if type(entry) == "table" then
+            local name = entry.name or entry.title
+            if type(name) == "string" and name ~= "" then
+                soilName = name
+            end
+        elseif type(entry) == "string" and entry ~= "" then
+            soilName = entry
+        end
+    end
+
+    return {
+        available = true,
+        scanned = true,
+        nitrogen = countN > 0 and (sumN / countN) or nil,
+        nitrogenTarget = countNt > 0 and (sumNt / countNt) or nil,
+        ph = countPh > 0 and (sumPh / countPh) or nil,
+        phTarget = countPht > 0 and (sumPht / countPht) or nil,
+        soil = bestSoil,
+        soilName = soilName,
+    }
+end
+
+local function collectState(connector, field, id)
+    local record = { id = id }
+    if field == nil then
+        return record
+    end
+    local cx, cz = nil, nil
+    if field.getCenterOfFieldWorldPosition ~= nil then
+        local a, b = safeMethod(field, "getCenterOfFieldWorldPosition")
+        cx = num(a)
+        cz = num(b)
+    end
+    local fieldState = safeMethod(field, "getFieldState")
+    local farmlandId, farmId = ownership(field, fieldState, cx, cz)
+    record.farmlandId = farmlandId
+    record.farmId = farmId
+    if farmId ~= nil then
+        record.owned = farmId > 0 and "1" or "0"
+    elseif farmlandId ~= nil then
+        record.owned = "0"
+    end
+
+    if fieldState ~= nil then
+        local fruitTypeIndex = num(fieldState.fruitTypeIndex)
+        local fruitName, fruitTitle, fruit = fruitInfo(fruitTypeIndex)
+        record.fruit = fruitName
+        record.fruitTitle = fruitTitle
+        record.fruitIcon = queueFruitIcon(connector, fruit)
+        record.growth = num(fieldState.growthState)
+        if fruit ~= nil then
+            record.growthMax = num(fruit.numGrowthStates)
+            record.harvestMin = num(fruit.minHarvestingGrowthState)
+            record.harvestMax = num(fruit.maxHarvestingGrowthState)
+            record.crop = classifyCrop(fruit, record.growth)
+        else
+            record.crop = "noCrop"
+        end
+        record.ground = num(fieldState.groundType)
+        record.weed = num(fieldState.weedState)
+        record.weedFactor = round(fieldState.weedFactor, 3)
+        record.stones = num(fieldState.stoneLevel)
+        record.spray = num(fieldState.sprayLevel)
+        record.sprayType = num(fieldState.sprayType)
+        record.lime = num(fieldState.limeLevel)
+        record.roller = num(fieldState.rollerLevel)
+        record.plow = num(fieldState.plowLevel)
+        record.stubble = num(fieldState.stubbleShredLevel)
+        record.water = num(fieldState.waterLevel)
+    end
+
+    local precision = samplePrecision(getPrecisionFarming(), farmlandId, cx, cz, fieldState ~= nil and fieldState.fruitTypeIndex or nil)
+    record.precisionAvailable = precision.available == true
+    if precision.available == true then
+        record.scanned = precision.scanned == true and "1" or "0"
+        record.n = round(precision.nitrogen, 1)
+        record.nTarget = round(precision.nitrogenTarget, 1)
+        record.ph = round(precision.ph, 2)
+        record.phTarget = round(precision.phTarget, 2)
+        record.soil = precision.soil
+        record.soilName = precision.soilName
+    end
+    return record
+end
+
+local function writeGeometry(connector, ids, records)
+    local lines = {}
+    for _, id in ipairs(ids) do
+        local row = records[id]
+        if row ~= nil then
+            lines[#lines + 1] = string.format(
+                "<field%s%s%s%s%s />",
+                attr(connector, "id", row.id),
+                attr(connector, "cx", row.cx),
+                attr(connector, "cz", row.cz),
+                attr(connector, "areaHa", row.areaHa),
+                attr(connector, "points", row.points)
+            )
+        end
+    end
+    local body = string.format(
+        '<?xml version="1.0" encoding="utf-8"?>\n<fieldsGeometry schema="1" generation="%s" writtenAtUtc="%s"%s>\n%s\n</fieldsGeometry>\n',
+        tostring(connector:nextGeneration()),
+        xmlEscape(connector, (getDate ~= nil and getDate("%Y-%m-%dT%H:%M:%SZ")) or "unknown"),
+        attr(connector, "mapSize", terrainSize() ~= nil and math.floor(terrainSize()) or nil),
+        table.concat(lines, "\n")
+    )
+    connector:writeTextFile(connector.stateDir .. "fields_geometry.xml", body)
+end
+
+local function stateLine(connector, row)
+    return string.format(
+        "<field%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s />",
+        attr(connector, "id", row.id),
+        attr(connector, "farmId", row.farmId),
+        attr(connector, "farmlandId", row.farmlandId),
+        attr(connector, "owned", row.owned),
+        attr(connector, "fruit", row.fruit),
+        attr(connector, "fruitTitle", row.fruitTitle),
+        attr(connector, "fruitIcon", row.fruitIcon),
+        attr(connector, "growth", row.growth),
+        attr(connector, "growthMax", row.growthMax),
+        attr(connector, "harvestMin", row.harvestMin),
+        attr(connector, "harvestMax", row.harvestMax),
+        attr(connector, "crop", row.crop),
+        attr(connector, "ground", row.ground),
+        attr(connector, "weed", row.weed),
+        attr(connector, "weedFactor", row.weedFactor),
+        attr(connector, "stones", row.stones),
+        attr(connector, "spray", row.spray),
+        attr(connector, "sprayType", row.sprayType),
+        attr(connector, "lime", row.lime),
+        attr(connector, "roller", row.roller),
+        attr(connector, "plow", row.plow),
+        attr(connector, "stubble", row.stubble),
+        attr(connector, "water", row.water),
+        attr(connector, "scanned", row.scanned),
+        attr(connector, "n", row.n),
+        attr(connector, "nTarget", row.nTarget),
+        attr(connector, "ph", row.ph),
+        attr(connector, "phTarget", row.phTarget),
+        attr(connector, "soil", row.soil),
+        attr(connector, "soilName", row.soilName)
+    )
+end
+
+local function writeState(connector, ids, records)
+    local lines = {}
+    local precision = "0"
+    for _, id in ipairs(ids) do
+        local row = records[id]
+        if row ~= nil then
+            if row.precisionAvailable then
+                precision = "1"
+            end
+            lines[#lines + 1] = stateLine(connector, row)
+        end
+    end
+    local body = string.format(
+        '<?xml version="1.0" encoding="utf-8"?>\n<fieldsState schema="1" generation="%s" writtenAtUtc="%s" precisionFarming="%s">\n%s\n</fieldsState>\n',
+        tostring(connector:nextGeneration()),
+        xmlEscape(connector, (getDate ~= nil and getDate("%Y-%m-%dT%H:%M:%SZ")) or "unknown"),
+        precision,
+        table.concat(lines, "\n")
+    )
+    connector:writeTextFile(connector.stateDir .. "fields_state.xml", body)
+end
+
+local function copyPendingFruitIcons(connector, budget)
+    local pending = connector.pendingFruitIcons
+    if pending == nil or connector.copyIconFile == nil or connector.fruitsIconsDir == nil then
+        return
+    end
+    connector.copiedFruitIcons = connector.copiedFruitIcons or {}
+    local copied = 0
+    for key, src in pairs(pending) do
+        if copied >= budget then
+            break
+        end
+        local ext = "dds"
+        if connector.iconExtFromPath ~= nil then
+            ext = connector:iconExtFromPath(src)
+        end
+        local dest = connector.fruitsIconsDir .. key .. "." .. ext
+        local ok = connector:copyIconFile(src, dest)
+        if ok then
+            connector.copiedFruitIcons[key] = "icons/fruits/" .. key .. "." .. ext
+            pending[key] = nil
+            copied = copied + 1
+        end
+    end
+end
+
+local function writeFruitManifest(connector)
+    local copied = connector.copiedFruitIcons
+    if copied == nil then
+        return
+    end
+    local lines = {}
+    for key, rel in pairs(copied) do
+        lines[#lines + 1] = string.format(
+            "<fruit%s%s />",
+            attr(connector, "key", key),
+            attr(connector, "iconFile", rel)
+        )
+    end
+    table.sort(lines)
+    local fingerprint = table.concat(lines, "")
+    if fingerprint == connector.fruitManifestFingerprint then
+        return
+    end
+    local body = string.format(
+        '<?xml version="1.0" encoding="utf-8"?>\n<fruitsManifest schema="1" generation="%s" writtenAtUtc="%s">\n%s\n</fruitsManifest>\n',
+        tostring(connector:nextGeneration()),
+        xmlEscape(connector, (getDate ~= nil and getDate("%Y-%m-%dT%H:%M:%SZ")) or "unknown"),
+        fingerprint
+    )
+    connector:writeTextFile(connector.stateDir .. "fruits_manifest.xml", body)
+    connector.fruitManifestFingerprint = fingerprint
+end
+
+local function geometryFingerprint(ids, records)
+    local parts = {}
+    for _, id in ipairs(ids) do
+        local row = records[id]
+        if row ~= nil then
+            parts[#parts + 1] = tostring(row.id) .. ":" .. tostring(row.points or "")
+        end
+    end
+    return table.concat(parts, "|")
+end
+
+function FieldSnapshot.writeIfDue(connector)
+    if connector == nil or connector.stateDir == nil or connector.writeTextFile == nil then
+        return
+    end
+    if not connector.fruitDirReady and connector.fruitsIconsDir ~= nil and createFolder ~= nil then
+        pcall(createFolder, connector.fruitsIconsDir)
+        connector.fruitDirReady = true
+    end
+
+    local ids, byId = indexFields()
+    if #ids == 0 then
+        return
+    end
+
+    if connector.fieldGeometryDone and connector.fieldGeometryCount ~= #ids then
+        connector.fieldGeometryDone = false
+        connector.fieldGeoIndex = 1
+        connector.fieldGeoRecords = {}
+        connector.fieldGeometryFingerprint = nil
+        connector.fieldStateIndex = nil
+        connector.fieldStateRecords = nil
+        connector.fieldStateIds = nil
+    end
+
+    if not connector.fieldGeometryDone then
+        connector.fieldGeoRecords = connector.fieldGeoRecords or {}
+        connector.fieldGeoIndex = connector.fieldGeoIndex or 1
+        local budget = FieldSnapshot.GEOMETRY_BUDGET
+        while budget > 0 and connector.fieldGeoIndex <= #ids do
+            local id = ids[connector.fieldGeoIndex]
+            connector.fieldGeoRecords[id] = collectGeometry(byId[id], id)
+            connector.fieldGeoIndex = connector.fieldGeoIndex + 1
+            budget = budget - 1
+        end
+        if connector.fieldGeoIndex > #ids then
+            local fingerprint = geometryFingerprint(ids, connector.fieldGeoRecords)
+            if fingerprint ~= connector.fieldGeometryFingerprint then
+                writeGeometry(connector, ids, connector.fieldGeoRecords)
+                connector.fieldGeometryFingerprint = fingerprint
+                if not connector.fieldGeometryLogged then
+                    log(string.format("fields geometry written count=%s", tostring(#ids)))
+                    connector.fieldGeometryLogged = true
+                end
+            end
+            connector.fieldGeometryDone = true
+            connector.fieldGeometryCount = #ids
+            connector.fieldGeoRecords = nil
+        end
+        return
+    end
+
+    connector.fieldAccumMs = (connector.fieldAccumMs or 0) + (connector.TICK_MS or 5000)
+    if connector.fieldStateIds ~= nil and #connector.fieldStateIds ~= #ids then
+        connector.fieldStateIndex = nil
+        connector.fieldStateRecords = nil
+        connector.fieldStateIds = nil
+    end
+
+    if connector.fieldStateIndex == nil then
+        if connector.fieldStateWritten and connector.fieldAccumMs < FieldSnapshot.STATE_EVERY_MS then
+            copyPendingFruitIcons(connector, 2)
+            writeFruitManifest(connector)
+            return
+        end
+        connector.fieldAccumMs = 0
+        connector.fieldStateIndex = 1
+        connector.fieldStateRecords = {}
+        connector.fieldStateIds = ids
+    end
+
+    local budget = getPrecisionFarming() ~= nil and FieldSnapshot.STATE_BUDGET_PF or FieldSnapshot.STATE_BUDGET
+    local stateIds = connector.fieldStateIds
+    while budget > 0 and connector.fieldStateIndex <= #stateIds do
+        local id = stateIds[connector.fieldStateIndex]
+        connector.fieldStateRecords[id] = collectState(connector, byId[id], id)
+        connector.fieldStateIndex = connector.fieldStateIndex + 1
+        budget = budget - 1
+    end
+
+    if connector.fieldStateIndex > #stateIds then
+        writeState(connector, stateIds, connector.fieldStateRecords)
+        copyPendingFruitIcons(connector, 4)
+        writeFruitManifest(connector)
+        if not connector.fieldStateLogged then
+            log(string.format("fields state written count=%s", tostring(#stateIds)))
+            connector.fieldStateLogged = true
+        end
+        connector.fieldStateWritten = true
+        connector.fieldStateIndex = nil
+        connector.fieldStateRecords = nil
+        connector.fieldStateIds = nil
+    end
+end

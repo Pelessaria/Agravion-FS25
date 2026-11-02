@@ -12,7 +12,7 @@
 
 AgriVisionConnector = {}
 AgriVisionConnector.MOD_NAME = "FS25_AgriVisionConnector"
-AgriVisionConnector.VERSION = "0.1.2.11"
+AgriVisionConnector.VERSION = "0.1.3.0"
 AgriVisionConnector.SCHEMA = "1"
 AgriVisionConnector.TICK_MS = 5000
 AgriVisionConnector.HELLO_EVERY_MS = 60000
@@ -62,6 +62,7 @@ function AgriVisionConnector:init()
     self.stateDir = self.baseDir .. "state/"
     self.iconsDir = self.baseDir .. "icons/"
     self.storeIconsDir = self.iconsDir .. "store/"
+    self.fruitsIconsDir = self.iconsDir .. "fruits/"
     self.modIconsDir = self.iconsDir .. "mods/"
     self.pendingStoreIcons = {}
     self.copiedStorePaths = {}
@@ -76,6 +77,7 @@ function AgriVisionConnector:init()
     ensureDir(self.stateDir)
     ensureDir(self.iconsDir)
     ensureDir(self.storeIconsDir)
+    ensureDir(self.fruitsIconsDir)
     -- mod icons deferred (needed later for mod list UI, not vehicle overview)
 
     -- Drop empty leftover command.xml so the Engine does not spam
@@ -1203,6 +1205,12 @@ function AgriVisionConnector:tick(dt)
             self:writeHello()
         end
         self:processCommands()
+        if FieldSnapshot ~= nil and FieldSnapshot.writeIfDue ~= nil then
+            local okFields, errFields = pcall(FieldSnapshot.writeIfDue, self)
+            if not okFields then
+                log("fields error: " .. tostring(errFields))
+            end
+        end
         local hasVehicles = self:missionHasVehicles()
         if not self.vehiclesPrimed and not hasVehicles then
             if self.waitLogAccumMs >= self.WAIT_LOG_EVERY_MS then

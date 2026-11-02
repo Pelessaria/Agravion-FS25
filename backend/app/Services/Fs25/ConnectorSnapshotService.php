@@ -173,6 +173,21 @@ final class ConnectorSnapshotService
             $detail = $detail ?? $e->getMessage();
         }
 
+        foreach (['fields_geometry.xml', 'fields_state.xml', 'fruits_manifest.xml'] as $file) {
+            try {
+                $remote = $client->read($base.'/state/'.$file);
+                $this->storeLocalIfChanged($this->localStateDir($workspace).'/'.$file, $remote);
+            } catch (Throwable) {
+                // Field files are optional until the connector that writes them is installed.
+            }
+        }
+
+        try {
+            $this->pullFruitIcons($client, $workspace, $base);
+        } catch (Throwable) {
+            // Fruit icons are decorative. The map still renders without them.
+        }
+
         if (! is_file($this->localVehiclesPath($workspace)) && ! is_file($this->localManifestPath($workspace))) {
             return [
                 'changed' => false,
@@ -190,6 +205,103 @@ final class ConnectorSnapshotService
             'vehicles' => $vehiclesChanged,
             'manifest' => $manifestChanged,
         ];
+    }
+
+    /**
+     * Local field cache only. Page loads do not open FTP.
+     *
+     * @return array{
+     *   ok: bool,
+     *   error: string|null,
+     *   mapSize: int|null,
+     *   precisionFarming: bool|null,
+     *   geometryAt: string|null,
+     *   stateAt: string|null,
+     *   fields: list<array<string, mixed>>
+     * }
+     */
+    public function readFields(Workspace $workspace): array
+    {
+        $geoPath = $this->localStateDir($workspace).'/fields_geometry.xml';
+        $statePath = $this->localStateDir($workspace).'/fields_state.xml';
+        $geometryXml = is_file($geoPath) ? (string) file_get_contents($geoPath) : '';
+        $stateXml = is_file($statePath) ? (string) file_get_contents($statePath) : '';
+        $merged = ConnectorFieldsParser::merge($geometryXml, $stateXml);
+        if ($merged['mapSize'] === null && $workspace->map_size) {
+            $merged['mapSize'] = (int) $workspace->map_size;
+        }
+
+        foreach ($merged['fields'] as &$field) {
+            $key = $field['fruitIcon'] ?? null;
+            $field['iconUrl'] = null;
+            if (is_string($key) && $this->fruitIconPath($workspace, $key) !== null) {
+                $field['iconUrl'] = '/api/workspaces/'.$workspace->public_id.'/connector/fruits/'.$key;
+            }
+        }
+        unset($field);
+
+        $merged['ok'] = $geometryXml !== '' || $stateXml !== '';
+        $merged['error'] = $merged['ok'] ? null : 'missing';
+
+        return $merged;
+    }
+
+    private function pullFruitIcons(HostFileClient $client, Workspace $workspace, string $base): void
+    {
+        $manifest = $this->localStateDir($workspace).'/fruits_manifest.xml';
+        if (! is_file($manifest)) {
+            return;
+        }
+
+        $entries = ConnectorFieldsParser::fruitIcons((string) file_get_contents($manifest));
+        $dir = storage_path('app/connector/'.$workspace->public_id.'/icons/fruits');
+        $pulled = 0;
+        foreach ($entries as $entry) {
+            if ($pulled >= 6) {
+                return;
+            }
+            if ($this->fruitIconPath($workspace, $entry['key']) !== null) {
+                continue;
+            }
+            try {
+                $bytes = $client->read($base.'/'.$entry['iconFile'], 8);
+            } catch (Throwable) {
+                continue;
+            }
+            $pulled++;
+            $ext = strtolower(pathinfo($entry['iconFile'], PATHINFO_EXTENSION));
+            if ($ext === 'dds') {
+                $converted = DdsToPng::convert($bytes);
+                if ($converted === null) {
+                    continue;
+                }
+                $bytes = $converted;
+                $ext = 'png';
+            } elseif ($ext === 'jpeg') {
+                $ext = 'jpg';
+            } elseif (! in_array($ext, ['png', 'jpg', 'webp'], true)) {
+                continue;
+            }
+            File::ensureDirectoryExists($dir);
+            File::put($dir.'/'.$entry['key'].'.'.$ext, $bytes);
+        }
+    }
+
+    public function fruitIconPath(Workspace $workspace, string $key): ?string
+    {
+        $key = strtolower($key);
+        if (! preg_match('/^[a-z0-9_-]{1,64}$/', $key)) {
+            return null;
+        }
+        $dir = storage_path('app/connector/'.$workspace->public_id.'/icons/fruits');
+        foreach (['png', 'jpg', 'jpeg', 'webp'] as $ext) {
+            $path = $dir.'/'.$key.'.'.$ext;
+            if (is_file($path)) {
+                return $path;
+            }
+        }
+
+        return null;
     }
 
     /**
