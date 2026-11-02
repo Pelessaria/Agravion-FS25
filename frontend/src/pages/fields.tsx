@@ -324,6 +324,7 @@ export function FieldsPage() {
                   ? `${workspace.mapPreviewPath}?size=1024&quality=70`
                   : null
               }
+              live={liveMode}
               selectedId={selectedId}
               focusToken={focusToken}
               label={workspace.mapName ?? t("fields.mapLabel")}
@@ -354,7 +355,7 @@ function labelWidth(digits: number) {
 
 /** Labels stay large enough to read and grow when zooming in, without covering a neighbour. */
 function labelScreenPx(zoom: number) {
-  return Math.min(48, 34 * Math.sqrt(Math.max(zoom, 1)))
+  return Math.min(48, 30 * Math.sqrt(Math.max(zoom, 1)))
 }
 
 function visibleLabels(fields: DrawnField[], zoom: number, sidePx: number, pinnedId: number | null) {
@@ -373,7 +374,11 @@ function visibleLabels(fields: DrawnField[], zoom: number, sidePx: number, pinne
     const height = LABEL_HEIGHT * scale
     const labelBox = { x: field.x - width / 2, y: field.y - height / 2, w: width, h: height }
     const pinned = field.id === pinnedId
-    const fits = field.box != null && field.box.w >= width && field.box.h >= height
+  const fits =
+    field.box != null &&
+    field.box.w * field.box.h >= width * height * 0.42 &&
+    field.box.w >= width * 0.55 &&
+    field.box.h >= height * 0.45
     if (!pinned && !fits) continue
     const gap = 0.15 * scale
     const blocked = placed.some(
@@ -393,6 +398,7 @@ function visibleLabels(fields: DrawnField[], zoom: number, sidePx: number, pinne
 function FieldMap({
   fields,
   mapUrl,
+  live,
   selectedId,
   focusToken,
   label,
@@ -401,6 +407,7 @@ function FieldMap({
 }: {
   fields: DrawnField[]
   mapUrl: string | null
+  live: boolean
   selectedId: number | null
   focusToken: number
   label: string
@@ -471,6 +478,12 @@ function FieldMap({
     if (focusToken === 0) return
     focusField(fieldsRef.current.find((field) => field.id === selectedRef.current))
   }, [focusToken])
+
+  useEffect(() => {
+    if (!mapFailed) return
+    const timer = window.setTimeout(() => setMapFailed(false), 20_000)
+    return () => window.clearTimeout(timer)
+  }, [mapFailed])
 
   useEffect(() => {
     const viewport = viewportRef.current
@@ -579,6 +592,8 @@ function FieldMap({
                 }
               }}
             />
+          ) : live ? (
+            <p className="fields-map-note">{t("fields.mapUnavailable")}</p>
           ) : (
             <div className="fields-terrain" aria-hidden="true" />
           )}

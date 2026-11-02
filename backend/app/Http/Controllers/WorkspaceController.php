@@ -323,10 +323,21 @@ class WorkspaceController extends Controller
 
         try {
             $jpeg = $feeds->fetchMapJpeg($row, $quality, $size);
-        } catch (Throwable $e) {
-            return response($e->getMessage(), 502)
+        } catch (Throwable) {
+            $cached = $this->cachedMapJpeg($row->public_id, $size, $quality);
+            if ($cached !== null) {
+                return response($cached, 200, [
+                    'Content-Type' => 'image/jpeg',
+                    'Cache-Control' => 'private, max-age=30',
+                    'X-Map-Stale' => '1',
+                ]);
+            }
+
+            return response('Feed connection failed.', 502)
                 ->header('Content-Type', 'text/plain; charset=UTF-8');
         }
+
+        $this->storeMapJpeg($row->public_id, $size, $quality, $jpeg);
 
         return response($jpeg, 200, [
             'Content-Type' => 'image/jpeg',
@@ -514,5 +525,37 @@ class WorkspaceController extends Controller
         $minutes = $totalMinutes % 60;
 
         return sprintf('%02d:%02d', $hours, $minutes);
+    }
+
+    private function mapCachePath(string $publicId, int $size, int $quality): string
+    {
+        return storage_path('app/map-cache/'.$publicId.'-'.$size.'-'.$quality.'.jpg');
+    }
+
+    private function storeMapJpeg(string $publicId, int $size, int $quality, string $jpeg): void
+    {
+        if ($jpeg === '' || ! str_starts_with($jpeg, "\xFF\xD8")) {
+            return;
+        }
+        $path = $this->mapCachePath($publicId, $size, $quality);
+        $dir = dirname($path);
+        if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
+            return;
+        }
+        file_put_contents($path, $jpeg);
+    }
+
+    private function cachedMapJpeg(string $publicId, int $size, int $quality): ?string
+    {
+        $path = $this->mapCachePath($publicId, $size, $quality);
+        if (! is_file($path)) {
+            return null;
+        }
+        $jpeg = file_get_contents($path);
+        if (! is_string($jpeg) || $jpeg === '' || ! str_starts_with($jpeg, "\xFF\xD8")) {
+            return null;
+        }
+
+        return $jpeg;
     }
 }

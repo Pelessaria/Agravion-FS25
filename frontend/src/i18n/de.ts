@@ -661,6 +661,7 @@ export const de = {
     zoomIn: "Vergrößern",
     zoomOut: "Verkleinern",
     mapLabel: "Feldkarte",
+    mapUnavailable: "Das Kartenbild ist gerade nicht erreichbar. Die Feldumrisse bleiben aus dem letzten Stand.",
     selectHint: "Eine Fläche anklicken, um Frucht, Boden und Precision Farming zu sehen.",
     number: "Feld",
     numberValue: "Feld {{id}}",
