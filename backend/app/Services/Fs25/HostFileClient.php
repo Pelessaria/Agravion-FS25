@@ -299,28 +299,6 @@ final class HostFileClient
         }
     }
 
-    public function writeFile(string $path, string $localPath): void
-    {
-        try {
-            if ($this->ftp) {
-                $this->ftp->writeFile($path, $localPath);
-
-                return;
-            }
-            $contents = file_get_contents($localPath);
-            if ($contents === false) {
-                throw new RuntimeException('Lokale Datei nicht lesbar.');
-            }
-            $this->write($path, $contents);
-        } catch (Throwable $e) {
-            throw new RuntimeException(
-                HostConnectionError::format($e, 'Schreiben '.$path.' @ '.$this->endpointLabel()),
-                0,
-                $e
-            );
-        }
-    }
-
     public function write(string $path, string $contents): void
     {
         try {
