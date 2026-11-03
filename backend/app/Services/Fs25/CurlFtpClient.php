@@ -113,14 +113,11 @@ final class CurlFtpClient
 
     public function fileExists(string $path): bool
     {
+        // One directory listing. SIZE opens a second full login and is slower here
+        // than matching the name in the parent listing for a single check.
         $normalized = $this->normalizePath($path);
         if ($normalized === '') {
             return false;
-        }
-        try {
-            return $this->fileSize($path) >= 0;
-        } catch (RuntimeException) {
-            // Some servers reject SIZE. Fall back to one directory listing.
         }
         $parent = dirname(str_replace('\\', '/', $normalized));
         if ($parent === '.' || $parent === '/') {
@@ -138,6 +135,38 @@ final class CurlFtpClient
         }
 
         return false;
+    }
+
+    /**
+     * One FTP login: SIZE the zip, then download a small file such as hello.xml.
+     *
+     * @return array{size: int|null, body: string}
+     */
+    public function sizeAndRead(string $sizePath, string $readPath): array
+    {
+        $reply = '';
+        $ch = $this->open($this->urlForPath($readPath, false));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        curl_setopt($ch, CURLOPT_QUOTE, ['SIZE '.$this->commandPath($sizePath)]);
+        curl_setopt($ch, CURLOPT_VERBOSE, true);
+        curl_setopt($ch, CURLOPT_DEBUGFUNCTION, static function ($ch, int $type, string $data) use (&$reply): int {
+            if ($type === CURLINFO_HEADER_IN || $type === CURLINFO_TEXT) {
+                $reply .= $data;
+            }
+
+            return 0;
+        });
+        $body = curl_exec($ch);
+        curl_close($ch);
+        $size = null;
+        if (preg_match('/\b213\s+(\d+)/', $reply, $match)) {
+            $size = (int) $match[1];
+        }
+
+        return [
+            'size' => $size,
+            'body' => is_string($body) ? $body : '',
+        ];
     }
 
     /**
@@ -465,6 +494,14 @@ final class CurlFtpClient
         }
 
         return $url;
+    }
+
+    private function commandPath(string $path): string
+    {
+        $path = $this->normalizePath($path);
+        $full = $this->root === '' ? $path : ($path === '' ? $this->root : $this->root.'/'.$path);
+
+        return $this->normalizePath($full);
     }
 
     private function normalizePath(string $path): string

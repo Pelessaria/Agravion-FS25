@@ -281,22 +281,24 @@ final class RequiredModsService
 
         $modSettings = trim(str_replace('\\', '/', (string) ($access->remote_mod_settings_path ?? '')), '/');
         $modsDir = null;
+        $combined = null;
         if ($modSettings !== '') {
             $parent = trim(dirname($modSettings), '/.');
             $sibling = ($parent === '' || $parent === '.') ? 'mods' : $parent.'/mods';
-            foreach ($this->catalog() as $item) {
-                $candidate = $sibling.'/'.$item['zipName'];
+            $item = $this->catalog()[0] ?? null;
+            if ($item !== null) {
+                $helloPath = $modSettings.'/'.$item['folderName'].'/hello.xml';
                 try {
-                    if ($client->fileSize($candidate) > 0) {
+                    $combined = $client->sizeAndRead($sibling.'/'.$item['zipName'], $helloPath);
+                    if (($combined['size'] ?? null) !== null && $combined['size'] > 0) {
                         $modsDir = $sibling;
-                        break;
                     }
                 } catch (Throwable) {
-                    // The sibling folder is not the mods directory. Probe below.
+                    $combined = null;
                 }
             }
         }
-        if ($modsDir === null) {
+        if ($modsDir === null && $combined === null) {
             try {
                 $modsDir = ConnectorDeployService::resolveModsDirectory($client, $access);
             } catch (Throwable) {
@@ -309,13 +311,17 @@ final class RequiredModsService
             $isInstalled = false;
             if ($modsDir !== null) {
                 $path = rtrim($modsDir, '/').'/'.$item['zipName'];
-                $isInstalled = $client->fileExists($path);
-                if (! $isInstalled) {
-                    // Unpacked folder mods (rare on dedicated, but check).
-                    $folder = rtrim($modsDir, '/').'/'.$item['folderName'];
-                    if ($this->dirPresent($client, $folder)) {
-                        $isInstalled = true;
-                        $path = $folder;
+                $known = is_array($combined) && ($combined['size'] ?? 0) > 0;
+                if ($known) {
+                    $isInstalled = true;
+                } else {
+                    $isInstalled = $client->fileExists($path);
+                    if (! $isInstalled) {
+                        $folder = rtrim($modsDir, '/').'/'.$item['folderName'];
+                        if ($this->dirPresent($client, $folder)) {
+                            $isInstalled = true;
+                            $path = $folder;
+                        }
                     }
                 }
             }
@@ -324,7 +330,14 @@ final class RequiredModsService
             $zipVersions[$item['id']] = null;
 
             $hello[$item['id']] = ['present' => false, 'version' => null];
-            if ($item['id'] === 'FS25_AgriVisionConnector' && $modSettings !== '') {
+            if ($item['id'] === 'FS25_AgriVisionConnector' && is_array($combined)) {
+                $raw = (string) ($combined['body'] ?? '');
+                if ($raw !== '' && preg_match('/<agrivisionConnector\b[^>]*\bversion="([^"]+)"/i', $raw, $m)) {
+                    $hello[$item['id']] = ['present' => true, 'version' => trim($m[1]) ?: null];
+                } elseif ($raw !== '') {
+                    $hello[$item['id']] = ['present' => true, 'version' => null];
+                }
+            } elseif ($item['id'] === 'FS25_AgriVisionConnector' && $modSettings !== '') {
                 $connectorDir = $modSettings.'/'.$item['folderName'];
                 $helloPath = $connectorDir.'/hello.xml';
                 try {
@@ -336,11 +349,10 @@ final class RequiredModsService
                         }
                         $hello[$item['id']] = ['present' => true, 'version' => $version];
                     } elseif ($this->dirPresent($client, $connectorDir)) {
-                        // Folder created by a running connector even before the first hello flush.
                         $hello[$item['id']] = ['present' => true, 'version' => null];
                     }
                 } catch (Throwable) {
-                    // ignore — missing modSettings folder is normal until the mod has run once.
+                    // Missing modSettings is normal until the mod has run once.
                 }
             }
 

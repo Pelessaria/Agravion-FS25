@@ -180,6 +180,32 @@ final class HostFileClient
         }
     }
 
+    /**
+     * One FTP login: SIZE the zip, then download a small companion file.
+     *
+     * @return array{size: int|null, body: string}
+     */
+    public function sizeAndRead(string $sizePath, string $readPath): array
+    {
+        if ($this->ftp) {
+            return $this->ftp->sizeAndRead($sizePath, $readPath);
+        }
+        $body = '';
+        try {
+            $body = $this->read($readPath);
+        } catch (Throwable) {
+            $body = '';
+        }
+        $size = null;
+        try {
+            $size = $this->fileSize($sizePath);
+        } catch (Throwable) {
+            $size = null;
+        }
+
+        return ['size' => $size, 'body' => $body];
+    }
+
     public function fileSize(string $path): int
     {
         try {
