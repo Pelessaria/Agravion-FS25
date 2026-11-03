@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react"
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { ChevronDown, ChevronRight, Copy, Download, Play, RotateCcw, Square } from "lucide-react"
@@ -17,6 +17,34 @@ import {
 import { MissingWorkspace, PermissionBlock } from "../components/ui"
 import { useStore } from "../store"
 import { useWorkspaceRoute } from "../use-workspace"
+
+type ModSort = "name" | "version" | "author" | "size" | "active"
+
+function Tip({ text, children }: { text?: string; children: ReactNode }) {
+  if (!text) return children
+  return (
+    <span className="btn-tip" title={text}>
+      {children}
+    </span>
+  )
+}
+
+function versionParts(value: string): number[] {
+  const match = /(\d+(?:\.\d+)*)/.exec(value)
+  if (!match) return []
+  return match[1].split(".").map((part) => Number(part))
+}
+
+function compareVersions(left: string, right: string): number {
+  const a = versionParts(left)
+  const b = versionParts(right)
+  const count = Math.max(a.length, b.length)
+  for (let index = 0; index < count; index += 1) {
+    const diff = (a[index] ?? 0) - (b[index] ?? 0)
+    if (diff !== 0) return diff
+  }
+  return 0
+}
 
 function formatBytes(bytes: number | null | undefined): string {
   if (bytes == null || bytes < 0) return "—"
@@ -52,6 +80,8 @@ export function ServerPage() {
   const [settings, setSettings] = useState<ServerSettingField[]>([])
   const [modQuery, setModQuery] = useState("")
   const [modsOpen, setModsOpen] = useState(false)
+  const [sortKey, setSortKey] = useState<ModSort>("name")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -81,11 +111,50 @@ export function ServerPage() {
 
   const visibleMods = useMemo(() => {
     const needle = modQuery.trim().toLocaleLowerCase()
-    if (!needle) return snapshot.mods
-    return snapshot.mods.filter((mod) =>
-      [mod.title, mod.name, mod.author, mod.version].some((value) => (value ?? "").toLocaleLowerCase().includes(needle)),
-    )
-  }, [modQuery, snapshot.mods])
+    const filtered = needle
+      ? snapshot.mods.filter((mod) =>
+          [mod.title, mod.name, mod.author, mod.version, mod.hubVersion].some((value) => (value ?? "").toLocaleLowerCase().includes(needle)),
+        )
+      : snapshot.mods
+    const factor = sortDir === "asc" ? 1 : -1
+    const label = (mod: (typeof filtered)[number]) => mod.title || mod.name
+    return [...filtered].sort((a, b) => {
+      const tie = label(a).localeCompare(label(b), "de", { sensitivity: "base" })
+      if (sortKey === "name") return label(a).localeCompare(label(b), "de", { sensitivity: "base" }) * factor
+      if (sortKey === "author") {
+        const left = a.author ?? ""
+        const right = b.author ?? ""
+        if (left === "" && right !== "") return 1
+        if (left !== "" && right === "") return -1
+        const diff = left.localeCompare(right, "de", { sensitivity: "base" })
+        return (diff === 0 ? tie : diff) * factor
+      }
+      if (sortKey === "version") {
+        if (!a.version && b.version) return 1
+        if (a.version && !b.version) return -1
+        const diff = compareVersions(a.version ?? "", b.version ?? "")
+        return (diff === 0 ? tie : diff) * factor
+      }
+      if (sortKey === "size") {
+        if (a.bytes == null && b.bytes != null) return 1
+        if (a.bytes != null && b.bytes == null) return -1
+        const diff = (a.bytes ?? 0) - (b.bytes ?? 0)
+        return (diff === 0 ? tie : diff) * factor
+      }
+      const rank = (value: boolean | null | undefined) => (value === true ? 2 : value === false ? 0 : 1)
+      const diff = rank(a.active) - rank(b.active)
+      return (diff === 0 ? tie : diff) * factor
+    })
+  }, [modQuery, snapshot.mods, sortDir, sortKey])
+
+  function toggleSort(next: ModSort) {
+    if (sortKey === next) {
+      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"))
+      return
+    }
+    setSortKey(next)
+    setSortDir("asc")
+  }
 
   if (!workspace) return <MissingWorkspace />
   if (!allowed || !access) return <PermissionBlock />
@@ -253,9 +322,11 @@ export function ServerPage() {
           <h1>{t("modules.server")}</h1>
           <p>{t("server.lead")}</p>
         </div>
-        <button type="button" className="btn btn-secondary" onClick={() => void reload()} disabled={loading}>
-          {loading ? t("server.loading") : t("server.refresh")}
-        </button>
+        <Tip text={loading ? t("server.refreshBusy") : undefined}>
+          <button type="button" className="btn btn-secondary" onClick={() => void reload()} disabled={loading}>
+            {loading ? t("server.loading") : t("server.refresh")}
+          </button>
+        </Tip>
       </div>
       {error ? <p className="field-error">{error}</p> : null}
 
@@ -271,18 +342,30 @@ export function ServerPage() {
           {actions.map((action) => {
             const Icon = action.icon
             const ready = actionIds.has(action.id)
+            const disabled = !canWrite || !ready || busy !== ""
+            const reason = !disabled
+              ? undefined
+              : !canWrite
+                ? t("server.needWrite")
+                : busy !== ""
+                  ? t("server.busy")
+                  : action.id === "start" && snapshot.running === true
+                    ? t("server.startWhileRunning")
+                    : action.id !== "start" && snapshot.running === false
+                      ? t("server.stopWhileStopped")
+                      : t("server.actionMissing")
             return (
-              <button
-                key={action.id}
-                type="button"
-                className={action.className}
-                disabled={!canWrite || !ready || busy !== ""}
-                title={ready ? undefined : t("server.actionMissing")}
-                onClick={() => void run(action.id)}
-              >
-                <Icon className="icon" aria-hidden="true" />
-                {t(`server.${action.id}`)}
-              </button>
+              <Tip key={action.id} text={reason}>
+                <button
+                  type="button"
+                  className={action.className}
+                  disabled={disabled}
+                  onClick={() => void run(action.id)}
+                >
+                  <Icon className="icon" aria-hidden="true" />
+                  {t(`server.${action.id}`)}
+                </button>
+              </Tip>
             )
           })}
         </div>
@@ -310,118 +393,136 @@ export function ServerPage() {
             </button>
           </div>
         </div>
-        {modsOpen ? (
-          <>
-            {!snapshot.ftpConfigured ? <p className="hint">{t("server.missingFiles")}</p> : null}
-            <p className="hint">{snapshot.savegameRead ? t("server.savegameKnown") : t("server.savegameUnknown")}</p>
-            <div className="server-toolbar">
+        {!snapshot.ftpConfigured ? <p className="hint">{t("server.missingFiles")}</p> : null}
+        <p className="hint">{snapshot.savegameRead ? t("server.savegameKnown") : t("server.savegameUnknown")}</p>
+        <div className="server-toolbar">
+          <input
+            value={modQuery}
+            placeholder={t("server.modSearch")}
+            onChange={(event) => setModQuery(event.target.value)}
+          />
+          {canWrite ? (
+            <label className="btn btn-secondary">
+              {busy === "upload" ? t("server.loading") : t("server.upload")}
               <input
-                value={modQuery}
-                placeholder={t("server.modSearch")}
-                onChange={(event) => setModQuery(event.target.value)}
+                className="sr-only"
+                type="file"
+                accept=".zip,application/zip"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ""
+                  void upload(file)
+                }}
               />
-              {canWrite ? (
-                <label className="btn btn-secondary">
-                  {busy === "upload" ? t("server.loading") : t("server.upload")}
-                  <input
-                    className="sr-only"
-                    type="file"
-                    accept=".zip,application/zip"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      event.target.value = ""
-                      void upload(file)
-                    }}
-                  />
-                </label>
-              ) : null}
-            </div>
-            {visibleMods.length === 0 ? (
-              <p className="muted">{t("server.noMods")}</p>
-            ) : (
-              <div className="server-mods">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>{t("server.modName")}</th>
-                      <th>{t("server.modVersion")}</th>
-                      <th>{t("server.modAuthor")}</th>
-                      <th>{t("server.modSize")}</th>
-                      <th>{t("server.active")}</th>
-                      <th />
+            </label>
+          ) : null}
+        </div>
+        {visibleMods.length === 0 ? (
+          <p className="muted">{t("server.noMods")}</p>
+        ) : (
+          <div className={modsOpen ? "server-mods is-open" : "server-mods"}>
+            <table>
+              <thead>
+                <tr>
+                  {(
+                    [
+                      ["name", t("server.modName")],
+                      ["author", t("server.modAuthor")],
+                      ["size", t("server.modSize")],
+                      ["active", t("server.active")],
+                      ["version", t("server.modVersion")],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <th key={id} aria-sort={sortKey === id ? (sortDir === "asc" ? "ascending" : "descending") : "none"} className={id === "version" ? "mod-version" : undefined}>
+                      <button type="button" className="sort-btn" onClick={() => toggleSort(id)}>
+                        {label}
+                        <span className="sort-mark" aria-hidden="true">
+                          {sortKey === id ? (sortDir === "asc" ? "↑" : "↓") : ""}
+                        </span>
+                      </button>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visibleMods.map((mod) => {
+                  const stopped = snapshot.running === false
+                  const updateDisabled = !canWrite || !stopped || busy !== ""
+                  const updateReason = !mod.updateAvailable
+                    ? undefined
+                    : !updateDisabled
+                      ? undefined
+                      : !canWrite
+                        ? t("server.needWrite")
+                        : busy !== ""
+                          ? t("server.busy")
+                          : snapshot.running === true
+                            ? t("server.updateNeedsStop")
+                            : t("server.updateUnknown")
+                  const toggleDisabled = busy === mod.name
+                  return (
+                    <tr key={mod.name}>
+                      <td className="mod-name">
+                        <strong>{mod.title || mod.name}</strong>
+                        {mod.title ? <span className="mod-file">{mod.name}</span> : null}
+                      </td>
+                      <td>{mod.author || "—"}</td>
+                      <td>{formatBytes(mod.bytes)}</td>
+                      <td>
+                        <div className="server-mod-meta">
+                          <span className={mod.active == null ? "badge is-unknown" : mod.active ? "badge" : "badge is-off"}>
+                            {mod.active == null ? t("server.unknownActive") : mod.active ? t("server.active") : t("server.inactive")}
+                          </span>
+                          {mod.used === false ? <span className="badge is-warn">{t("server.unused")}</span> : null}
+                        </div>
+                      </td>
+                      <td className="mod-version">
+                        <div className="mod-version-row">
+                          <span>{mod.version || "—"}</span>
+                          {mod.updateAvailable && mod.hubVersion ? <span className="mod-version-next">{mod.hubVersion}</span> : null}
+                          {mod.hubUrl ? (
+                            <a className="btn btn-secondary" href={mod.hubUrl} target="_blank" rel="noreferrer">
+                              {t("server.modHub")}
+                            </a>
+                          ) : null}
+                          {mod.updateAvailable ? (
+                            <Tip text={updateReason}>
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                disabled={updateDisabled}
+                                onClick={() => void updateMod(mod.name)}
+                              >
+                                {busy === `update:${mod.name}` ? t("server.loading") : t("server.update")}
+                              </button>
+                            </Tip>
+                          ) : null}
+                          {mod.active != null && canWrite ? (
+                            <Tip text={toggleDisabled ? t("server.busy") : undefined}>
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                disabled={toggleDisabled}
+                                onClick={() => void toggleMod(mod.name, mod.active !== true)}
+                              >
+                                {mod.active ? t("server.inactive") : t("server.active")}
+                              </button>
+                            </Tip>
+                          ) : null}
+                          {mod.download ? (
+                            <button type="button" className="btn btn-secondary" onClick={() => void apiDownloadServerMod(workspace.id, mod.name).catch((caught) => setError(caught instanceof ApiError ? caught.message : t("server.missingFiles")))}>
+                              {t("server.download")}
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {visibleMods.map((mod) => {
-                      const stopped = snapshot.running === false
-                      return (
-                        <tr key={mod.name}>
-                          <td className="mod-name">
-                            <strong>{mod.title || mod.name}</strong>
-                            {mod.title ? <span className="mod-file">{mod.name}</span> : null}
-                          </td>
-                          <td>{mod.version || "—"}</td>
-                          <td>{mod.author || "—"}</td>
-                          <td>{formatBytes(mod.bytes)}</td>
-                          <td>
-                            <div className="server-mod-meta">
-                              <span className={mod.active == null ? "badge is-unknown" : mod.active ? "badge" : "badge is-off"}>
-                                {mod.active == null ? t("server.unknownActive") : mod.active ? t("server.active") : t("server.inactive")}
-                              </span>
-                              {mod.used === false ? <span className="badge is-warn">{t("server.unused")}</span> : null}
-                              {mod.updateAvailable && mod.hubVersion ? (
-                                <span className="badge is-warn">{t("server.updateTo", { version: mod.hubVersion })}</span>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="server-mod-actions">
-                              {mod.updateAvailable ? (
-                                <>
-                                  {mod.hubUrl ? (
-                                    <a className="btn btn-secondary" href={mod.hubUrl} target="_blank" rel="noreferrer">
-                                      {t("server.modHub")}
-                                    </a>
-                                  ) : null}
-                                  {canWrite ? (
-                                    <button
-                                      type="button"
-                                      className="btn btn-primary"
-                                      disabled={!stopped || busy !== ""}
-                                      title={stopped ? undefined : t("server.updateNeedsStop")}
-                                      onClick={() => void updateMod(mod.name)}
-                                    >
-                                      {busy === `update:${mod.name}` ? t("server.loading") : t("server.update")}
-                                    </button>
-                                  ) : null}
-                                </>
-                              ) : null}
-                              {mod.active != null && canWrite ? (
-                                <button
-                                  type="button"
-                                  className="btn btn-secondary"
-                                  disabled={busy === mod.name}
-                                  onClick={() => void toggleMod(mod.name, mod.active !== true)}
-                                >
-                                  {mod.active ? t("server.inactive") : t("server.active")}
-                                </button>
-                              ) : null}
-                              {mod.download ? (
-                                <button type="button" className="btn btn-secondary" onClick={() => void apiDownloadServerMod(workspace.id, mod.name).catch((caught) => setError(caught instanceof ApiError ? caught.message : t("server.missingFiles")))}>
-                                  {t("server.download")}
-                                </button>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        ) : null}
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {settings.length > 0 ? (
@@ -472,9 +573,11 @@ export function ServerPage() {
             ))}
           </div>
           {canWrite ? (
-            <button className="btn btn-primary" type="submit" disabled={busy === "settings"}>
-              {t("server.saveSettings")}
-            </button>
+            <Tip text={busy === "settings" ? t("server.busy") : undefined}>
+              <button className="btn btn-primary" type="submit" disabled={busy === "settings"}>
+                {t("server.saveSettings")}
+              </button>
+            </Tip>
           ) : null}
         </form>
       ) : null}
@@ -483,14 +586,18 @@ export function ServerPage() {
         <div className="server-panel-head">
           <h2>{t("server.log")}</h2>
           <div className="server-actions">
-            <button type="button" className="btn btn-secondary" disabled={!snapshot.log} onClick={() => void copyLog()}>
-              <Copy className="icon" aria-hidden="true" />
-              {copied ? t("server.copied") : t("server.copyLog")}
-            </button>
-            <button type="button" className="btn btn-secondary" disabled={!snapshot.log} onClick={downloadLog}>
-              <Download className="icon" aria-hidden="true" />
-              {t("server.downloadLog")}
-            </button>
+            <Tip text={snapshot.log ? undefined : t("server.noLogTip")}>
+              <button type="button" className="btn btn-secondary" disabled={!snapshot.log} onClick={() => void copyLog()}>
+                <Copy className="icon" aria-hidden="true" />
+                {copied ? t("server.copied") : t("server.copyLog")}
+              </button>
+            </Tip>
+            <Tip text={snapshot.log ? undefined : t("server.noLogTip")}>
+              <button type="button" className="btn btn-secondary" disabled={!snapshot.log} onClick={downloadLog}>
+                <Download className="icon" aria-hidden="true" />
+                {t("server.downloadLog")}
+              </button>
+            </Tip>
           </div>
         </div>
         {snapshot.log ? (

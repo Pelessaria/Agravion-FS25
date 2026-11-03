@@ -2979,12 +2979,39 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   border: 1px solid var(--line);
   border-radius: 12px;
 }
+.server-mods.is-open {
+  max-height: none;
+  overflow: visible;
+}
 .server-mods th {
   position: sticky;
   top: 0;
   z-index: 1;
   background: var(--surface-2);
 }
+.server-mods .sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 650;
+  color: inherit;
+}
+.server-mods .sort-mark { width: 0.8em; color: var(--text-faint); }
+.server-mods td.mod-version, .server-mods th.mod-version { text-align: right; }
+.mod-version-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+.mod-version-next { color: var(--warning); font-weight: 650; }
+.btn-tip { display: inline-flex; }
+.btn-tip :disabled { pointer-events: none; }
 .server-mods tbody tr { cursor: default; }
 .server-mod-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .server-mod-meta { display: flex; flex-wrap: wrap; gap: 6px; }
