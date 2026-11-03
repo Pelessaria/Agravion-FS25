@@ -657,7 +657,7 @@ final class DedicatedServerConsole
         foreach ($rows as $row) {
             $byLower[strtolower((string) $row['name'])] = $row;
         }
-        $deadline = microtime(true) + 20;
+        $deadline = microtime(true) + 8;
         $reads = 0;
 
         if ($client !== null && $modsDir !== null && $mapStem !== null) {
@@ -701,7 +701,7 @@ final class DedicatedServerConsole
             if ($client === null || $modsDir === null || isset($owned[$stem]) || isset($dependencyKeys[$stem])) {
                 continue;
             }
-            if ($reads >= 40 || microtime(true) > $deadline) {
+            if ($reads >= 8 || microtime(true) > $deadline) {
                 continue;
             }
             $xml = $this->readModDesc($client, $modsDir, $filename);
@@ -718,10 +718,35 @@ final class DedicatedServerConsole
         if (! is_dir($dir) && ! mkdir($dir, 0775, true) && ! is_dir($dir)) {
             return ['dependencies' => $dependencies, 'store' => $store];
         }
-        file_put_contents($path, json_encode([
-            'map' => $cache['map'],
-            'items' => $cache['items'],
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $handle = fopen($path, 'c+');
+        if ($handle === false) {
+            return ['dependencies' => $dependencies, 'store' => $store];
+        }
+        try {
+            if (! flock($handle, LOCK_EX)) {
+                return ['dependencies' => $dependencies, 'store' => $store];
+            }
+            $existing = stream_get_contents($handle);
+            $decoded = is_string($existing) && $existing !== '' ? json_decode($existing, true) : null;
+            $items = is_array($decoded['items'] ?? null) ? $decoded['items'] : [];
+            foreach ($cache['items'] as $key => $item) {
+                if (is_string($key) && is_array($item)) {
+                    $items[$key] = $item;
+                }
+            }
+            $map = is_array($cache['map']) ? $cache['map'] : ($decoded['map'] ?? null);
+            $payload = json_encode([
+                'map' => $map,
+                'items' => $items,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            rewind($handle);
+            ftruncate($handle, 0);
+            fwrite($handle, $payload === false ? '{}' : $payload);
+            fflush($handle);
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
 
         return ['dependencies' => $dependencies, 'store' => $store];
     }
