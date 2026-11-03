@@ -5,7 +5,9 @@ import {
   apiConnectorPackageMeta,
   apiDeployConnector,
   apiRequiredMods,
+  apiSaveServerLogin,
   downloadConnectorPackage,
+  ApiError,
   type ConnectorPackageMeta,
   type RequiredModStatus,
 } from "../api"
@@ -15,6 +17,18 @@ import { useStore } from "../store"
 import type { HostProtocol } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
 import { isFeedUrl, isFeedUrlWithCode } from "../validate"
+
+function feedOrigin(value: string): string {
+  const raw = value.trim()
+  if (!raw) return ""
+  try {
+    const url = new URL(raw.includes("://") ? raw : `http://${raw}`)
+    if (url.protocol !== "http:" && url.protocol !== "https:") return ""
+    return url.origin
+  } catch {
+    return ""
+  }
+}
 
 export function WorkspaceSettingsPage() {
   const { t } = useTranslation()
@@ -38,6 +52,10 @@ export function WorkspaceSettingsPage() {
   const [hostBusy, setHostBusy] = useState(false)
   const [savegameBusy, setSavegameBusy] = useState<number | null>(null)
   const [syncedId, setSyncedId] = useState(workspace?.id)
+  const [consoleUser, setConsoleUser] = useState(workspace?.console?.username ?? "")
+  const [consolePassword, setConsolePassword] = useState("")
+  const [consoleError, setConsoleError] = useState("")
+  const [consoleBusy, setConsoleBusy] = useState(false)
   if (workspace && syncedId !== workspace.id) {
     setSyncedId(workspace.id)
     setName(workspace.name)
@@ -55,6 +73,9 @@ export function WorkspaceSettingsPage() {
     setModSettingsPath(next?.remoteModSettingsPath ?? "")
     setInsecureAck(false)
     setHostError("")
+    setConsoleUser(workspace.console?.username ?? "")
+    setConsolePassword("")
+    setConsoleError("")
   }
   const [testing, setTesting] = useState(false)
   const [dialog, setDialog] = useState<"download" | "disable" | "confirm" | "code" | null>(null)
@@ -215,6 +236,32 @@ export function WorkspaceSettingsPage() {
     store.pushToast(result === "ok" ? "ok" : "warn", t(key))
   }
 
+  async function saveConsole(event: FormEvent) {
+    event.preventDefault()
+    if (!workspace) return
+    const keepPassword = consolePassword === "" && Boolean(workspace.console?.hasPassword)
+    if (!consoleUser.trim() || (!keepPassword && consolePassword === "")) {
+      setConsoleError(t("server.loginRequired"))
+      return
+    }
+    setConsoleBusy(true)
+    setConsoleError("")
+    try {
+      const result = await apiSaveServerLogin(workspace.id, {
+        username: consoleUser.trim(),
+        password: consolePassword || undefined,
+        keepPassword,
+      })
+      store.upsertWorkspace({ ...workspace, console: result.console })
+      setConsolePassword("")
+      store.pushToast("ok", t("server.loginSaved"))
+    } catch (caught) {
+      setConsoleError(caught instanceof ApiError ? caught.message : t("server.loginRequired"))
+    } finally {
+      setConsoleBusy(false)
+    }
+  }
+
   function onProtocolChange(next: HostProtocol) {
     setProtocol(next)
     if (!ws.hostAccess) {
@@ -315,6 +362,45 @@ export function WorkspaceSettingsPage() {
                 <button className="btn btn-secondary" type="submit">{t("save")}</button>
               </div>
             </form>
+
+            {store.canManageUsers() ? (
+              <form className="panel settings-card" onSubmit={(event) => void saveConsole(event)}>
+                <div className="field-label-row">
+                  <h2>{t("wsettings.consoleTitle")}</h2>
+                  <FieldTip label={t("wsettings.consoleTipLabel")}>
+                    <p>{t("wsettings.consoleTipWeb")}</p>
+                    <p>{t("wsettings.consoleTipFiles")}</p>
+                    <p>{t("wsettings.consoleTipNeither")}</p>
+                  </FieldTip>
+                </div>
+                <p className="hint">{t("wsettings.consoleLead")}</p>
+                <p className="server-origin">
+                  <span>{t("server.detectedUrl")}</span>
+                  <strong>{feedOrigin(workspace.feedUrl || workspace.console?.baseUrl || "") || t("server.detectedMissing")}</strong>
+                </p>
+                <label className="field">
+                  <span>{t("server.username")}</span>
+                  <input value={consoleUser} autoComplete="off" onChange={(event) => setConsoleUser(event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>{t("server.password")}</span>
+                  <input
+                    type="password"
+                    value={consolePassword}
+                    autoComplete="new-password"
+                    placeholder={workspace.console?.hasPassword ? t("server.keepPassword") : ""}
+                    onChange={(event) => setConsolePassword(event.target.value)}
+                  />
+                </label>
+                {consoleError ? <p className="field-error">{consoleError}</p> : null}
+                <div className="setting-actions">
+                  <button className="btn btn-primary" type="submit" disabled={consoleBusy}>
+                    {consoleBusy ? <LoaderCircle className="icon spin" aria-hidden="true" /> : null}
+                    {t("server.saveLogin")}
+                  </button>
+                </div>
+              </form>
+            ) : null}
 
             <form className="panel settings-card" onSubmit={(event) => void saveHost(event)}>
               <div className="field-label-row">

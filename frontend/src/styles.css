@@ -2973,7 +2973,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .server-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .server-toolbar input { flex: 1 1 220px; min-width: 0; }
 .server-mods {
-  max-height: 440px;
+  max-height: 640px;
   margin-top: 12px;
   overflow: auto;
   border: 1px solid var(--line);
@@ -2986,7 +2986,17 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   background: var(--surface-2);
 }
 .server-mods tbody tr { cursor: default; }
-.server-mod-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.server-mod-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.server-mod-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.server-mods .mod-name strong { display: block; }
+.server-mods .mod-file { display: block; color: var(--text-muted); font-size: var(--small); }
+.badge.is-warn {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 42%, var(--line));
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+}
 .server-log { max-height: 420px; }
 .badge.is-off, .badge.is-unknown {
   letter-spacing: 0;

@@ -123,6 +123,17 @@ class ServerConsoleController extends Controller
         ]);
     }
 
+    public function updateMod(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
+    {
+        $row = $this->workspace($workspace);
+        $this->requireAccess($request, $row, $grants, 'write');
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:180'],
+        ]);
+
+        return $this->afterChange($row, $console, fn () => $console->updateMod($row, $data['name']));
+    }
+
     public function active(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
     {
         $row = $this->workspace($workspace);

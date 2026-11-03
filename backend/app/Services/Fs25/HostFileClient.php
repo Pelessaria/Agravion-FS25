@@ -235,6 +235,44 @@ final class HostFileClient
         }
     }
 
+    public function writeFile(string $path, string $localPath): void
+    {
+        if (! is_file($localPath)) {
+            throw new RuntimeException('Lokale Datei nicht lesbar.');
+        }
+
+        try {
+            if ($this->ftp) {
+                $this->ftp->writeFile($path, $localPath);
+
+                return;
+            }
+
+            $handle = fopen($localPath, 'rb');
+            if ($handle === false) {
+                throw new RuntimeException('Lokale Datei nicht lesbar.');
+            }
+            try {
+                $path = $this->normalizePath($path);
+                $parent = dirname(str_replace('\\', '/', $path));
+                if ($parent !== '.' && $parent !== '') {
+                    $this->ensureDirectory($parent);
+                }
+                $this->sftp()->writeStream($path, $handle);
+            } finally {
+                if (is_resource($handle)) {
+                    fclose($handle);
+                }
+            }
+        } catch (Throwable $e) {
+            throw new RuntimeException(
+                HostConnectionError::format($e, 'Schreiben '.$path.' @ '.$this->endpointLabel()),
+                0,
+                $e
+            );
+        }
+    }
+
     public function write(string $path, string $contents): void
     {
         try {

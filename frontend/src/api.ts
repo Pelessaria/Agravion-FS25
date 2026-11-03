@@ -367,6 +367,13 @@ export interface ServerModRow {
   active: boolean | null
   source: string
   download: boolean
+  title?: string
+  version?: string
+  author?: string
+  used?: boolean | null
+  hubVersion?: string | null
+  hubUrl?: string | null
+  updateAvailable?: boolean
 }
 
 export interface ServerSettingField {
@@ -387,6 +394,7 @@ export interface ServerSnapshot {
   settings: ServerSettingField[]
   log: { name: string; text: string; truncated: boolean } | null
   error: string | null
+  savegameRead?: boolean
   at?: string | null
   pending?: boolean
 }
@@ -471,6 +479,13 @@ export async function apiSetServerModActive(workspaceId: string, name: string, a
   return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/mods/active`, {
     method: "POST",
     body: JSON.stringify({ name, active }),
+  })
+}
+
+export async function apiUpdateServerMod(workspaceId: string, name: string): Promise<{ ok: boolean; note?: string }> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/mods/update`, {
+    method: "POST",
+    body: JSON.stringify({ name }),
   })
 }
 

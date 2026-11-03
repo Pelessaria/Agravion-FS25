@@ -19,6 +19,8 @@ final class DedicatedServerPage
      *   links: list<array{href: string, text: string}>,
      *   modForm: array{action: string, save: array{name: string, value: string}|null, file: string|null, fields: list<array{name: string, value: string, checked: bool}>}|null,
      *   modRows: list<array{name: string, active: bool|null, checkbox: string|null, download: string|null, buttonName: string|null, buttonValue: string|null}>,
+     *   modCards: list<array{name: string, title: string, version: string, author: string, bytes: int|null, active: bool|null}>,
+     *   savegameDownloads: list<string>,
      *   settingsForm: array{action: string, save: array{name: string, value: string}|null, fields: list<array{name: string, label: string, type: string, value: string, checked: bool, options: list<array{value: string, label: string}>}>}|null,
      *   logLinks: list<array{href: string, text: string}>,
      *   logText: string,
@@ -117,6 +119,13 @@ final class DedicatedServerPage
         $logNodes = $xpath->query('//*[@id="log_textarea"]');
         $logNode = $logNodes !== false ? $logNodes->item(0) : null;
         $logText = $logNode instanceof DOMElement ? trim($logNode->textContent) : '';
+        $savegameDownloads = [];
+        foreach ($links as $link) {
+            $href = trim($link['href']);
+            if (preg_match('#(?:^|/)savegame\d+/?$#i', $href) === 1) {
+                $savegameDownloads[] = $href;
+            }
+        }
 
         return [
             'loginForm' => $loginForm,
@@ -124,6 +133,8 @@ final class DedicatedServerPage
             'links' => $links,
             'modForm' => $modForm,
             'modRows' => $modRows,
+            'modCards' => self::modCards($xpath),
+            'savegameDownloads' => $savegameDownloads,
             'settingsForm' => $settingsForm,
             'logLinks' => $logLinks,
             'logText' => $logText,
@@ -553,6 +564,88 @@ final class DedicatedServerPage
         }
 
         return null;
+    }
+
+    /**
+     * The home page lists mods as div rows, not as a table.
+     * The CSS class modSelection-inactive is not the active state.
+     *
+     * @return list<array{name: string, title: string, version: string, author: string, bytes: int|null, active: bool|null}>
+     */
+    private static function modCards(DOMXPath $xpath): array
+    {
+        $nodes = $xpath->query('//*[@id]');
+        if ($nodes === false) {
+            return [];
+        }
+
+        $cards = [];
+        foreach ($nodes as $node) {
+            if (! $node instanceof DOMElement) {
+                continue;
+            }
+            $id = trim($node->getAttribute('id'));
+            if (preg_match('/\.zip$/i', $id) !== 1) {
+                continue;
+            }
+            $fields = [];
+            $labels = $xpath->query('.//div[contains(concat(" ", normalize-space(@class), " "), " col-md-hidden ")]', $node);
+            if ($labels !== false) {
+                foreach ($labels as $label) {
+                    if (! $label instanceof DOMElement) {
+                        continue;
+                    }
+                    $key = strtolower(trim($label->textContent));
+                    if (! in_array($key, ['name', 'version', 'author', 'filename', 'size'], true)) {
+                        continue;
+                    }
+                    $valueNode = $label->nextSibling;
+                    while ($valueNode !== null && ! ($valueNode instanceof DOMElement)) {
+                        $valueNode = $valueNode->nextSibling;
+                    }
+                    $fields[$key] = $valueNode instanceof DOMElement
+                        ? trim(preg_replace('/\s+/', ' ', $valueNode->textContent) ?? '')
+                        : '';
+                }
+            }
+            $name = $fields['filename'] ?? '';
+            if (preg_match('/\.zip$/i', $name) !== 1) {
+                $name = $id;
+            }
+            $heading = '';
+            $previous = $xpath->query('preceding::h2[1]', $node);
+            if ($previous !== false && $previous->length > 0) {
+                $heading = strtolower(trim(preg_replace('/\s+/', ' ', $previous->item(0)?->textContent ?? '') ?? ''));
+            }
+            $active = preg_match('/\b(active mods|aktive mods)\b/', $heading) === 1 ? true : null;
+            $cards[] = [
+                'name' => $name,
+                'title' => $fields['name'] ?? '',
+                'version' => trim($fields['version'] ?? ''),
+                'author' => $fields['author'] ?? '',
+                'bytes' => self::sizeToBytes($fields['size'] ?? ''),
+                'active' => $active,
+            ];
+        }
+
+        return $cards;
+    }
+
+    private static function sizeToBytes(string $label): ?int
+    {
+        if (preg_match('/([\d]+(?:[.,]\d+)?)\s*(GB|MB|KB|B)/i', $label, $match) !== 1) {
+            return null;
+        }
+        $number = (float) str_replace(',', '.', $match[1]);
+        $unit = strtoupper($match[2]);
+        $multiplier = match ($unit) {
+            'GB' => 1024 ** 3,
+            'MB' => 1024 ** 2,
+            'KB' => 1024,
+            default => 1,
+        };
+
+        return (int) round($number * $multiplier);
     }
 
     private static function inside(DOMElement $node, DOMElement $form): bool

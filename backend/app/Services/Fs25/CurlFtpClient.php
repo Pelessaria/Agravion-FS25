@@ -246,6 +246,34 @@ final class CurlFtpClient
         }
     }
 
+    public function writeFile(string $path, string $localPath): void
+    {
+        $handle = fopen($localPath, 'rb');
+        if ($handle === false) {
+            throw new RuntimeException('Lokale Datei nicht lesbar.');
+        }
+        $size = filesize($localPath);
+        if ($size === false) {
+            fclose($handle);
+            throw new RuntimeException('Lokale Datei nicht lesbar.');
+        }
+
+        try {
+            $url = $this->urlForPath($path, false);
+            $this->exec($url, [
+                CURLOPT_UPLOAD => true,
+                CURLOPT_INFILE => $handle,
+                CURLOPT_INFILESIZE => $size,
+                CURLOPT_TIMEOUT => 0,
+                CURLOPT_FTP_CREATE_MISSING_DIRS => defined('CURLFTP_CREATE_DIR_RETRY')
+                    ? CURLFTP_CREATE_DIR_RETRY
+                    : 2,
+            ], 'WRITE '.$path);
+        } finally {
+            fclose($handle);
+        }
+    }
+
     public function ensureDirectory(string $path): void
     {
         $path = $this->normalizePath($path);

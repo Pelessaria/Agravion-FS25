@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react"
 import { useTranslation } from "react-i18next"
-import { Copy, Download, Play, RotateCcw, Square } from "lucide-react"
+import { Link } from "react-router-dom"
+import { ChevronDown, ChevronRight, Copy, Download, Play, RotateCcw, Square } from "lucide-react"
 import {
   apiDownloadServerMod,
-  apiSaveServerLogin,
   apiSaveServerSettings,
   apiServerAction,
   apiServerSnapshot,
   apiSetServerModActive,
+  apiUpdateServerMod,
   apiUploadServerMod,
   ApiError,
   type ServerSettingField,
@@ -16,6 +17,16 @@ import {
 import { MissingWorkspace, PermissionBlock } from "../components/ui"
 import { useStore } from "../store"
 import { useWorkspaceRoute } from "../use-workspace"
+
+function formatBytes(bytes: number | null | undefined): string {
+  if (bytes == null || bytes < 0) return "—"
+  if (bytes >= 1024 * 1024) {
+    const mb = bytes / (1024 * 1024)
+    return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(2)} MB`
+  }
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
+}
 
 const EMPTY_SNAPSHOT: ServerSnapshot = {
   webConfigured: false,
@@ -28,43 +39,20 @@ const EMPTY_SNAPSHOT: ServerSnapshot = {
   error: null,
 }
 
-function feedOrigin(value: string): string {
-  const raw = value.trim()
-  if (!raw) return ""
-  try {
-    const url = new URL(raw.includes("://") ? raw : `http://${raw}`)
-    if (url.protocol !== "http:" && url.protocol !== "https:") return ""
-    return url.origin
-  } catch {
-    return ""
-  }
-}
-
 export function ServerPage() {
   const { t } = useTranslation()
-  const { liveMode, moduleAccess, canManageUsers, upsertWorkspace, pushToast } = useStore()
+  const { liveMode, moduleAccess, canManageUsers, pushToast } = useStore()
   const { workspace, allowed } = useWorkspaceRoute()
   const access = workspace ? moduleAccess(workspace.id, "server") : null
   const canWrite = access === "write"
-  const admin = canManageUsers()
   const [snapshot, setSnapshot] = useState<ServerSnapshot>(EMPTY_SNAPSHOT)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState("")
-  const [loginDraft, setLoginDraft] = useState<{ id: string; username: string; password: string } | null>(null)
   const [settings, setSettings] = useState<ServerSettingField[]>([])
   const [modQuery, setModQuery] = useState("")
+  const [modsOpen, setModsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-
-  const login =
-    workspace && loginDraft?.id === workspace.id
-      ? loginDraft
-      : {
-          id: workspace?.id ?? "",
-          username: workspace?.console?.username ?? "",
-          password: "",
-        }
-  const origin = feedOrigin(workspace?.feedUrl ?? workspace?.console?.baseUrl ?? "")
 
   useEffect(() => {
     if (!workspace || !allowed || !access || !liveMode) return
@@ -94,7 +82,9 @@ export function ServerPage() {
   const visibleMods = useMemo(() => {
     const needle = modQuery.trim().toLocaleLowerCase()
     if (!needle) return snapshot.mods
-    return snapshot.mods.filter((mod) => mod.name.toLocaleLowerCase().includes(needle))
+    return snapshot.mods.filter((mod) =>
+      [mod.title, mod.name, mod.author, mod.version].some((value) => (value ?? "").toLocaleLowerCase().includes(needle)),
+    )
   }, [modQuery, snapshot.mods])
 
   if (!workspace) return <MissingWorkspace />
@@ -124,32 +114,6 @@ export function ServerPage() {
       setError(caught instanceof ApiError ? caught.message : t("server.missingLogin"))
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function saveLogin(event: FormEvent) {
-    event.preventDefault()
-    if (!workspace) return
-    const keepPassword = login.password === "" && Boolean(workspace.console?.hasPassword)
-    if (!login.username.trim() || (!keepPassword && login.password === "")) {
-      setError(t("server.loginRequired"))
-      return
-    }
-    setBusy("login")
-    try {
-      const result = await apiSaveServerLogin(workspace.id, {
-        username: login.username.trim(),
-        password: login.password || undefined,
-        keepPassword,
-      })
-      upsertWorkspace({ ...workspace, console: result.console })
-      setLoginDraft(null)
-      setError("")
-      await reload()
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : t("server.loginRequired"))
-    } finally {
-      setBusy("")
     }
   }
 
@@ -200,6 +164,20 @@ export function ServerPage() {
       await reload()
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : t("server.missingFiles"))
+    } finally {
+      setBusy("")
+    }
+  }
+
+  async function updateMod(name: string) {
+    if (!workspace) return
+    setBusy(`update:${name}`)
+    try {
+      const result = await apiUpdateServerMod(workspace.id, name)
+      pushToast("ok", result.note || t("server.updateDone"))
+      await reload()
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : t("server.updateNeedsStop"))
     } finally {
       setBusy("")
     }
@@ -308,115 +286,142 @@ export function ServerPage() {
             )
           })}
         </div>
-        {!snapshot.webConfigured ? <p className="hint server-hero-note">{t("server.missingLogin")}</p> : null}
-      </div>
-
-      {admin ? (
-        <form className="panel" onSubmit={(event) => void saveLogin(event)}>
-          <div className="server-panel-head">
-            <h2>{t("server.loginTitle")}</h2>
-          </div>
-          <p className="hint">{t("server.loginHint")}</p>
-          <p className="server-origin">
-            <span>{t("server.detectedUrl")}</span>
-            <strong>{origin || t("server.detectedMissing")}</strong>
+        {!snapshot.webConfigured ? (
+          <p className="hint server-hero-note">
+            {t("server.missingLogin")}{" "}
+            {canManageUsers() ? <Link to={`/w/${workspace.id}/settings`}>{t("server.openSettings")}</Link> : null}
           </p>
-          <div className="server-login-grid">
-            <label className="field">
-              <span>{t("server.username")}</span>
-              <input value={login.username} autoComplete="off" onChange={(event) => setLoginDraft({ ...login, username: event.target.value })} />
-            </label>
-            <label className="field">
-              <span>{t("server.password")}</span>
-              <input
-                type="password"
-                value={login.password}
-                autoComplete="new-password"
-                placeholder={workspace.console?.hasPassword ? t("server.keepPassword") : ""}
-                onChange={(event) => setLoginDraft({ ...login, password: event.target.value })}
-              />
-            </label>
-          </div>
-          <button className="btn btn-primary" type="submit" disabled={busy === "login"}>
-            {t("server.saveLogin")}
-          </button>
-        </form>
-      ) : null}
+        ) : null}
+      </div>
 
       <div className="panel">
         <div className="server-panel-head">
           <h2>{t("server.mods")}</h2>
-          <span className="faint">{t("server.modCount", { count: visibleMods.length })}</span>
-        </div>
-        {!snapshot.ftpConfigured ? <p className="hint">{t("server.missingFiles")}</p> : null}
-        <div className="server-toolbar">
-          <input
-            value={modQuery}
-            placeholder={t("server.modSearch")}
-            onChange={(event) => setModQuery(event.target.value)}
-          />
-          {canWrite ? (
-            <label className="btn btn-secondary">
-              {busy === "upload" ? t("server.loading") : t("server.upload")}
-              <input
-                className="sr-only"
-                type="file"
-                accept=".zip,application/zip"
-                onChange={(event) => {
-                  const file = event.target.files?.[0]
-                  event.target.value = ""
-                  void upload(file)
-                }}
-              />
-            </label>
-          ) : null}
-        </div>
-        {visibleMods.length === 0 ? (
-          <p className="muted">{t("server.noMods")}</p>
-        ) : (
-          <div className="server-mods">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t("server.mods")}</th>
-                  <th>{t("server.active")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {visibleMods.map((mod) => (
-                  <tr key={mod.name}>
-                    <td>{mod.name}</td>
-                    <td>
-                      <span className={mod.active == null ? "badge is-unknown" : mod.active ? "badge" : "badge is-off"}>
-                        {mod.active == null ? t("server.unknownActive") : mod.active ? t("server.active") : t("server.inactive")}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="server-mod-actions">
-                        {mod.active != null && canWrite ? (
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            disabled={busy === mod.name}
-                            onClick={() => void toggleMod(mod.name, !mod.active)}
-                          >
-                            {mod.active ? t("server.inactive") : t("server.active")}
-                          </button>
-                        ) : null}
-                        {mod.download ? (
-                          <button type="button" className="btn btn-secondary" onClick={() => void apiDownloadServerMod(workspace.id, mod.name).catch((caught) => setError(caught instanceof ApiError ? caught.message : t("server.missingFiles")))}>
-                            {t("server.download")}
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="server-actions">
+            <span className="faint">{t("server.modCount", { count: snapshot.mods.length })}</span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-expanded={modsOpen}
+              onClick={() => setModsOpen((open) => !open)}
+            >
+              {modsOpen ? <ChevronDown className="icon" aria-hidden="true" /> : <ChevronRight className="icon" aria-hidden="true" />}
+              {modsOpen ? t("server.modsHide") : t("server.modsShow")}
+            </button>
           </div>
-        )}
+        </div>
+        {modsOpen ? (
+          <>
+            {!snapshot.ftpConfigured ? <p className="hint">{t("server.missingFiles")}</p> : null}
+            <p className="hint">{snapshot.savegameRead ? t("server.savegameKnown") : t("server.savegameUnknown")}</p>
+            <div className="server-toolbar">
+              <input
+                value={modQuery}
+                placeholder={t("server.modSearch")}
+                onChange={(event) => setModQuery(event.target.value)}
+              />
+              {canWrite ? (
+                <label className="btn btn-secondary">
+                  {busy === "upload" ? t("server.loading") : t("server.upload")}
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept=".zip,application/zip"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      event.target.value = ""
+                      void upload(file)
+                    }}
+                  />
+                </label>
+              ) : null}
+            </div>
+            {visibleMods.length === 0 ? (
+              <p className="muted">{t("server.noMods")}</p>
+            ) : (
+              <div className="server-mods">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t("server.modName")}</th>
+                      <th>{t("server.modVersion")}</th>
+                      <th>{t("server.modAuthor")}</th>
+                      <th>{t("server.modSize")}</th>
+                      <th>{t("server.active")}</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleMods.map((mod) => {
+                      const stopped = snapshot.running === false
+                      return (
+                        <tr key={mod.name}>
+                          <td className="mod-name">
+                            <strong>{mod.title || mod.name}</strong>
+                            {mod.title ? <span className="mod-file">{mod.name}</span> : null}
+                          </td>
+                          <td>{mod.version || "—"}</td>
+                          <td>{mod.author || "—"}</td>
+                          <td>{formatBytes(mod.bytes)}</td>
+                          <td>
+                            <div className="server-mod-meta">
+                              <span className={mod.active == null ? "badge is-unknown" : mod.active ? "badge" : "badge is-off"}>
+                                {mod.active == null ? t("server.unknownActive") : mod.active ? t("server.active") : t("server.inactive")}
+                              </span>
+                              {mod.used === false ? <span className="badge is-warn">{t("server.unused")}</span> : null}
+                              {mod.updateAvailable && mod.hubVersion ? (
+                                <span className="badge is-warn">{t("server.updateTo", { version: mod.hubVersion })}</span>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="server-mod-actions">
+                              {mod.updateAvailable ? (
+                                <>
+                                  {mod.hubUrl ? (
+                                    <a className="btn btn-secondary" href={mod.hubUrl} target="_blank" rel="noreferrer">
+                                      {t("server.modHub")}
+                                    </a>
+                                  ) : null}
+                                  {canWrite ? (
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary"
+                                      disabled={!stopped || busy !== ""}
+                                      title={stopped ? undefined : t("server.updateNeedsStop")}
+                                      onClick={() => void updateMod(mod.name)}
+                                    >
+                                      {busy === `update:${mod.name}` ? t("server.loading") : t("server.update")}
+                                    </button>
+                                  ) : null}
+                                </>
+                              ) : null}
+                              {mod.active != null && canWrite ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  disabled={busy === mod.name}
+                                  onClick={() => void toggleMod(mod.name, mod.active !== true)}
+                                >
+                                  {mod.active ? t("server.inactive") : t("server.active")}
+                                </button>
+                              ) : null}
+                              {mod.download ? (
+                                <button type="button" className="btn btn-secondary" onClick={() => void apiDownloadServerMod(workspace.id, mod.name).catch((caught) => setError(caught instanceof ApiError ? caught.message : t("server.missingFiles")))}>
+                                  {t("server.download")}
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        ) : null}
       </div>
 
       {settings.length > 0 ? (

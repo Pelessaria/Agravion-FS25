@@ -130,4 +130,53 @@ class DedicatedServerPageTest extends TestCase
             DedicatedServerConsole::origin('http://games.example:8081/index.html'),
         );
     }
+
+    public function test_mod_cards_keep_name_version_author_and_size_and_ignore_the_inactive_class(): void
+    {
+        $html = <<<'HTML'
+        <html><body>
+          <h2>Active Mods</h2>
+          <div class="container-row grid-row modSelection-inactive" id="FS25_Example.zip">
+            <div class="container-row col col-md-4">
+              <div class="col col-md-hidden">Name</div>
+              <div class="col">Example Tractor</div>
+            </div>
+            <div class="container-row col col-md-hidden-toggle">
+              <div class="col col-md-hidden">Version</div>
+              <div class="col">1.2.0.0</div>
+            </div>
+            <div class="container-row col">
+              <div class="col col-md-hidden">Author</div>
+              <div class="col">Farming Dud's</div>
+            </div>
+            <div class="container-row col">
+              <div class="col col-md-hidden">Filename</div>
+              <div class="col">FS25_Example.zip</div>
+            </div>
+            <div class="container-row col">
+              <div class="col col-md-hidden">Size</div>
+              <div class="col">12.50 MB</div>
+            </div>
+          </div>
+          <h2>Activate Mods</h2>
+          <div id="FS25_Other.zip">
+            <div class="col col-md-hidden">Name</div>
+            <div class="col">Other</div>
+          </div>
+          <a href="savegame2">Download</a>
+        </body></html>
+        HTML;
+
+        $page = DedicatedServerPage::parse($html, 'http://games.example/index.html');
+
+        $this->assertCount(2, $page['modCards']);
+        $this->assertSame('FS25_Example.zip', $page['modCards'][0]['name']);
+        $this->assertSame('Example Tractor', $page['modCards'][0]['title']);
+        $this->assertSame('1.2.0.0', $page['modCards'][0]['version']);
+        $this->assertSame("Farming Dud's", $page['modCards'][0]['author']);
+        $this->assertSame(13107200, $page['modCards'][0]['bytes']);
+        $this->assertTrue($page['modCards'][0]['active']);
+        $this->assertNull($page['modCards'][1]['active']);
+        $this->assertSame(['savegame2'], $page['savegameDownloads']);
+    }
 }
