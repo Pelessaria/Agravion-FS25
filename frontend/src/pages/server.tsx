@@ -462,7 +462,6 @@ export function ServerPage() {
                             : t("server.updateUnknown")
                   const toggleDisabled = busy === mod.name
                   const toggleLabel = mod.active ? t("server.deactivate") : t("server.activate")
-                  const hasActions = Boolean(mod.hubUrl || mod.updateAvailable || (mod.active != null && canWrite) || mod.download)
                   return (
                     <tr key={mod.name}>
                       <td className="mod-name">
@@ -481,56 +480,59 @@ export function ServerPage() {
                       </td>
                       <td className="mod-version">
                         <div className="mod-version-row">
-                          <span className="mod-version-numbers">
-                            <span>{mod.version || "—"}</span>
-                            {mod.updateAvailable && mod.hubVersion ? <span className="mod-version-next">{mod.hubVersion}</span> : null}
+                          <span className="mod-version-current">{mod.version || "—"}</span>
+                          <span className="mod-version-next">{mod.updateAvailable && mod.hubVersion ? mod.hubVersion : ""}</span>
+                          <span className="mod-version-rule" aria-hidden="true" />
+                          <span className="mod-icon-slot">
+                            {mod.hubUrl ? (
+                              <a className="btn btn-secondary mod-icon-btn" href={mod.hubUrl} target="_blank" rel="noreferrer" title={t("server.modHub")} aria-label={t("server.modHub")}>
+                                <img src={modhubIcon} alt="" width={18} height={18} />
+                              </a>
+                            ) : null}
                           </span>
-                          {hasActions ? (
-                            <span className="mod-version-actions">
-                              {mod.hubUrl ? (
-                                <a className="btn btn-secondary mod-icon-btn" href={mod.hubUrl} target="_blank" rel="noreferrer" title={t("server.modHub")} aria-label={t("server.modHub")}>
-                                  <img src={modhubIcon} alt="" width={18} height={18} />
-                                </a>
-                              ) : null}
-                              {mod.updateAvailable ? (
-                                <Tip text={updateReason}>
-                                  <button
-                                    type="button"
-                                    className="btn btn-primary"
-                                    disabled={updateDisabled}
-                                    onClick={() => void updateMod(mod.name)}
-                                  >
-                                    {busy === `update:${mod.name}` ? t("server.loading") : t("server.update")}
-                                  </button>
-                                </Tip>
-                              ) : null}
-                              {mod.active != null && canWrite ? (
-                                <Tip text={toggleDisabled ? t("server.busy") : undefined}>
-                                  <button
-                                    type="button"
-                                    className="btn btn-secondary mod-icon-btn"
-                                    disabled={toggleDisabled}
-                                    aria-label={toggleLabel}
-                                    title={toggleDisabled ? undefined : toggleLabel}
-                                    onClick={() => void toggleMod(mod.name, mod.active !== true)}
-                                  >
-                                    {mod.active ? <Pause className="icon" aria-hidden="true" /> : <Play className="icon" aria-hidden="true" />}
-                                  </button>
-                                </Tip>
-                              ) : null}
-                              {mod.download ? (
+                          <span className="mod-icon-slot">
+                            {mod.active != null && canWrite ? (
+                              <Tip text={toggleDisabled ? t("server.busy") : undefined}>
                                 <button
                                   type="button"
                                   className="btn btn-secondary mod-icon-btn"
-                                  aria-label={t("server.download")}
-                                  title={t("server.download")}
-                                  onClick={() => void apiDownloadServerMod(workspace.id, mod.name).catch((caught) => setError(caught instanceof ApiError ? caught.message : t("server.missingFiles")))}
+                                  disabled={toggleDisabled}
+                                  aria-label={toggleLabel}
+                                  title={toggleDisabled ? undefined : toggleLabel}
+                                  onClick={() => void toggleMod(mod.name, mod.active !== true)}
                                 >
-                                  <Download className="icon" aria-hidden="true" />
+                                  {mod.active ? <Pause className="icon" aria-hidden="true" /> : <Play className="icon" aria-hidden="true" />}
                                 </button>
-                              ) : null}
-                            </span>
-                          ) : null}
+                              </Tip>
+                            ) : null}
+                          </span>
+                          <span className="mod-icon-slot">
+                            {mod.download ? (
+                              <button
+                                type="button"
+                                className="btn btn-secondary mod-icon-btn"
+                                aria-label={t("server.download")}
+                                title={t("server.download")}
+                                onClick={() => void apiDownloadServerMod(workspace.id, mod.name).catch((caught) => setError(caught instanceof ApiError ? caught.message : t("server.missingFiles")))}
+                              >
+                                <Download className="icon" aria-hidden="true" />
+                              </button>
+                            ) : null}
+                          </span>
+                          <span className="mod-update-slot">
+                            {mod.updateAvailable ? (
+                              <Tip text={updateReason}>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary"
+                                  disabled={updateDisabled}
+                                  onClick={() => void updateMod(mod.name)}
+                                >
+                                  {busy === `update:${mod.name}` ? t("server.loading") : t("server.update")}
+                                </button>
+                              </Tip>
+                            ) : null}
+                          </span>
                         </div>
                       </td>
                     </tr>

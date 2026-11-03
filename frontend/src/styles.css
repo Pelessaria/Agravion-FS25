@@ -3001,35 +3001,45 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   color: inherit;
 }
 .server-mods .sort-mark { width: 0.8em; color: var(--text-faint); }
-.server-mods td.mod-version, .server-mods th.mod-version { text-align: right; }
+.server-mods td.mod-version { vertical-align: middle; }
 .mod-version-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: 9ch 11ch 13px 32px 32px 32px max-content;
   align-items: center;
-  gap: 0;
+  justify-content: start;
+  column-gap: 6px;
+  min-height: 32px;
 }
-.mod-version-numbers {
-  display: inline-flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 10px;
-  min-width: 11rem;
+.mod-version-current,
+.mod-version-next {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  line-height: 32px;
 }
-.mod-version-next { color: var(--warning); font-weight: 650; }
-.mod-version-actions {
-  display: inline-flex;
+.mod-version-current { text-align: right; }
+.mod-version-next {
+  padding-left: 10px;
+  color: var(--warning);
+  font-weight: 650;
+}
+.mod-version-rule {
+  width: 1px;
+  height: 22px;
+  justify-self: center;
+  background: var(--line);
+}
+.mod-icon-slot {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  margin-left: 12px;
-  padding-left: 12px;
-  border-left: 1px solid var(--line);
+  justify-content: center;
+  width: 32px;
+  height: 32px;
 }
-.mod-version-actions .btn { min-height: 32px; }
+.mod-update-slot { min-height: 32px; display: flex; align-items: center; }
+.mod-update-slot .btn { min-height: 32px; }
 .mod-icon-btn {
   width: 32px;
+  min-height: 32px;
   padding: 0;
 }
 .mod-icon-btn img {
