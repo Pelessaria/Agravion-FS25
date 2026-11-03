@@ -67,14 +67,14 @@ final class RequiredModsService
             $installed = $host['installed'][$item['id']] ?? false;
             $installedPath = $host['paths'][$item['id']] ?? null;
             $activated = $this->isActivated($item, $feedMods, $host['hello'][$item['id']] ?? null);
-            $runningVersion = $host['hello'][$item['id']]['version'] ?? null;
-            if ($runningVersion === null) {
-                $runningVersion = $this->feedModVersion($item, $feedMods);
+            $zipVersion = $host['zipVersions'][$item['id']] ?? null;
+            $loadedVersion = $host['hello'][$item['id']]['version'] ?? null;
+            if ($loadedVersion === null) {
+                $loadedVersion = $this->feedModVersion($item, $feedMods);
             }
-            // modSettings/hello is optional — fall back to version inside the installed zip.
-            if ($runningVersion === null && $installed && is_string($installedPath) && str_ends_with(strtolower($installedPath), '.zip')) {
-                $runningVersion = $host['zipVersions'][$item['id']] ?? null;
-            }
+            // The file in mods/ is what was updated. hello.xml stays on the old
+            // version until the dedicated server starts the new connector.
+            $runningVersion = is_string($zipVersion) && $zipVersion !== '' ? $zipVersion : $loadedVersion;
 
             if ($item['id'] === 'FS25_AgriVisionConnector' && is_string($runningVersion) && $runningVersion !== '') {
                 if ($workspace->connector_version !== $runningVersion) {
@@ -280,89 +280,47 @@ final class RequiredModsService
         $zipVersions = [];
 
         $modSettings = trim(str_replace('\\', '/', (string) ($access->remote_mod_settings_path ?? '')), '/');
-        $modsDir = null;
-        $combined = null;
-        if ($modSettings !== '') {
-            $parent = trim(dirname($modSettings), '/.');
-            $sibling = ($parent === '' || $parent === '.') ? 'mods' : $parent.'/mods';
-            $item = $this->catalog()[0] ?? null;
-            if ($item !== null) {
-                $helloPath = $modSettings.'/'.$item['folderName'].'/hello.xml';
-                try {
-                    $combined = $client->sizeAndRead($sibling.'/'.$item['zipName'], $helloPath);
-                    if (($combined['size'] ?? null) !== null && $combined['size'] > 0) {
-                        $modsDir = $sibling;
-                    }
-                } catch (Throwable) {
-                    $combined = null;
-                }
-            }
-        }
-        if ($modsDir === null && $combined === null) {
-            try {
-                $modsDir = ConnectorDeployService::resolveModsDirectory($client, $access);
-            } catch (Throwable) {
-                $modsDir = null;
-            }
-        }
+        $parent = $modSettings === '' ? '' : trim(dirname($modSettings), '/.');
+        $modsDir = ($parent === '' || $parent === '.') ? 'mods' : $parent.'/mods';
 
         foreach ($this->catalog() as $item) {
-            $path = null;
+            $path = rtrim($modsDir, '/').'/'.$item['zipName'];
             $isInstalled = false;
-            if ($modsDir !== null) {
-                $path = rtrim($modsDir, '/').'/'.$item['zipName'];
-                $known = is_array($combined) && ($combined['size'] ?? 0) > 0;
-                if ($known) {
+            $zipVersions[$item['id']] = null;
+            try {
+                $raw = $client->read($path, 20);
+                if (str_starts_with($raw, "PK")) {
                     $isInstalled = true;
-                } else {
+                    $zipVersions[$item['id']] = $this->versionFromZipBytes($raw);
+                }
+            } catch (Throwable) {
+                $isInstalled = false;
+            }
+            if (! $isInstalled) {
+                try {
                     $isInstalled = $client->fileExists($path);
-                    if (! $isInstalled) {
-                        $folder = rtrim($modsDir, '/').'/'.$item['folderName'];
-                        if ($this->dirPresent($client, $folder)) {
-                            $isInstalled = true;
-                            $path = $folder;
-                        }
-                    }
+                } catch (Throwable) {
+                    $isInstalled = false;
                 }
             }
             $installed[$item['id']] = $isInstalled;
             $paths[$item['id']] = $isInstalled ? $path : null;
-            $zipVersions[$item['id']] = null;
 
             $hello[$item['id']] = ['present' => false, 'version' => null];
-            if ($item['id'] === 'FS25_AgriVisionConnector' && is_array($combined)) {
-                $raw = (string) ($combined['body'] ?? '');
-                if ($raw !== '' && preg_match('/<agrivisionConnector\b[^>]*\bversion="([^"]+)"/i', $raw, $m)) {
-                    $hello[$item['id']] = ['present' => true, 'version' => trim($m[1]) ?: null];
-                } elseif ($raw !== '') {
-                    $hello[$item['id']] = ['present' => true, 'version' => null];
-                }
-            } elseif ($item['id'] === 'FS25_AgriVisionConnector' && $modSettings !== '') {
-                $connectorDir = $modSettings.'/'.$item['folderName'];
-                $helloPath = $connectorDir.'/hello.xml';
+            if ($item['id'] === 'FS25_AgriVisionConnector' && $modSettings !== '') {
+                $helloPath = $modSettings.'/'.$item['folderName'].'/hello.xml';
                 try {
-                    if ($client->fileExists($helloPath)) {
-                        $raw = $client->read($helloPath);
-                        $version = null;
-                        if (preg_match('/<agrivisionConnector\b[^>]*\bversion="([^"]+)"/i', $raw, $m)) {
-                            $version = trim($m[1]) ?: null;
-                        }
+                    $raw = $client->read($helloPath, 12);
+                    $version = null;
+                    if (preg_match('/<agrivisionConnector\b[^>]*\bversion="([^"]+)"/i', $raw, $m)) {
+                        $version = trim($m[1]) ?: null;
+                    }
+                    if ($raw !== '') {
                         $hello[$item['id']] = ['present' => true, 'version' => $version];
-                    } elseif ($this->dirPresent($client, $connectorDir)) {
-                        $hello[$item['id']] = ['present' => true, 'version' => null];
                     }
                 } catch (Throwable) {
-                    // Missing modSettings is normal until the mod has run once.
+                    // hello.xml is written when the connector runs. A missing file does not mean the zip is gone.
                 }
-            }
-
-            if (
-                $isInstalled
-                && is_string($path)
-                && str_ends_with(strtolower($path), '.zip')
-                && ($hello[$item['id']]['version'] ?? null) === null
-            ) {
-                $zipVersions[$item['id']] = $this->versionFromRemoteZip($client, $path);
             }
         }
 
@@ -375,29 +333,33 @@ final class RequiredModsService
         ];
     }
 
-    private function versionFromRemoteZip(HostFileClient $client, string $remoteZip): ?string
+    private function versionFromZipBytes(string $bytes): ?string
     {
+        if (! str_starts_with($bytes, "PK\x03\x04") || ! class_exists(\ZipArchive::class)) {
+            return null;
+        }
+        $tmp = tempnam(sys_get_temp_dir(), 'avzip');
+        if ($tmp === false) {
+            return null;
+        }
         try {
-            $size = $client->fileSize($remoteZip);
-            $xml = ZipModDescReader::xml($size, static fn (int $offset, int $length): string => $client->readRange($remoteZip, $offset, $length));
+            if (file_put_contents($tmp, $bytes) === false) {
+                return null;
+            }
+            $zip = new \ZipArchive;
+            if ($zip->open($tmp) !== true) {
+                return null;
+            }
+            $xml = $zip->getFromName('modDesc.xml');
+            $zip->close();
             if (! is_string($xml) || ! preg_match('/<version>\s*([^<]+)\s*<\/version>/i', $xml, $match)) {
                 return null;
             }
 
             return trim($match[1]) ?: null;
-        } catch (Throwable) {
-            return null;
+        } finally {
+            @unlink($tmp);
         }
     }
 
-    private function dirPresent(HostFileClient $client, string $path): bool
-    {
-        try {
-            $client->listDirectories($path);
-
-            return true;
-        } catch (Throwable) {
-            return false;
-        }
-    }
 }
