@@ -19,7 +19,7 @@ final class PngRgbWriter
         }
         $png = "\x89PNG\r\n\x1a\n";
         $png .= $this->chunk('IHDR', pack('NNC5', $width, $height, 8, 2, 0, 0, 0));
-        $png .= $this->chunk('IDAT', gzcompress($raw, 6));
+        $png .= $this->chunk('IDAT', gzcompress($raw, $width > 1024 ? 1 : 6));
         $png .= $this->chunk('IEND', '');
         $temporary = $path.'.tmp';
         if (file_put_contents($temporary, $png) === false) {

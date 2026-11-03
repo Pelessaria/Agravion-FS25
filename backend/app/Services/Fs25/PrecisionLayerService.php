@@ -122,12 +122,16 @@ final class PrecisionLayerService
             return $png;
         }
         $image = $this->decoder->decodeFitted($bytes, 2048);
+        unset($bytes);
         if ($image === null) {
             return is_file($png) ? $png : null;
         }
         $rgb = $this->colorize($layer, $image['pixels']);
+        $width = $image['width'];
+        $height = $image['height'];
+        unset($image);
         try {
-            $this->png->write($png, $image['width'], $image['height'], $rgb);
+            $this->png->write($png, $width, $height, $rgb);
             file_put_contents($stamp, $hash);
         } catch (Throwable) {
             return is_file($png) ? $png : null;
@@ -162,12 +166,18 @@ final class PrecisionLayerService
     {
         $table = $this->table($layer);
         $count = strlen($pixels);
-        $parts = [];
-        for ($index = 0; $index < $count; $index++) {
-            $parts[] = $table[ord($pixels[$index])];
+        $rgb = '';
+        $step = 4096;
+        for ($index = 0; $index < $count; $index += $step) {
+            $end = min($count, $index + $step);
+            $piece = '';
+            for ($cursor = $index; $cursor < $end; $cursor++) {
+                $piece .= $table[ord($pixels[$cursor])];
+            }
+            $rgb .= $piece;
         }
 
-        return implode('', $parts);
+        return $rgb;
     }
 
     /**
