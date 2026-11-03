@@ -521,7 +521,7 @@ class WorkspaceController extends Controller
             'console' => [
                 'configured' => $w->consoleConfigured(),
                 'username' => (string) ($w->console_username ?? ''),
-                'baseUrl' => \App\Services\Fs25\DedicatedServerConsole::displayOrigin($w->console_base_url),
+                'baseUrl' => \App\Services\Fs25\DedicatedServerConsole::displayOrigin($w->feed_base_url ?: $w->console_base_url),
                 'hasPassword' => filled($w->console_password_encrypted),
             ],
         ];

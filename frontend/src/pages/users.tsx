@@ -14,6 +14,7 @@ import {
   Tractor,
   Wallet,
 } from "lucide-react"
+import { apiSaveModuleAccess, ApiError } from "../api"
 import { APP_MODULES, type ModuleId } from "../modules"
 import { useStore } from "../store"
 import type { AppUser, GlobalRole, ModuleAccess, Workspace, WorkspaceRole } from "../types"
@@ -94,8 +95,16 @@ export function UsersPanel() {
     store.unassign(user.id, workspace.id)
   }
 
-  function setModule(user: AppUser, workspaceId: string, moduleId: string, current: ModuleAccess | null) {
+  async function setModule(user: AppUser, workspaceId: string, moduleId: string, current: ModuleAccess | null) {
     const next = current === null ? "read" : current === "read" ? "write" : null
+    if (store.liveMode && user.globalRole !== "admin") {
+      try {
+        await apiSaveModuleAccess(workspaceId, user.id, moduleId, next ?? "none")
+      } catch (caught) {
+        store.pushToast("warn", caught instanceof ApiError ? caught.message : t("users.accessFailed"))
+        return
+      }
+    }
     store.setModuleAccess(user.id, workspaceId, moduleId, next)
   }
 
@@ -315,7 +324,7 @@ export function UsersPanel() {
                                   className={access ? `perm ${access}` : "perm"}
                                   disabled={admin || fullModules || !enabled}
                                   aria-label={t("modules.cycle", { module: t(module.labelKey), right })}
-                                  onClick={() => setModule(selected, workspace.id, module.id, access)}
+                                  onClick={() => void setModule(selected, workspace.id, module.id, access)}
                                 >
                                   <span className="perm-checks" aria-hidden="true">
                                     <Check className={access ? "icon perm-mark on" : "icon perm-mark"} />

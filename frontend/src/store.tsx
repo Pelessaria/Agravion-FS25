@@ -13,6 +13,7 @@ import {
   apiLogin,
   apiLogout,
   apiMe,
+  apiUsers,
   apiProbeHostAccess,
   apiSaveHostAccess,
   apiSelectSavegame,
@@ -338,6 +339,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           setUsers([me])
           setSessionUserId(me.id)
           setViewUserId(me.id)
+          if (me.globalRole === "admin") {
+            try {
+              const directory = await apiUsers()
+              if (!cancelled && directory.length > 0) setUsers(directory)
+            } catch {
+              // The signed-in account stays in the list when the directory cannot be loaded.
+            }
+          }
           const list = await apiWorkspaces()
           if (!cancelled) setWorkspaces(list)
         } else {

@@ -52,6 +52,19 @@ class AuthController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function index(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if ($user === null || ($user->global_role ?? 'admin') === 'member') {
+            abort(403, 'Kein Zugriff auf die Benutzerverwaltung.');
+        }
+        $users = User::query()->orderBy('name')->orderBy('id')->get();
+
+        return response()->json([
+            'users' => $users->map(fn (User $row): array => $this->serializeUser($row))->values(),
+        ]);
+    }
+
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();

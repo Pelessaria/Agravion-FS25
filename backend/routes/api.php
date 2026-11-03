@@ -15,6 +15,7 @@ Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:web')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
+    Route::get('/users', [AuthController::class, 'index']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::get('/workspaces', [WorkspaceController::class, 'index']);
@@ -47,6 +48,7 @@ Route::middleware('auth:web')->group(function () {
     Route::post('/workspaces/{workspace}/server/mods/active', [ServerConsoleController::class, 'active']);
     Route::get('/workspaces/{workspace}/server/access', [ServerConsoleController::class, 'access']);
     Route::put('/workspaces/{workspace}/server/access', [ServerConsoleController::class, 'saveAccess']);
+    Route::put('/workspaces/{workspace}/modules/access', [ServerConsoleController::class, 'saveModuleAccess']);
 
     Route::get('/system/update', [SystemUpdateController::class, 'status']);
     Route::get('/system/schedule', [SystemUpdateController::class, 'schedule']);

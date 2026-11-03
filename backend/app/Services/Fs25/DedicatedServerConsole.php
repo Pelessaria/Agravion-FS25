@@ -732,10 +732,11 @@ final class DedicatedServerConsole
 
     private function baseUrl(Workspace $workspace): string
     {
-        $raw = trim((string) $workspace->console_base_url);
-        if ($raw === '') {
-            $raw = trim((string) $workspace->feed_base_url);
+        $feed = trim((string) $workspace->feed_base_url);
+        if ($feed !== '') {
+            return self::origin($feed);
         }
+        $raw = trim((string) $workspace->console_base_url);
         if ($raw === '') {
             throw new RuntimeException('Keine Adresse für die Serveroberfläche.');
         }

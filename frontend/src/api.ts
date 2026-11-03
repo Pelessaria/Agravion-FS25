@@ -78,6 +78,23 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   return data as T
 }
 
+export async function apiUsers(): Promise<AppUser[]> {
+  const data = await apiFetch<{ users: AppUser[] }>("/api/users")
+  return data.users
+}
+
+export async function apiSaveModuleAccess(
+  workspaceId: string,
+  userId: string,
+  moduleId: string,
+  access: "none" | "read" | "write",
+): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/modules/access`, {
+    method: "PUT",
+    body: JSON.stringify({ userId: Number(userId), moduleId, access }),
+  })
+}
+
 export async function apiMe(): Promise<AppUser | null> {
   try {
     const data = await apiFetch<{ user: AppUser }>("/api/me")
@@ -388,7 +405,7 @@ export async function apiServerSnapshot(workspaceId: string): Promise<ServerSnap
 
 export async function apiSaveServerLogin(
   workspaceId: string,
-  body: { baseUrl: string; username: string; password?: string; keepPassword: boolean },
+  body: { username: string; password?: string; keepPassword: boolean },
 ): Promise<{ ok: boolean; console: NonNullable<import("./types").Workspace["console"]> }> {
   return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/login`, {
     method: "PUT",

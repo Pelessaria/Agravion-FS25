@@ -2929,3 +2929,73 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   .fields-detail { max-height: none; }
   .fields-facts div { grid-template-columns: 1fr 1fr; }
 }
+
+.server-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.server-hero-note { flex: 1 0 100%; margin: 0; }
+.server-state { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.server-state > div { display: grid; gap: 2px; }
+.server-state strong { font-weight: 600; letter-spacing: -0.02em; }
+.server-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.server-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.server-panel-head h2 { margin: 0; }
+.server-origin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+.server-origin span { color: var(--text-faint); }
+.server-origin strong { font-weight: 600; overflow-wrap: anywhere; }
+.server-login-grid, .server-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.server-login-grid { margin-bottom: 14px; }
+.server-settings { margin-bottom: 14px; }
+.server-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.server-toolbar input { flex: 1 1 220px; min-width: 0; }
+.server-mods {
+  max-height: 440px;
+  margin-top: 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.server-mods th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-2);
+}
+.server-mods tbody tr { cursor: default; }
+.server-mod-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.server-log { max-height: 420px; }
+.badge.is-off, .badge.is-unknown {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-muted);
+  border-color: var(--line);
+  background: transparent;
+}
+@media (max-width: 860px) {
+  .server-login-grid, .server-settings { grid-template-columns: 1fr; }
+  .server-hero { align-items: stretch; }
+}

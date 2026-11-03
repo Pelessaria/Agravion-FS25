@@ -29,24 +29,18 @@ class ServerConsoleController extends Controller
         $this->requireAdmin($request);
         $row = $this->workspace($workspace);
         $data = $request->validate([
-            'baseUrl' => ['nullable', 'string', 'max:2048'],
             'username' => ['required', 'string', 'max:190'],
             'password' => ['nullable', 'string', 'max:500'],
             'keepPassword' => ['sometimes', 'boolean'],
         ]);
-        $base = trim((string) ($data['baseUrl'] ?? ''));
-        if ($base !== '' && preg_match('#^https?://#i', $base) !== 1) {
-            throw ValidationException::withMessages([
-                'baseUrl' => 'Die Adresse muss mit http oder https beginnen.',
-            ]);
-        }
         if (($data['keepPassword'] ?? false) !== true && trim((string) ($data['password'] ?? '')) === '') {
             throw ValidationException::withMessages([
                 'password' => 'Passwort fehlt.',
             ]);
         }
+        $feed = trim((string) $row->feed_base_url);
         try {
-            $row->console_base_url = $base !== '' ? DedicatedServerConsole::origin($base) : null;
+            $row->console_base_url = $feed !== '' ? DedicatedServerConsole::origin($feed) : null;
         } catch (RuntimeException $e) {
             throw ValidationException::withMessages([
                 'baseUrl' => $e->getMessage(),
@@ -169,10 +163,18 @@ class ServerConsoleController extends Controller
 
     public function saveAccess(Request $request, string $workspace): JsonResponse
     {
+        $request->merge(['moduleId' => 'server']);
+
+        return $this->saveModuleAccess($request, $workspace);
+    }
+
+    public function saveModuleAccess(Request $request, string $workspace): JsonResponse
+    {
         $this->requireAdmin($request);
         $row = $this->workspace($workspace);
         $data = $request->validate([
             'userId' => ['required', 'integer'],
+            'moduleId' => ['required', 'in:map,fields,equipment,animals,storage,finance,trade,farm,server'],
             'access' => ['required', 'in:none,read,write'],
         ]);
         $user = User::query()->find($data['userId']);
@@ -183,14 +185,14 @@ class ServerConsoleController extends Controller
             ModuleGrant::query()
                 ->where('user_id', $user->id)
                 ->where('workspace_id', $row->id)
-                ->where('module_id', 'server')
+                ->where('module_id', $data['moduleId'])
                 ->delete();
         } else {
             ModuleGrant::query()->updateOrCreate(
                 [
                     'user_id' => $user->id,
                     'workspace_id' => $row->id,
-                    'module_id' => 'server',
+                    'module_id' => $data['moduleId'],
                 ],
                 ['access' => $data['access']],
             );
@@ -263,7 +265,7 @@ class ServerConsoleController extends Controller
         return [
             'configured' => $workspace->consoleConfigured(),
             'username' => (string) ($workspace->console_username ?? ''),
-            'baseUrl' => (string) ($workspace->console_base_url ?? ''),
+            'baseUrl' => DedicatedServerConsole::displayOrigin($workspace->feed_base_url ?: $workspace->console_base_url),
             'hasPassword' => filled($workspace->console_password_encrypted),
         ];
     }
