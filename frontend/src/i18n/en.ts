@@ -924,6 +924,7 @@ export const en = {
     legendOpen: "Open",
     legendDone: "Done",
     shown: "{{shown}} of {{total}}",
+    filterBar: "Filters",
     filterJoined: "Joined",
     filterWeeds: "With weeds",
     filterStones: "With stones",

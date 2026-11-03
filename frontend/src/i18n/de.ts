@@ -922,6 +922,7 @@ export const de = {
     legendOpen: "Offen",
     legendDone: "Erledigt",
     shown: "{{shown}} von {{total}}",
+    filterBar: "Filter",
     filterJoined: "Zusammengelegt",
     filterWeeds: "Mit Unkraut",
     filterStones: "Mit Steinen",

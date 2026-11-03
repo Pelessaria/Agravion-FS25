@@ -467,23 +467,6 @@ export function FieldsPage() {
                 <LocateFixed className="icon" />
                 {t("fields.pick")}
               </button>
-              <button
-                type="button"
-                className={onlyMine ? "btn" : "btn btn-secondary"}
-                aria-pressed={onlyMine}
-                disabled={!farm}
-                onClick={() => setOnlyMine((value) => !value)}
-              >
-                {onlyMine ? t("fields.thisFarm") : t("fields.allFarms")}
-              </button>
-              <button
-                type="button"
-                className={showUnowned ? "btn" : "btn btn-secondary"}
-                aria-pressed={showUnowned}
-                onClick={() => setShowUnowned((value) => !value)}
-              >
-                {t("fields.showUnowned")}
-              </button>
               <label className="field fields-layer">
                 <span className="sr-only">{t("fields.layer")}</span>
                 <select value={activeLayer} onChange={(event) => setLayer(event.target.value as FieldLayerId)}>
@@ -496,15 +479,27 @@ export function FieldsPage() {
               </label>
             </div>
             <div className="fields-filters">
-              <span className="fields-filter-count">
-                {t("fields.shown", {
-                  shown: visible.length.toLocaleString(i18n.language),
-                  total: drawn.length.toLocaleString(i18n.language),
-                })}
-              </span>
+              <span className="fields-filter-label">{t("fields.filterBar")}</span>
               <button
                 type="button"
-                className={fieldQuery.crop === "harvestReady" ? "btn" : "btn btn-secondary"}
+                className={onlyMine ? "chip-check on" : "chip-check"}
+                aria-pressed={onlyMine}
+                disabled={!farm}
+                onClick={() => setOnlyMine((value) => !value)}
+              >
+                {t("fields.thisFarm")}
+              </button>
+              <button
+                type="button"
+                className={showUnowned ? "chip-check on" : "chip-check"}
+                aria-pressed={showUnowned}
+                onClick={() => setShowUnowned((value) => !value)}
+              >
+                {t("fields.showUnowned")}
+              </button>
+              <button
+                type="button"
+                className={fieldQuery.crop === "harvestReady" ? "chip-check on" : "chip-check"}
                 aria-pressed={fieldQuery.crop === "harvestReady"}
                 onClick={() => patchQuery({ crop: fieldQuery.crop === "harvestReady" ? "" : "harvestReady" })}
               >
@@ -512,7 +507,7 @@ export function FieldsPage() {
               </button>
               <button
                 type="button"
-                className={fieldQuery.joined ? "btn" : "btn btn-secondary"}
+                className={fieldQuery.joined ? "chip-check on" : "chip-check"}
                 aria-pressed={fieldQuery.joined}
                 onClick={() => patchQuery({ joined: !fieldQuery.joined })}
               >
@@ -520,7 +515,7 @@ export function FieldsPage() {
               </button>
               <button
                 type="button"
-                className={fieldQuery.weeds ? "btn" : "btn btn-secondary"}
+                className={fieldQuery.weeds ? "chip-check on" : "chip-check"}
                 aria-pressed={fieldQuery.weeds}
                 onClick={() => patchQuery({ weeds: !fieldQuery.weeds })}
               >
@@ -528,7 +523,7 @@ export function FieldsPage() {
               </button>
               <button
                 type="button"
-                className={fieldQuery.stones ? "btn" : "btn btn-secondary"}
+                className={fieldQuery.stones ? "chip-check on" : "chip-check"}
                 aria-pressed={fieldQuery.stones}
                 onClick={() => patchQuery({ stones: !fieldQuery.stones })}
               >
@@ -538,7 +533,7 @@ export function FieldsPage() {
                 <>
                   <button
                     type="button"
-                    className={fieldQuery.nitrogen === "low" ? "btn" : "btn btn-secondary"}
+                    className={fieldQuery.nitrogen === "low" ? "chip-check on" : "chip-check"}
                     aria-pressed={fieldQuery.nitrogen === "low"}
                     onClick={() => patchQuery({ nitrogen: fieldQuery.nitrogen === "low" ? "" : "low" })}
                   >
@@ -546,7 +541,7 @@ export function FieldsPage() {
                   </button>
                   <button
                     type="button"
-                    className={fieldQuery.ph === "off" ? "btn" : "btn btn-secondary"}
+                    className={fieldQuery.ph === "off" ? "chip-check on" : "chip-check"}
                     aria-pressed={fieldQuery.ph === "off"}
                     onClick={() => patchQuery({ ph: fieldQuery.ph === "off" ? "" : "off" })}
                   >
@@ -554,7 +549,7 @@ export function FieldsPage() {
                   </button>
                   <button
                     type="button"
-                    className={fieldQuery.scan === "no" ? "btn" : "btn btn-secondary"}
+                    className={fieldQuery.scan === "no" ? "chip-check on" : "chip-check"}
                     aria-pressed={fieldQuery.scan === "no"}
                     onClick={() => patchQuery({ scan: fieldQuery.scan === "no" ? "" : "no" })}
                   >
@@ -565,7 +560,7 @@ export function FieldsPage() {
                 <>
                   <button
                     type="button"
-                    className={fieldQuery.spray === "open" ? "btn" : "btn btn-secondary"}
+                    className={fieldQuery.spray === "open" ? "chip-check on" : "chip-check"}
                     aria-pressed={fieldQuery.spray === "open"}
                     onClick={() => patchQuery({ spray: fieldQuery.spray === "open" ? "" : "open" })}
                   >
@@ -573,7 +568,7 @@ export function FieldsPage() {
                   </button>
                   <button
                     type="button"
-                    className={fieldQuery.lime === "open" ? "btn" : "btn btn-secondary"}
+                    className={fieldQuery.lime === "open" ? "chip-check on" : "chip-check"}
                     aria-pressed={fieldQuery.lime === "open"}
                     onClick={() => patchQuery({ lime: fieldQuery.lime === "open" ? "" : "open" })}
                   >
@@ -581,43 +576,55 @@ export function FieldsPage() {
                   </button>
                 </>
               )}
-              <label className="field">
-                <span className="sr-only">{t("fields.filterFruit")}</span>
-                <select value={fieldQuery.fruit} onChange={(event) => patchQuery({ fruit: event.target.value })}>
-                  <option value="">{t("fields.filterFruit")}</option>
-                  {fruitOptions.map(([name, title]) => (
-                    <option key={name} value={name}>
-                      {title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span className="sr-only">{t("fields.filterCrop")}</span>
-                <select value={fieldQuery.crop} onChange={(event) => patchQuery({ crop: event.target.value })}>
-                  <option value="">{t("fields.filterCrop")}</option>
-                  {cropFilters.map((crop) => (
-                    <option key={crop} value={crop}>
-                      {t(`fields.crop.${crop}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <select
+                className="fields-filter-select"
+                aria-label={t("fields.filterFruit")}
+                value={fieldQuery.fruit}
+                onChange={(event) => patchQuery({ fruit: event.target.value })}
+              >
+                <option value="">{t("fields.filterFruit")}</option>
+                {fruitOptions.map(([name, title]) => (
+                  <option key={name} value={name}>
+                    {title}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="fields-filter-select"
+                aria-label={t("fields.filterCrop")}
+                value={fieldQuery.crop}
+                onChange={(event) => patchQuery({ crop: event.target.value })}
+              >
+                <option value="">{t("fields.filterCrop")}</option>
+                {cropFilters.map((crop) => (
+                  <option key={crop} value={crop}>
+                    {t(`fields.crop.${crop}`)}
+                  </option>
+                ))}
+              </select>
               {precisionFarming === true ? (
-                <label className="field">
-                  <span className="sr-only">{t("fields.filterSoil")}</span>
-                  <select value={fieldQuery.soil} onChange={(event) => patchQuery({ soil: event.target.value })}>
-                    <option value="">{t("fields.filterSoil")}</option>
-                    {[1, 2, 3, 4].map((soil) => (
-                      <option key={soil} value={String(soil)}>
-                        {t(`fields.soilType.${soil}`)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <select
+                  className="fields-filter-select"
+                  aria-label={t("fields.filterSoil")}
+                  value={fieldQuery.soil}
+                  onChange={(event) => patchQuery({ soil: event.target.value })}
+                >
+                  <option value="">{t("fields.filterSoil")}</option>
+                  {[1, 2, 3, 4].map((soil) => (
+                    <option key={soil} value={String(soil)}>
+                      {t(`fields.soilType.${soil}`)}
+                    </option>
+                  ))}
+                </select>
               ) : null}
+              <span className="fields-filter-count">
+                {t("fields.shown", {
+                  shown: visible.length.toLocaleString(i18n.language),
+                  total: drawn.length.toLocaleString(i18n.language),
+                })}
+              </span>
               {filterCount > 0 ? (
-                <button type="button" className="btn btn-secondary" onClick={() => setFieldQuery(EMPTY_FIELD_QUERY)}>
+                <button type="button" className="fields-filter-reset" onClick={() => setFieldQuery(EMPTY_FIELD_QUERY)}>
                   {t("fields.filterReset")}
                 </button>
               ) : null}

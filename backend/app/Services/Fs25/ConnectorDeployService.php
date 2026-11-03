@@ -94,27 +94,54 @@ final class ConnectorDeployService
             if ($bytes === false || $bytes < 1) {
                 return $this->fail('Connector-Paket ist leer oder unlesbar.');
             }
-            $contents = file_get_contents($local);
-            if ($contents === false) {
-                return $this->fail('Connector-Paket konnte nicht gelesen werden.');
-            }
 
             $client = new HostFileClient($access);
-            $modsDir = self::resolveModsDirectory($client, $access, $modsPathHint);
-            $client->ensureDirectory($modsDir);
+            $modsDir = self::knownModsDirectory($access, $modsPathHint);
             $remote = rtrim($modsDir, '/').'/'.self::MOD_ZIP;
-            $client->write($remote, $contents);
+            $last = null;
+            for ($attempt = 0; $attempt < 2; $attempt++) {
+                try {
+                    $client->writeFile($remote, $local);
 
-            return [
-                'ok' => true,
-                'error' => null,
-                'remotePath' => $remote,
-                'bytes' => strlen($contents),
-                'version' => $this->packageVersion(),
-            ];
+                    return [
+                        'ok' => true,
+                        'error' => null,
+                        'remotePath' => $remote,
+                        'bytes' => (int) $bytes,
+                        'version' => $this->packageVersion(),
+                    ];
+                } catch (Throwable $e) {
+                    $last = $e;
+                    if ($attempt === 0) {
+                        usleep(2_000_000);
+                    }
+                }
+            }
+
+            return $this->fail(HostConnectionError::format($last ?? new RuntimeException('Upload fehlgeschlagen.'), 'Connector-Deploy'));
         } catch (Throwable $e) {
             return $this->fail(HostConnectionError::format($e, 'Connector-Deploy'));
         }
+    }
+
+    /**
+     * The mods folder sits next to modSettings. Listing it just to confirm the name
+     * opens a second FTP session and is what made the upload fail while another
+     * job was already connected.
+     */
+    public static function knownModsDirectory(HostAccess $access, ?string $hint = null): string
+    {
+        $hint = $hint !== null ? trim(str_replace('\\', '/', $hint), '/') : '';
+        if ($hint !== '') {
+            return $hint;
+        }
+        $modSettings = trim(str_replace('\\', '/', (string) ($access->remote_mod_settings_path ?? '')), '/');
+        if ($modSettings === '') {
+            return 'mods';
+        }
+        $parent = trim(dirname($modSettings), '/.');
+
+        return $parent === '' || $parent === '.' ? 'mods' : $parent.'/mods';
     }
 
     public static function resolveModsDirectory(HostFileClient $client, HostAccess $access, ?string $hint = null): string

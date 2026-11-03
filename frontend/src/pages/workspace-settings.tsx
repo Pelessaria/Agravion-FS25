@@ -86,24 +86,31 @@ export function WorkspaceSettingsPage() {
   const [deployBusy, setDeployBusy] = useState(false)
   const [downloadBusy, setDownloadBusy] = useState(false)
 
+  const workspaceId = workspace?.id
   useEffect(() => {
-    if (dialog !== "download" || !workspace) return
+    if (dialog !== "download" || !workspaceId) return
     let cancelled = false
-    setUpdateCheckBusy(true)
-    void Promise.all([
-      apiConnectorPackageMeta().catch(() => ({
-        available: false,
-        error: "meta",
-        version: null,
-        fileName: "FS25_AgriVisionConnector.zip",
-      })),
-      apiRequiredMods(workspace.id).catch(() => null),
-    ])
-      .then(([meta, mods]) => {
-        if (cancelled) return
-        setPackageMeta(meta)
-        const connector = mods?.mods.find((m) => m.id === "FS25_AgriVisionConnector") ?? null
-        setConnectorMod(connector)
+    void apiConnectorPackageMeta()
+      .then((meta) => {
+        if (!cancelled) setPackageMeta(meta)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPackageMeta({
+            available: false,
+            error: "meta",
+            version: null,
+            fileName: "FS25_AgriVisionConnector.zip",
+          })
+        }
+      })
+    void apiRequiredMods(workspaceId)
+      .then((mods) => {
+        if (cancelled || !mods) return
+        setConnectorMod(mods.mods.find((item) => item.id === "FS25_AgriVisionConnector") ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setConnectorMod(null)
       })
       .finally(() => {
         if (!cancelled) setUpdateCheckBusy(false)
@@ -111,7 +118,7 @@ export function WorkspaceSettingsPage() {
     return () => {
       cancelled = true
     }
-  }, [dialog, workspace?.id])
+  }, [dialog, workspaceId])
 
   if (!workspace) return <MissingWorkspace />
   if (!allowed || !manage) return <PermissionBlock />
@@ -645,7 +652,14 @@ export function WorkspaceSettingsPage() {
                 <button type="button" className="btn btn-ghost" onClick={() => setDialog("confirm")}>
                   {t("card.recouple")}
                 </button>
-                <button type="button" className="btn btn-primary" onClick={() => setDialog("download")}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setUpdateCheckBusy(true)
+                    setDialog("download")
+                  }}
+                >
                   {t("card.download")}
                 </button>
               </div>
@@ -756,7 +770,10 @@ export function WorkspaceSettingsPage() {
                     )
                     setDialog(null)
                   })
-                  .catch(() => store.pushToast("warn", t("wsettings.connectorDeployFail")))
+                  .catch((error: unknown) => {
+                    const text = error instanceof ApiError && error.message ? error.message : t("wsettings.connectorDeployFail")
+                    store.pushToast("warn", text)
+                  })
                   .finally(() => setDeployBusy(false))
               }}
             >
