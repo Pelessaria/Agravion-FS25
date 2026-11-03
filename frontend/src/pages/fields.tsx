@@ -437,22 +437,6 @@ export function FieldsPage() {
         <div className="fields-layout">
           <div className="fields-map-card">
             <div className="fields-toolbar">
-              <label className="field fields-search">
-                <span className="sr-only">{t("fields.fieldNumber")}</span>
-                <input
-                  inputMode="numeric"
-                  value={query}
-                  placeholder={t("fields.fieldNumber")}
-                  onChange={(event) => setQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") jumpToNumber()
-                  }}
-                />
-              </label>
-              <button type="button" className="btn btn-secondary" onClick={jumpToNumber}>
-                <LocateFixed className="icon" />
-                {t("fields.pick")}
-              </button>
               <div className="layer-switch" role="group" aria-label={t("fields.layer")}>
                 <button
                   type="button"
@@ -475,6 +459,22 @@ export function FieldsPage() {
                   <ChevronRight className="icon" />
                 </button>
               </div>
+              <label className="field fields-search">
+                <span className="sr-only">{t("fields.fieldNumber")}</span>
+                <input
+                  inputMode="numeric"
+                  value={query}
+                  placeholder={t("fields.fieldNumber")}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") jumpToNumber()
+                  }}
+                />
+              </label>
+              <button type="button" className="btn btn-secondary" onClick={jumpToNumber}>
+                <LocateFixed className="icon" />
+                {t("fields.pick")}
+              </button>
             </div>
             <div className="fields-filters">
               <button

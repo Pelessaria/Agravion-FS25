@@ -2868,11 +2868,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   align-items: center;
   gap: 2px;
   flex: 0 0 auto;
-  margin-left: auto;
   height: 34px;
-  margin-top: 0;
-  margin-bottom: 0;
-  margin-right: 0;
+  margin: 0;
   padding: 0 4px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -2898,7 +2895,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   position: absolute;
   z-index: 8;
   top: calc(100% + 6px);
-  right: 0;
+  left: 0;
+  right: auto;
   width: max-content;
   min-width: 9.5rem;
   max-height: 200px;
