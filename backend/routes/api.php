@@ -46,7 +46,9 @@ Route::middleware('auth:web')->group(function () {
     Route::post('/workspaces/{workspace}/server/mods', [ServerConsoleController::class, 'upload']);
     Route::get('/workspaces/{workspace}/server/mod', [ServerConsoleController::class, 'download']);
     Route::post('/workspaces/{workspace}/server/mods/active', [ServerConsoleController::class, 'active']);
+    Route::post('/workspaces/{workspace}/server/mods/download', [ServerConsoleController::class, 'downloadMany']);
     Route::post('/workspaces/{workspace}/server/mods/update', [ServerConsoleController::class, 'updateMod']);
+    Route::post('/workspaces/{workspace}/server/mods/updates', [ServerConsoleController::class, 'updateMods']);
     Route::post('/workspaces/{workspace}/server/mods/delete', [ServerConsoleController::class, 'deleteMods']);
     Route::get('/workspaces/{workspace}/server/access', [ServerConsoleController::class, 'access']);
     Route::put('/workspaces/{workspace}/server/access', [ServerConsoleController::class, 'saveAccess']);

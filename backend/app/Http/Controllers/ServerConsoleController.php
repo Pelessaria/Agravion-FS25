@@ -136,6 +136,28 @@ class ServerConsoleController extends Controller
         ]);
     }
 
+    public function downloadMany(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): Response
+    {
+        $row = $this->workspace($workspace);
+        $this->requireServer($request, $row, $grants, 'mods');
+        $data = $request->validate([
+            'names' => ['required', 'array', 'min:1', 'max:40'],
+            'names.*' => ['required', 'string', 'max:180'],
+        ]);
+        $request->session()->save();
+        try {
+            $path = $console->downloadMany($row, $data['names']);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        } catch (Throwable) {
+            return response()->json(['error' => 'Die Mods konnten nicht geladen werden.'], 422);
+        }
+
+        return response()->download($path, 'mods.zip', [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
+    }
+
     public function updateMod(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
     {
         $row = $this->workspace($workspace);
@@ -145,6 +167,18 @@ class ServerConsoleController extends Controller
         ]);
 
         return $this->afterChange($row, $console, fn () => $console->updateMod($row, $data['name']));
+    }
+
+    public function updateMods(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
+    {
+        $row = $this->workspace($workspace);
+        $this->requireServer($request, $row, $grants, 'control');
+        $data = $request->validate([
+            'names' => ['required', 'array', 'min:1', 'max:40'],
+            'names.*' => ['required', 'string', 'max:180'],
+        ]);
+
+        return $this->afterChange($row, $console, fn () => $console->updateMods($row, $data['names']));
     }
 
     public function deleteMods(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse

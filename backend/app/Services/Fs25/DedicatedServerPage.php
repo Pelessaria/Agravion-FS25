@@ -20,6 +20,7 @@ final class DedicatedServerPage
      *   modForm: array{action: string, save: array{name: string, value: string}|null, file: string|null, fields: list<array{name: string, value: string, checked: bool}>}|null,
      *   modRows: list<array{name: string, active: bool|null, checkbox: string|null, download: string|null, buttonName: string|null, buttonValue: string|null}>,
      *   modCards: list<array{name: string, title: string, version: string, author: string, bytes: int|null, active: bool|null}>,
+     *   modToggles: list<array{name: string, active: bool, disabled: bool, reason: string, field: string, action: string, submitName: string, submitValue: string}>,
      *   savegameDownloads: list<string>,
      *   settingsForm: array{action: string, save: array{name: string, value: string}|null, fields: list<array{name: string, label: string, type: string, value: string, checked: bool, options: list<array{value: string, label: string}>}>}|null,
      *   logLinks: list<array{href: string, text: string}>,
@@ -134,6 +135,7 @@ final class DedicatedServerPage
             'modForm' => $modForm,
             'modRows' => $modRows,
             'modCards' => self::modCards($xpath),
+            'modToggles' => self::modToggles($dom),
             'savegameDownloads' => $savegameDownloads,
             'settingsForm' => $settingsForm,
             'logLinks' => $logLinks,
@@ -564,6 +566,80 @@ final class DedicatedServerPage
         }
 
         return null;
+    }
+
+    /**
+     * Active mods sit in the ActiveMods form as moddeactivate_* checkboxes.
+     * Inactive mods sit in the InactiveMods form as modactivate_* checkboxes.
+     * Both forms are only present while the game server is stopped.
+     *
+     * @return list<array{name: string, active: bool, disabled: bool, reason: string, field: string, action: string, submitName: string, submitValue: string}>
+     */
+    private static function modToggles(DOMDocument $dom): array
+    {
+        $toggles = [];
+        foreach ($dom->getElementsByTagName('form') as $form) {
+            if (! $form instanceof DOMElement) {
+                continue;
+            }
+            $formName = $form->getAttribute('name');
+            $active = match ($formName) {
+                'ActiveMods' => true,
+                'InactiveMods' => false,
+                default => null,
+            };
+            if ($active === null) {
+                continue;
+            }
+            $submitName = '';
+            $submitValue = '';
+            foreach ($form->getElementsByTagName('input') as $input) {
+                if (! $input instanceof DOMElement || strtolower($input->getAttribute('type')) !== 'submit') {
+                    continue;
+                }
+                $name = $input->getAttribute('name');
+                if (! in_array($name, ['deactivate_mods', 'activate_mods'], true)) {
+                    continue;
+                }
+                $submitName = $name;
+                $submitValue = $input->getAttribute('value');
+            }
+            if ($submitName === '') {
+                continue;
+            }
+            $action = $form->getAttribute('action');
+            foreach ($form->getElementsByTagName('input') as $input) {
+                if (! $input instanceof DOMElement || strtolower($input->getAttribute('type')) !== 'checkbox') {
+                    continue;
+                }
+                $field = $input->getAttribute('name');
+                if (preg_match('/^mod(?:de)?activate_(.+\.zip)$/i', $field, $match) !== 1) {
+                    continue;
+                }
+                $reason = '';
+                $node = $input->parentNode;
+                while ($node instanceof DOMElement) {
+                    $title = trim($node->getAttribute('title'));
+                    if ($title !== '') {
+                        $reason = $title;
+                        break;
+                    }
+                    $node = $node->parentNode;
+                }
+                $toggles[] = [
+                    'name' => $match[1],
+                    'active' => $active,
+                    'disabled' => $input->hasAttribute('disabled'),
+                    'reason' => $reason,
+                    'field' => $field,
+                    'action' => $action,
+                    'submitName' => $submitName,
+                    'submitValue' => $submitValue,
+                ];
+            }
+        }
+
+        return $toggles;
     }
 
     /**

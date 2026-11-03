@@ -5,11 +5,13 @@ import { ChevronDown, ChevronRight, Copy, Download, Link2, Pause, Play, RotateCc
 import {
   apiDeleteServerMods,
   apiDownloadServerMod,
+  apiDownloadServerMods,
   apiSaveServerSettings,
   apiServerAction,
   apiServerSnapshot,
   apiSetServerModActive,
   apiUpdateServerMod,
+  apiUpdateServerMods,
   apiUploadServerMod,
   ApiError,
   type ServerSettingField,
@@ -91,6 +93,7 @@ export function ServerPage() {
   const [copied, setCopied] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
   const [pendingDelete, setPendingDelete] = useState<string[] | null>(null)
+  const [pendingUpdate, setPendingUpdate] = useState<string[] | null>(null)
   const [downloading, setDownloading] = useState("")
   const alive = useRef(true)
 
@@ -165,6 +168,9 @@ export function ServerPage() {
   }, [modQuery, snapshot.mods, sortDir, sortKey])
 
   const selectedSet = useMemo(() => new Set(selected), [selected])
+  const selectedMods = snapshot.mods.filter((mod) => selectedSet.has(mod.name))
+  const selectedUpdatable = selectedMods.filter((mod) => mod.updateAvailable)
+  const selectedDownloadable = selectedMods.filter((mod) => mod.download)
   const visibleSelected = visibleMods.filter((mod) => selectedSet.has(mod.name)).length
   const allVisibleSelected = visibleMods.length > 0 && visibleSelected === visibleMods.length
 
@@ -240,11 +246,16 @@ export function ServerPage() {
   }
 
   async function downloadMod(name: string) {
-    if (!workspace) return
-    setDownloading(name)
+    await downloadMods([name])
+  }
+
+  async function downloadMods(names: string[]) {
+    if (!workspace || names.length === 0) return
+    setDownloading(names.length === 1 ? names[0] : "many")
     setError("")
     try {
-      await apiDownloadServerMod(workspace.id, name)
+      if (names.length === 1) await apiDownloadServerMod(workspace.id, names[0])
+      else await apiDownloadServerMods(workspace.id, names)
     } catch (caught) {
       if (alive.current) setError(caught instanceof ApiError ? caught.message : t("server.missingFiles"))
     } finally {
@@ -319,6 +330,26 @@ export function ServerPage() {
       setPendingDelete(null)
     } finally {
       setBusy("")
+    }
+  }
+
+  async function updateMods(names: string[]) {
+    if (!workspace || names.length === 0) return
+    setBusy("update-many")
+    setError("")
+    try {
+      const result = await apiUpdateServerMods(workspace.id, names)
+      if (!alive.current) return
+      pushToast("ok", t("server.updateManyDone", { count: result.updated }))
+      if (result.failed.length > 0) setError(result.failed.map((item) => `${item.name}: ${item.error}`).join(" "))
+      setSelected((current) => current.filter((name) => !names.includes(name) || result.failed.some((item) => item.name === name)))
+      setPendingUpdate(null)
+      await reload()
+    } catch (caught) {
+      if (alive.current) setError(caught instanceof ApiError ? caught.message : t("server.updateManyFailed"))
+      setPendingUpdate(null)
+    } finally {
+      if (alive.current) setBusy("")
     }
   }
 
@@ -475,6 +506,53 @@ export function ServerPage() {
             />
           </label>
           <div className="server-toolbar-actions">
+          <Tip
+            text={
+              selectedDownloadable.length === 0
+                ? selected.length > 0
+                  ? t("server.missingFiles")
+                  : undefined
+                : downloading !== ""
+                  ? t("server.downloadBusy")
+                  : undefined
+            }
+          >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={selectedDownloadable.length === 0 || downloading !== ""}
+              onClick={() => void downloadMods(selectedDownloadable.map((mod) => mod.name))}
+            >
+              <Download className="icon" aria-hidden="true" />
+              {downloading === "many" ? t("server.loading") : t("server.download")}
+              {selectedDownloadable.length > 0 ? ` (${selectedDownloadable.length})` : ""}
+            </button>
+          </Tip>
+          {canWrite ? (
+            <Tip
+              text={
+                selectedUpdatable.length === 0
+                  ? selected.length > 0
+                    ? t("server.updateManyNone")
+                    : undefined
+                  : snapshot.running !== false
+                    ? t("server.updateNeedsStop")
+                    : busy !== ""
+                      ? t("server.busy")
+                      : undefined
+              }
+            >
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={selectedUpdatable.length === 0 || snapshot.running !== false || busy !== ""}
+                onClick={() => setPendingUpdate(selectedUpdatable.map((mod) => mod.name))}
+              >
+                {busy === "update-many" ? t("server.loading") : t("server.update")}
+                {selectedUpdatable.length > 0 ? ` (${selectedUpdatable.length})` : ""}
+              </button>
+            </Tip>
+          ) : null}
           {canWrite ? (
             <Tip
               text={
@@ -573,8 +651,9 @@ export function ServerPage() {
                           : snapshot.running === true
                             ? t("server.updateNeedsStop")
                             : t("server.updateUnknown")
-                  const toggleDisabled = busy === mod.name
+                  const toggleDisabled = busy !== "" || snapshot.running === true
                   const toggleLabel = mod.active ? t("server.deactivate") : t("server.activate")
+                  const toggleReason = snapshot.running === true ? t("server.toggleNeedsStop") : busy !== "" ? t("server.busy") : undefined
                   const unused = mod.used === false && mod.mapDependency !== true
                   const deleteDisabled = !snapshot.ftpConfigured || snapshot.running !== false || busy !== ""
                   const deleteReason = !deleteDisabled
@@ -647,7 +726,7 @@ export function ServerPage() {
                           </span>
                           <span className="mod-icon-slot">
                             {mod.active != null && canWrite ? (
-                              <Tip text={toggleDisabled ? t("server.busy") : undefined}>
+                              <Tip text={toggleReason}>
                                 <button
                                   type="button"
                                   className="btn btn-secondary mod-icon-btn"
@@ -783,6 +862,19 @@ export function ServerPage() {
           <p className="muted">{t("server.noLog")}</p>
         )}
       </div> : null}
+      {pendingUpdate && pendingUpdate.length > 0 ? (
+        <Modal title={t("server.update")} onClose={() => busy !== "update-many" && setPendingUpdate(null)}>
+          <p>{t("server.updateMany", { count: pendingUpdate.length })}</p>
+          <div className="card-actions">
+            <button type="button" className="btn btn-secondary" disabled={busy === "update-many"} onClick={() => setPendingUpdate(null)}>
+              {t("server.cancel")}
+            </button>
+            <button type="button" className="btn btn-primary" disabled={busy === "update-many"} onClick={() => void updateMods(pendingUpdate)}>
+              {busy === "update-many" ? t("server.loading") : t("server.update")}
+            </button>
+          </div>
+        </Modal>
+      ) : null}
       {pendingDelete && pendingDelete.length > 0 ? (
         <Modal title={t("server.delete")} onClose={() => busy !== "delete" && setPendingDelete(null)}>
           <p>

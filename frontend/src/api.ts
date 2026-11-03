@@ -514,6 +514,75 @@ export async function apiUpdateServerMod(workspaceId: string, name: string): Pro
   })
 }
 
+export async function apiUpdateServerMods(
+  workspaceId: string,
+  names: string[],
+): Promise<{ ok: boolean; updated: number; failed: { name: string; error: string }[] }> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/mods/updates`, {
+    method: "POST",
+    body: JSON.stringify({ names }),
+  })
+}
+
+export async function apiDownloadServerMods(workspaceId: string, names: string[]): Promise<void> {
+  const url = `/api/workspaces/${encodeURIComponent(workspaceId)}/server/mods/download`
+  const picker = savePicker()
+  if (picker) {
+    let handle: SaveHandle
+    try {
+      handle = await picker({ suggestedName: "mods.zip" })
+    } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") return
+      await postModDownload(url, names)
+      return
+    }
+    await ensureCsrf()
+    const headers = new Headers({ Accept: "application/zip", "Content-Type": "application/json" })
+    const xsrf = readCookie("XSRF-TOKEN")
+    if (xsrf) headers.set("X-XSRF-TOKEN", xsrf)
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: JSON.stringify({ names }),
+    })
+    if (!response.ok || response.body === null) {
+      await handle.remove?.()
+      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
+      throw new ApiError(response.status, readApiErrorMessage(data, response.status))
+    }
+    const writable = await handle.createWritable()
+    await response.body.pipeTo(writable)
+    return
+  }
+  await postModDownload(url, names)
+}
+
+async function postModDownload(url: string, names: string[]): Promise<void> {
+  await ensureCsrf()
+  const form = document.createElement("form")
+  form.method = "POST"
+  form.action = url
+  const token = readCookie("XSRF-TOKEN")
+  if (token) {
+    const input = document.createElement("input")
+    input.type = "hidden"
+    input.name = "_token"
+    input.value = token
+    form.appendChild(input)
+  }
+  for (const name of names) {
+    const input = document.createElement("input")
+    input.type = "hidden"
+    input.name = "names[]"
+    input.value = name
+    form.appendChild(input)
+  }
+  document.body.appendChild(form)
+  form.submit()
+  form.remove()
+}
+
 export async function apiDeleteServerMods(workspaceId: string, names: string[]): Promise<{ ok: boolean; deleted: number }> {
   return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/mods/delete`, {
     method: "POST",

@@ -179,4 +179,38 @@ class DedicatedServerPageTest extends TestCase
         $this->assertNull($page['modCards'][1]['active']);
         $this->assertSame(['savegame2'], $page['savegameDownloads']);
     }
+
+    public function test_mod_toggles_come_from_the_active_and_inactive_forms(): void
+    {
+        $html = <<<'HTML'
+        <html><body>
+          <form action="index.html?lang=en#mods" method="post" name="ActiveMods">
+            <div title="This mod cannot be deactivated because active mods depend on it: FS25_Map.zip">
+              <input type="checkbox" disabled class="modSelection" name="moddeactivate_FS25_Needed.zip">
+            </div>
+            <input type="checkbox" class="modSelection" name="moddeactivate_FS25_Free.zip">
+            <input type="submit" name="deactivate_mods" value="Deactivate">
+          </form>
+          <form action="index.html?lang=en#mods" method="post" name="InactiveMods">
+            <input type="checkbox" class="modSelection" name="modactivate_FS25_Parked.zip">
+            <input type="submit" name="activate_mods" value="Activate">
+          </form>
+        </body></html>
+        HTML;
+
+        $page = DedicatedServerPage::parse($html, 'http://games.example/index.html');
+        $byName = [];
+        foreach ($page['modToggles'] as $toggle) {
+            $byName[$toggle['name']] = $toggle;
+        }
+
+        $this->assertTrue($byName['FS25_Needed.zip']['active']);
+        $this->assertTrue($byName['FS25_Needed.zip']['disabled']);
+        $this->assertStringContainsString('FS25_Map.zip', $byName['FS25_Needed.zip']['reason']);
+        $this->assertSame('deactivate_mods', $byName['FS25_Needed.zip']['submitName']);
+        $this->assertFalse($byName['FS25_Free.zip']['disabled']);
+        $this->assertFalse($byName['FS25_Parked.zip']['active']);
+        $this->assertSame('activate_mods', $byName['FS25_Parked.zip']['submitName']);
+        $this->assertSame('Activate', $byName['FS25_Parked.zip']['submitValue']);
+    }
 }

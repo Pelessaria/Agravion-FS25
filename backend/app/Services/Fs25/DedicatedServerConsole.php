@@ -276,57 +276,64 @@ final class DedicatedServerConsole
     {
         $name = $this->safeZip($filename);
         [$client, $base, $home] = $this->open($workspace);
-        $pages = $this->withPages($client, $base, $home, ['mods.html']);
-        foreach ($pages as $page) {
-            foreach ($page['modRows'] as $row) {
-                if (strcasecmp($row['name'], $name) !== 0) {
+        $match = null;
+        foreach ($home['modToggles'] ?? [] as $toggle) {
+            if (is_array($toggle) && strcasecmp((string) ($toggle['name'] ?? ''), $name) === 0) {
+                $match = $toggle;
+                break;
+            }
+        }
+        if ($match === null) {
+            if (($home['running'] ?? null) !== false) {
+                throw new RuntimeException('Aktivieren und Deaktivieren geht nur, solange der Spielserver aus ist.');
+            }
+            throw new RuntimeException('Die Oberfläche bietet für diese Mod gerade keinen Schalter.');
+        }
+        if (($match['active'] ?? null) === $active) {
+            return ['ok' => true];
+        }
+        if (($match['disabled'] ?? false) === true) {
+            throw new RuntimeException($this->toggleReason((string) ($match['reason'] ?? '')));
+        }
+        $href = preg_replace('/#.*$/', '', (string) ($match['action'] ?? '')) ?? '';
+        if ($href === '') {
+            $href = (string) ($home['pageUrl'] ?? '');
+        }
+        $response = $client->asForm()->post($this->absolute($base, (string) $home['pageUrl'], $href), [
+            (string) $match['field'] => 'on',
+            (string) $match['submitName'] => (string) $match['submitValue'],
+        ]);
+        if ($response->status() >= 400) {
+            throw new RuntimeException('Die Oberfläche hat den Schalter nicht angenommen.');
+        }
+        $checked = $client->get($base.'/index.html?lang=en');
+        if ($checked->status() === 200) {
+            $page = DedicatedServerPage::parse((string) $checked->body(), (string) $home['pageUrl']);
+            foreach ($page['modToggles'] as $toggle) {
+                if (strcasecmp($toggle['name'], $name) !== 0) {
                     continue;
                 }
-                $form = $page['modForm'] ?? null;
-                if ($row['checkbox'] !== null && is_array($form) && ($form['save'] ?? null) !== null) {
-                    $payload = [];
-                    foreach ($form['fields'] as $field) {
-                        $isTarget = $field['name'] === $row['checkbox'];
-                        $on = $isTarget ? $active : (bool) $field['checked'];
-                        if (($field['type'] ?? '') === 'checkbox') {
-                            if ($on) {
-                                $payload[$field['name']] = $field['value'] !== '' ? $field['value'] : '1';
-                            }
-                            continue;
-                        }
-                        $payload[$field['name']] = $field['value'];
-                    }
-                    if ($form['save']['name'] !== '') {
-                        $payload[$form['save']['name']] = $form['save']['value'];
-                    }
-                    $client->asForm()->post($this->absolute($base, $page['pageUrl'], $form['action']), $payload);
-
-                    return ['ok' => true];
+                if ($toggle['active'] !== $active) {
+                    throw new RuntimeException('Die Oberfläche hat den Schalter nicht übernommen.');
                 }
-                $label = mb_strtolower((string) ($row['buttonValue'] ?? ''));
-                $turnsOff = preg_match('/deaktiv|disable/u', $label) === 1;
-                $turnsOn = ! $turnsOff && preg_match('/aktiv|activ|enable/u', $label) === 1;
-                if ($row['buttonName'] && (($active && $turnsOn) || (! $active && $turnsOff))) {
-                    $payload = [];
-                    if (is_array($form)) {
-                        foreach ($form['fields'] as $field) {
-                            if (($field['type'] ?? '') === 'checkbox' && $field['checked']) {
-                                $payload[$field['name']] = $field['value'] !== '' ? $field['value'] : '1';
-                            } elseif (($field['type'] ?? '') !== 'checkbox') {
-                                $payload[$field['name']] = $field['value'];
-                            }
-                        }
-                    }
-                    $payload[$row['buttonName']] = (string) $row['buttonValue'];
-                    $action = is_array($form) ? $form['action'] : $page['pageUrl'];
-                    $client->asForm()->post($this->absolute($base, $page['pageUrl'], $action), $payload);
-
-                    return ['ok' => true];
-                }
+                break;
             }
         }
 
-        throw new RuntimeException('Die Oberfläche bietet für diese Mod gerade keinen Schalter.');
+        return ['ok' => true];
+    }
+
+    private function toggleReason(string $reason): string
+    {
+        if (preg_match('/depend on it:\s*(.+)$/i', $reason, $match) === 1) {
+            return 'Diese Mod kann nicht deaktiviert werden, weil andere aktive Mods sie brauchen: '.trim($match[1]);
+        }
+        $reason = trim($reason);
+        if ($reason !== '') {
+            return $reason;
+        }
+
+        return 'Die Oberfläche lässt diesen Schalter gerade nicht zu.';
     }
 
     /**
@@ -426,6 +433,120 @@ final class DedicatedServerConsole
         }
 
         return ['ok' => true, 'note' => 'Die Mod wurde ersetzt. Die neue Version erscheint, sobald die Oberfläche die Datei neu liest.'];
+    }
+
+    /**
+     * @param  list<string>  $names
+     * @return array{ok: true, updated: int, failed: list<array{name: string, error: string}>}
+     */
+    public function updateMods(Workspace $workspace, array $names): array
+    {
+        $files = $this->uniqueZips($names);
+        if (count($files) > 40) {
+            throw new RuntimeException('Es können höchstens 40 Mods auf einmal aktualisiert werden.');
+        }
+        $updated = 0;
+        $failed = [];
+        foreach ($files as $name) {
+            try {
+                $this->updateMod($workspace, $name);
+                $updated++;
+            } catch (RuntimeException $e) {
+                $failed[] = ['name' => $name, 'error' => $e->getMessage()];
+            }
+        }
+        if ($updated === 0) {
+            throw new RuntimeException($failed[0]['error'] ?? 'Keine Mod wurde aktualisiert.');
+        }
+
+        return ['ok' => true, 'updated' => $updated, 'failed' => $failed];
+    }
+
+    /**
+     * Pack the selected zips into one archive. Each file stays within the single-download limit.
+     */
+    public function downloadMany(Workspace $workspace, array $names): string
+    {
+        $files = $this->uniqueZips($names);
+        if (count($files) > 40) {
+            throw new RuntimeException('Es können höchstens 40 Mods auf einmal heruntergeladen werden.');
+        }
+        if (! class_exists(\ZipArchive::class)) {
+            throw new RuntimeException('Das Zippen mehrerer Mods ist auf dem Server nicht verfügbar.');
+        }
+        $workspace->loadMissing('hostAccess');
+        $access = $this->requireAccess($workspace);
+        $client = new HostFileClient($access);
+        $dir = trim(ConnectorDeployService::resolveModsDirectory($client, $access), '/');
+        $listed = [];
+        foreach ($client->listNames($dir) as $name) {
+            $listed[strtolower($name)] = $name;
+        }
+        $paths = [];
+        $total = 0;
+        foreach ($files as $name) {
+            $found = $listed[strtolower($name)] ?? null;
+            if ($found === null) {
+                throw new RuntimeException($name.' liegt nicht im Mods-Ordner.');
+            }
+            $path = $dir.'/'.$this->safeZip($found);
+            $size = $client->fileSize($path);
+            if ($size > self::MAX_BYTES) {
+                throw new RuntimeException($name.' ist größer als 80 MB.');
+            }
+            $total += $size;
+            if ($total > self::MAX_BYTES * 3) {
+                throw new RuntimeException('Die Auswahl ist größer als 240 MB.');
+            }
+            $paths[$this->safeZip($found)] = $path;
+        }
+        $tmp = tempnam(sys_get_temp_dir(), 'avmods');
+        if ($tmp === false) {
+            throw new RuntimeException('Die Mod-Auswahl konnte nicht gepackt werden.');
+        }
+        $zip = new \ZipArchive();
+        if ($zip->open($tmp, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            @unlink($tmp);
+            throw new RuntimeException('Die Mod-Auswahl konnte nicht gepackt werden.');
+        }
+        $open = true;
+        try {
+            foreach ($paths as $name => $path) {
+                if ($zip->addFromString($name, $client->read($path)) !== true) {
+                    throw new RuntimeException($name.' konnte nicht gepackt werden.');
+                }
+            }
+            $open = false;
+            if ($zip->close() !== true) {
+                throw new RuntimeException('Die Mod-Auswahl konnte nicht gepackt werden.');
+            }
+        } catch (Throwable $e) {
+            if ($open) {
+                $zip->close();
+            }
+            @unlink($tmp);
+            throw $e;
+        }
+
+        return $tmp;
+    }
+
+    /**
+     * @param  list<string>  $names
+     * @return list<string>
+     */
+    private function uniqueZips(array $names): array
+    {
+        $files = [];
+        foreach ($names as $name) {
+            $files[] = $this->safeZip((string) $name);
+        }
+        $files = array_values(array_unique($files));
+        if ($files === []) {
+            throw new RuntimeException('Keine Mod ausgewählt.');
+        }
+
+        return $files;
     }
 
     /**
