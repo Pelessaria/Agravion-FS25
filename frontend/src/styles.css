@@ -3005,12 +3005,14 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .mod-version-row {
   display: grid;
   width: 100%;
-  grid-template-columns: 9ch 11ch minmax(8px, 1fr) max-content 13px 32px 32px 32px;
+  grid-template-columns: 9ch 11ch minmax(12px, 1fr) 13px max-content 32px 32px 32px;
   align-items: center;
   justify-content: start;
   column-gap: 6px;
   min-height: 32px;
 }
+.mod-version-spacer { min-width: 0; }
+.mod-update-slot:empty { margin-left: -6px; }
 .mod-version-current,
 .mod-version-next {
   font-variant-numeric: tabular-nums;
@@ -3053,8 +3055,20 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .server-mods tbody tr { cursor: default; }
 .server-mod-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .server-mod-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.mod-title-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.mod-dependency { display: inline-flex; flex: none; color: var(--accent-2); }
+.mod-dependency .icon { width: 15px; height: 15px; }
+.server-mods tr.is-unused .mod-name strong { color: var(--text-muted); font-weight: 550; }
 .server-mods .mod-name strong { display: block; }
+.server-mods .mod-title-line strong { display: inline; min-width: 0; }
 .server-mods .mod-file { display: block; color: var(--text-muted); font-size: var(--small); }
+.badge.is-quiet {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-faint);
+  border-color: var(--line);
+  background: transparent;
+}
 .badge.is-warn {
   letter-spacing: 0;
   text-transform: none;

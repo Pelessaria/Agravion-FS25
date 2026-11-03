@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
-import { ChevronDown, ChevronRight, Copy, Download, Pause, Play, RotateCcw, Square } from "lucide-react"
+import { ChevronDown, ChevronRight, Copy, Download, Link2, Pause, Play, RotateCcw, Square } from "lucide-react"
 import {
   apiDownloadServerMod,
   apiSaveServerSettings,
@@ -462,10 +462,18 @@ export function ServerPage() {
                             : t("server.updateUnknown")
                   const toggleDisabled = busy === mod.name
                   const toggleLabel = mod.active ? t("server.deactivate") : t("server.activate")
+                  const unused = mod.used === false && mod.mapDependency !== true
                   return (
-                    <tr key={mod.name}>
+                    <tr key={mod.name} className={unused ? "is-unused" : undefined}>
                       <td className="mod-name">
-                        <strong>{mod.title || mod.name}</strong>
+                        <div className="mod-title-line">
+                          <strong>{mod.title || mod.name}</strong>
+                          {mod.mapDependency ? (
+                            <span className="mod-dependency" title={t("server.mapDependencyTip")} aria-label={t("server.mapDependency")}>
+                              <Link2 className="icon" aria-hidden="true" />
+                            </span>
+                          ) : null}
+                        </div>
                         {mod.title ? <span className="mod-file">{mod.name}</span> : null}
                       </td>
                       <td>{mod.author || "—"}</td>
@@ -475,13 +483,15 @@ export function ServerPage() {
                           <span className={mod.active == null ? "badge is-unknown" : mod.active ? "badge" : "badge is-off"}>
                             {mod.active == null ? t("server.unknownActive") : mod.active ? t("server.active") : t("server.inactive")}
                           </span>
-                          {mod.used === false ? <span className="badge is-warn">{t("server.unused")}</span> : null}
+                          {unused ? <span className="badge is-quiet" title={t("server.unusedTip")}>{t("server.unused")}</span> : null}
                         </div>
                       </td>
                       <td className="mod-version">
                         <div className="mod-version-row">
                           <span className="mod-version-current">{mod.version || "—"}</span>
                           <span className="mod-version-next">{mod.updateAvailable && mod.hubVersion ? mod.hubVersion : ""}</span>
+                          <span className="mod-version-spacer" />
+                          <span className="mod-version-rule" aria-hidden="true" />
                           <span className="mod-update-slot">
                             {mod.updateAvailable ? (
                               <Tip text={updateReason}>
@@ -496,7 +506,6 @@ export function ServerPage() {
                               </Tip>
                             ) : null}
                           </span>
-                          <span className="mod-version-rule" aria-hidden="true" />
                           <span className="mod-icon-slot">
                             {mod.hubUrl ? (
                               <a className="btn btn-secondary mod-icon-btn" href={mod.hubUrl} target="_blank" rel="noreferrer" title={t("server.modHub")} aria-label={t("server.modHub")}>

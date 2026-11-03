@@ -434,14 +434,9 @@ final class DedicatedServerConsole
 
         $career = $this->careerMods($workspace, $client, $base);
         $careerByStem = [];
-        $titleHits = [];
         if ($career !== null) {
             foreach ($career as $item) {
                 $careerByStem[strtolower($item['modName'])] = $item;
-                $titleKey = strtolower($item['title']);
-                if ($titleKey !== '') {
-                    $titleHits[$titleKey] = ($titleHits[$titleKey] ?? 0) + 1;
-                }
             }
         }
 
@@ -453,11 +448,6 @@ final class DedicatedServerConsole
             $title = is_array($card) ? trim((string) ($card['title'] ?? '')) : '';
             $version = is_array($card) ? trim((string) ($card['version'] ?? '')) : '';
             $author = is_array($card) ? trim((string) ($card['author'] ?? '')) : '';
-            $used = null;
-            if ($career !== null) {
-                $titleKey = strtolower($title);
-                $used = $saved !== null || ($titleKey !== '' && ($titleHits[$titleKey] ?? 0) === 1);
-            }
             if ($title === '' && $saved !== null) {
                 $title = $saved['title'];
             }
@@ -479,7 +469,8 @@ final class DedicatedServerConsole
                 'author' => $author,
                 'bytes' => is_int($bytes) ? $bytes : null,
                 'active' => is_bool($active) ? $active : null,
-                'used' => $used,
+                'used' => null,
+                'mapDependency' => false,
                 'source' => $mod['source'] ?? 'web',
                 'download' => (bool) ($mod['download'] ?? false),
                 'hubVersion' => null,
@@ -503,6 +494,8 @@ final class DedicatedServerConsole
             }
         }
 
+        $savegameRead = $this->applyPurchaseMarks($workspace, $rows);
+
         usort($rows, static function (array $a, array $b): int {
             $left = $a['title'] !== '' ? $a['title'] : $a['name'];
             $right = $b['title'] !== '' ? $b['title'] : $b['name'];
@@ -510,7 +503,248 @@ final class DedicatedServerConsole
             return strcasecmp($left, $right);
         });
 
-        return [$rows, $career !== null];
+        return [$rows, $savegameRead];
+    }
+
+    /**
+     * A mod is unused when a player farm owns none of its vehicles or buildings
+     * and the mod actually sells something. Map dependencies are marked separately
+     * so they are not offered as unused.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function applyPurchaseMarks(Workspace $workspace, array &$rows): bool
+    {
+        $files = $this->purchaseFiles($workspace);
+        if ($files === null) {
+            return false;
+        }
+        $playerFarms = SavegameUsage::playerFarmIds($files['farms.xml']);
+        $owned = SavegameUsage::ownedModStems($files['vehicles.xml'], $playerFarms);
+        foreach (SavegameUsage::ownedModStems($files['placeables.xml'], $playerFarms) as $stem => $_) {
+            $owned[$stem] = true;
+        }
+        if (isset($files['items.xml'])) {
+            foreach (SavegameUsage::ownedModStems($files['items.xml'], $playerFarms) as $stem => $_) {
+                $owned[$stem] = true;
+            }
+        }
+
+        $installed = [];
+        foreach ($rows as $row) {
+            $stem = (string) preg_replace('/\.zip$/i', '', (string) $row['name']);
+            if ($stem !== '') {
+                $installed[strtolower($stem)] = $stem;
+            }
+        }
+        $mapStem = SavegameUsage::mapStem($files['careerSavegame.xml'] ?? '', $installed);
+        $catalog = $this->modCatalog($workspace, $rows, $mapStem, $owned);
+        $dependencies = [];
+        foreach ($catalog['dependencies'] as $name) {
+            $dependencies[strtolower($name)] = true;
+        }
+        if ($playerFarms === []) {
+            foreach ($rows as $index => $row) {
+                $stem = strtolower((string) preg_replace('/\.zip$/i', '', (string) $row['name']));
+                $dependency = isset($dependencies[$stem]);
+                $rows[$index]['mapDependency'] = $dependency;
+                if ($dependency) {
+                    $rows[$index]['used'] = true;
+                }
+            }
+
+            return true;
+        }
+
+        foreach ($rows as $index => $row) {
+            $stem = strtolower((string) preg_replace('/\.zip$/i', '', (string) $row['name']));
+            $dependency = isset($dependencies[$stem]);
+            $rows[$index]['mapDependency'] = $dependency;
+            if ($dependency || isset($owned[$stem])) {
+                $rows[$index]['used'] = true;
+                continue;
+            }
+            if (! array_key_exists($stem, $catalog['store'])) {
+                $rows[$index]['used'] = null;
+                continue;
+            }
+            $rows[$index]['used'] = $catalog['store'][$stem] ? false : true;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return array<string, string>|null
+     */
+    private function purchaseFiles(Workspace $workspace): ?array
+    {
+        $workspace->loadMissing('hostAccess');
+        $access = $workspace->hostAccess;
+        if ($access === null) {
+            return null;
+        }
+        $save = trim(str_replace('\\', '/', (string) $access->remote_savegame_path), '/');
+        if ($save === '') {
+            return null;
+        }
+        try {
+            $client = new HostFileClient($access);
+            $out = [];
+            foreach (['vehicles.xml', 'placeables.xml', 'farms.xml', 'careerSavegame.xml', 'items.xml'] as $name) {
+                $path = $save.'/'.$name;
+                if (! $client->fileExists($path)) {
+                    if ($name === 'items.xml' || $name === 'careerSavegame.xml') {
+                        continue;
+                    }
+
+                    return null;
+                }
+                $size = $client->fileSize($path);
+                if ($size > 40 * 1024 * 1024) {
+                    if ($name === 'items.xml') {
+                        continue;
+                    }
+
+                    return null;
+                }
+                $out[$name] = $client->read($path);
+            }
+        } catch (Throwable) {
+            return null;
+        }
+
+        return isset($out['vehicles.xml'], $out['placeables.xml'], $out['farms.xml']) ? $out : null;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @param  array<string, true>  $owned
+     * @return array{dependencies: list<string>, store: array<string, bool>}
+     */
+    private function modCatalog(Workspace $workspace, array $rows, ?string $mapStem, array $owned): array
+    {
+        $path = dirname($this->cachePath($workspace)).'/mod_desc.json';
+        $cache = ['map' => null, 'items' => []];
+        if (is_file($path)) {
+            try {
+                $decoded = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($decoded)) {
+                    $cache['map'] = is_array($decoded['map'] ?? null) ? $decoded['map'] : null;
+                    $cache['items'] = is_array($decoded['items'] ?? null) ? $decoded['items'] : [];
+                }
+            } catch (Throwable) {
+                $cache = ['map' => null, 'items' => []];
+            }
+        }
+
+        $dependencies = [];
+        $store = [];
+        $workspace->loadMissing('hostAccess');
+        $access = $workspace->hostAccess;
+        $client = null;
+        $modsDir = null;
+        if ($access !== null) {
+            try {
+                $client = new HostFileClient($access);
+                $modsDir = trim(ConnectorDeployService::resolveModsDirectory($client, $access), '/');
+            } catch (Throwable) {
+                $client = null;
+            }
+        }
+
+        $byLower = [];
+        foreach ($rows as $row) {
+            $byLower[strtolower((string) $row['name'])] = $row;
+        }
+        $deadline = microtime(true) + 20;
+        $reads = 0;
+
+        if ($client !== null && $modsDir !== null && $mapStem !== null) {
+            $mapName = $mapStem.'.zip';
+            $mapRow = $byLower[strtolower($mapName)] ?? null;
+            $mapBytes = is_array($mapRow) && is_int($mapRow['bytes'] ?? null) ? $mapRow['bytes'] : null;
+            $cachedMap = is_array($cache['map']) ? $cache['map'] : null;
+            $cachedDeps = is_array($cachedMap['dependencies'] ?? null) ? $cachedMap['dependencies'] : null;
+            if ($cachedMap !== null && $cachedDeps !== null
+                && strcasecmp((string) ($cachedMap['name'] ?? ''), $mapName) === 0
+                && $mapBytes !== null && (int) ($cachedMap['bytes'] ?? -1) === $mapBytes) {
+                $dependencies = array_values(array_filter($cachedDeps, 'is_string'));
+            } else {
+                $xml = $this->readModDesc($client, $modsDir, $mapName);
+                $reads++;
+                if (is_string($xml)) {
+                    $dependencies = SavegameUsage::dependencies($xml);
+                    $cache['map'] = [
+                        'name' => $mapName,
+                        'bytes' => $mapBytes,
+                        'dependencies' => $dependencies,
+                    ];
+                }
+            }
+        }
+
+        $dependencyKeys = [];
+        foreach ($dependencies as $name) {
+            $dependencyKeys[strtolower($name)] = true;
+        }
+        foreach ($rows as $row) {
+            $filename = (string) $row['name'];
+            $stem = strtolower((string) preg_replace('/\.zip$/i', '', $filename));
+            $key = strtolower($filename);
+            $bytes = is_int($row['bytes'] ?? null) ? $row['bytes'] : null;
+            $cached = is_array($cache['items'][$key] ?? null) ? $cache['items'][$key] : null;
+            if ($cached !== null && is_bool($cached['store'] ?? null) && $bytes !== null && (int) ($cached['bytes'] ?? -1) === $bytes) {
+                $store[$stem] = $cached['store'];
+                continue;
+            }
+            if ($client === null || $modsDir === null || isset($owned[$stem]) || isset($dependencyKeys[$stem])) {
+                continue;
+            }
+            if ($reads >= 40 || microtime(true) > $deadline) {
+                continue;
+            }
+            $xml = $this->readModDesc($client, $modsDir, $filename);
+            $reads++;
+            if (! is_string($xml)) {
+                continue;
+            }
+            $hasStore = SavegameUsage::hasStoreItems($xml);
+            $store[$stem] = $hasStore;
+            $cache['items'][$key] = ['bytes' => $bytes, 'store' => $hasStore];
+        }
+
+        $dir = dirname($path);
+        if (! is_dir($dir) && ! mkdir($dir, 0775, true) && ! is_dir($dir)) {
+            return ['dependencies' => $dependencies, 'store' => $store];
+        }
+        file_put_contents($path, json_encode([
+            'map' => $cache['map'],
+            'items' => $cache['items'],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        return ['dependencies' => $dependencies, 'store' => $store];
+    }
+
+    private function readModDesc(HostFileClient $client, string $modsDir, string $filename): ?string
+    {
+        try {
+            $safe = $this->safeZip($filename);
+            $remote = $modsDir.'/'.$safe;
+            if (! $client->fileExists($remote)) {
+                return null;
+            }
+            $size = $client->fileSize($remote);
+            if ($size < 22 || $size > 2_000_000_000) {
+                return null;
+            }
+
+            return ZipModDescReader::xml($size, static function (int $offset, int $length) use ($client, $remote): string {
+                return $client->readRange($remote, $offset, $length);
+            });
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**

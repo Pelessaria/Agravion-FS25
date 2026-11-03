@@ -371,6 +371,7 @@ export interface ServerModRow {
   version?: string
   author?: string
   used?: boolean | null
+  mapDependency?: boolean
   hubVersion?: string | null
   hubUrl?: string | null
   updateAvailable?: boolean
