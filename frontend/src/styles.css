@@ -2681,10 +2681,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .fields-page .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .fields-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-  gap: 12px;
-  align-items: stretch;
+  display: block;
   min-height: 0;
 }
 .fields-map-card, .fields-detail {
@@ -2694,7 +2691,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   min-width: 0;
   min-height: 0;
 }
-.fields-map-card { display: flex; flex-direction: column; }
+.fields-map-card { display: flex; flex-direction: column; height: 100%; position: relative; }
 .fields-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -2796,15 +2793,28 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .fields-zoom {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
+  left: 10px;
+  top: 10px;
   display: grid;
   gap: 6px;
+  z-index: 3;
 }
 .fields-zoom .btn { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; }
 .fields-detail {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  right: 12px;
+  width: min(328px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
   padding: 16px;
   overflow: auto;
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
 }
 .fields-detail h2, .fields-detail h3 { margin: 0; }
 .fields-detail h3 { margin-top: 16px; font-size: 0.95rem; }
@@ -2840,13 +2850,23 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.22);
 }
-.layer-switch strong {
+.layer-switch select {
   min-width: 9.2rem;
-  padding: 0 6px;
+  max-width: 16rem;
+  height: 28px;
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   font-size: 0.92rem;
   font-weight: 600;
   text-align: center;
+  cursor: pointer;
 }
+.layer-switch select:focus { outline: none; }
 .layer-switch button {
   display: grid;
   place-items: center;
@@ -2868,16 +2888,31 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   fill-opacity: 0;
 }
 .field-shape.is-raster.is-selected { stroke: #f3ffd8; stroke-width: 2.2px; }
+.field-joined-hit { stroke: none; }
+.field-shape.field-joined-hit,
+.field-shape.field-joined-hit.is-painted,
+.field-shape.field-joined-hit.is-painted:hover,
+.field-shape.field-joined-hit:hover {
+  stroke: none;
+}
 .fields-filters {
+  position: absolute;
+  z-index: 4;
+  left: 12px;
+  right: 352px;
+  bottom: 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  margin: 0 12px 12px;
+  margin: 0;
   padding: 8px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 58%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
 }
 .fields-filter-label {
   margin-right: 2px;
@@ -3023,11 +3058,21 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   .content { width: 100%; margin-inline: 0; padding: 16px 14px 40px; }
   .header, .context { padding-left: 14px; padding-right: 14px; }
   .fields-page { height: auto; grid-template-rows: none; }
-  .fields-layout { grid-template-columns: 1fr; }
+  .fields-layout { display: block; }
   .fields-page .stat-grid { grid-template-columns: 1fr 1fr; }
   .fields-viewport { height: 68vh; flex: none; }
   .fields-map-frame { display: block; flex: none; }
-  .fields-detail { max-height: none; }
+  .fields-detail {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin-top: 12px;
+  }
+  .fields-filters {
+    position: static;
+    right: auto;
+    margin: 0 12px 12px;
+  }
   .fields-facts div { grid-template-columns: 1fr 1fr; }
 }
 

@@ -16,6 +16,7 @@ use Throwable;
  * soil 1..4 are the four types, 5..7 are the same types after a soil sample;
  * yield 1..20 spans the in-game 50–115% scale, 0 is no reading;
  * seed rate 1 low, 2 standard, 3 high.
+ * Base-game info layers: spray 0..3, lime 0..3, weed 0/1, plow, roller and stubble 0/1.
  */
 final class PrecisionLayerService
 {
@@ -25,6 +26,12 @@ final class PrecisionLayerService
         'soil' => 'precisionFarming_soilMap.grle',
         'yield' => 'precisionFarming_yieldMap.grle',
         'seed' => 'precisionFarming_seedRateMap.grle',
+        'spray' => 'infoLayer_sprayLevel.grle',
+        'lime' => 'infoLayer_limeLevel.grle',
+        'weed' => 'infoLayer_weed.grle',
+        'plow' => 'infoLayer_plowLevel.grle',
+        'roller' => 'infoLayer_rollerLevel.grle',
+        'stubble' => 'infoLayer_stubbleShredLevel.grle',
     ];
 
     /** @var array<int, array{0: float, 1: array{0: int, 1: int, 2: int}}> */
@@ -114,7 +121,7 @@ final class PrecisionLayerService
 
             return $png;
         }
-        $image = $this->decoder->decode($bytes);
+        $image = $this->decoder->decodeFitted($bytes, 2048);
         if ($image === null) {
             return is_file($png) ? $png : null;
         }
@@ -193,6 +200,22 @@ final class PrecisionLayerService
             foreach (self::SEED as $level => $color) {
                 $table[$level] = $this->pack($color);
             }
+        } elseif ($layer === 'spray') {
+            $table[0] = $this->pack([182, 64, 64]);
+            $table[1] = $this->pack([224, 180, 74]);
+            $table[2] = $this->pack([61, 154, 74]);
+            $table[3] = $this->pack([31, 106, 52]);
+        } elseif ($layer === 'lime') {
+            $table[0] = $this->pack([182, 64, 64]);
+            $table[1] = $this->pack([224, 180, 74]);
+            $table[2] = $this->pack([215, 211, 196]);
+            $table[3] = $this->pack([244, 241, 234]);
+        } elseif ($layer === 'weed') {
+            $table[0] = $this->pack([61, 154, 74]);
+            $table[1] = $this->pack([182, 64, 64]);
+        } elseif ($layer === 'plow' || $layer === 'roller' || $layer === 'stubble') {
+            $table[0] = $this->pack([182, 64, 64]);
+            $table[1] = $this->pack([61, 154, 74]);
         }
 
         return $table;

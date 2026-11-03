@@ -6,8 +6,10 @@
 
 const CELL_M = 6
 const MAX_CELLS = 180000
-const CLOSE_DILATE = 2
-const CLOSE_ERODE = 1
+// Close gaps up to about 48 m, then shrink back so the outer edge stays put.
+// That is the strip between joined fields, which was not a field polygon before.
+const CLOSE_DILATE = 4
+const CLOSE_ERODE = 4
 
 function inside(points: [number, number][], x: number, z: number) {
   let hit = false

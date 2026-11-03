@@ -16,6 +16,9 @@ export type FieldLayerId =
   | "stones"
   | "spray"
   | "lime"
+  | "plow"
+  | "roller"
+  | "stubble"
 
 export interface FieldQuery {
   fruit: string
@@ -74,11 +77,23 @@ const GROUND_COLOR: Record<number, string> = {
 const NEUTRAL = "#5c6560"
 
 export function precisionRasterLayer(layer: FieldLayerId) {
-  return layer === "soil" || layer === "nitrogen" || layer === "ph" || layer === "yield" || layer === "seed"
+  return (
+    layer === "soil" ||
+    layer === "nitrogen" ||
+    layer === "ph" ||
+    layer === "yield" ||
+    layer === "seed" ||
+    layer === "weed" ||
+    layer === "spray" ||
+    layer === "lime" ||
+    layer === "plow" ||
+    layer === "roller" ||
+    layer === "stubble"
+  )
 }
 
 export function layersFor(precisionFarming: boolean | null): FieldLayerId[] {
-  const shared: FieldLayerId[] = ["off", "fruit", "growth", "ground", "weed", "stones"]
+  const shared: FieldLayerId[] = ["off", "fruit", "growth", "ground", "weed", "stones", "plow", "roller", "stubble"]
   if (precisionFarming === true) return [...shared, "soil", "nitrogen", "ph", "yield", "seed"]
   return [...shared, "spray", "lime"]
 }
@@ -157,6 +172,9 @@ export function paintColor(field: FieldSnapshot, layer: FieldLayerId): string {
   if (layer === "stones") return levelColor(field.stones, 3, "#3d9a4a", "#c4a574", "#8a8178")
   if (layer === "spray") return levelColor(field.spray, 2, "#b64040", "#e0b44a", "#3d9a4a")
   if (layer === "lime") return levelColor(field.lime, 1, "#b64040", "#d7d3c4", "#d7d3c4")
+  if (layer === "plow") return levelColor(field.plow, 1, "#b64040", "#3d9a4a", "#3d9a4a")
+  if (layer === "roller") return levelColor(field.roller, 1, "#b64040", "#3d9a4a", "#3d9a4a")
+  if (layer === "stubble") return levelColor(field.stubble, 1, "#b64040", "#3d9a4a", "#3d9a4a")
   return NEUTRAL
 }
 
@@ -200,6 +218,20 @@ export function legendStops(layer: FieldLayerId, t: TFunction): { color: string;
     return [
       { color: "#3d9a4a", label: t("fields.legendNone") },
       { color: "#b64040", label: t("fields.legendHigh") },
+    ]
+  }
+  if (layer === "spray") {
+    return [
+      { color: "#b64040", label: t("fields.legendOpen") },
+      { color: "#e0b44a", label: t("fields.legendMid") },
+      { color: "#3d9a4a", label: t("fields.legendDone") },
+    ]
+  }
+  if (layer === "lime") {
+    return [
+      { color: "#b64040", label: t("fields.legendOpen") },
+      { color: "#e0b44a", label: t("fields.legendMid") },
+      { color: "#f4f1ea", label: t("fields.legendDone") },
     ]
   }
   return [

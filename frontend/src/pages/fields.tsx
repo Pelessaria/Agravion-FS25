@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { ChevronLeft, ChevronRight, LocateFixed, Minus, Plus } from "lucide-react"
 import { apiWorkspaceFields } from "../api"
@@ -55,7 +55,6 @@ type DrawnField = {
 
 const LABEL_HEIGHT = 2.7
 const LABELS_FROM_ZOOM = 1.7
-const ICONS_FROM_ZOOM = 2.6
 
 function CropMark({ kind }: { kind: string }) {
   if (
@@ -462,7 +461,17 @@ export function FieldsPage() {
                 >
                   <ChevronLeft className="icon" />
                 </button>
-                <strong>{t(`fields.layerName.${activeLayer}`)}</strong>
+                <select
+                  aria-label={t("fields.layer")}
+                  value={activeLayer}
+                  onChange={(event) => setLayer(event.target.value as FieldLayerId)}
+                >
+                  {availableLayers.map((id) => (
+                    <option key={id} value={id}>
+                      {t(`fields.layerName.${id}`)}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="button"
                   aria-label={t("fields.layerNext")}
@@ -473,7 +482,6 @@ export function FieldsPage() {
               </div>
             </div>
             <div className="fields-filters">
-              <span className="fields-filter-label">{t("fields.filterBar")}</span>
               <button
                 type="button"
                 className={onlyMine ? "chip-check on" : "chip-check"}
@@ -661,9 +669,8 @@ export function FieldsPage() {
               label={workspace.mapName ?? t("fields.mapLabel")}
               onSelect={(nextId) => choose(nextId, false)}
               onContentBox={setContentBox}
-            />
-          </div>
-          <FieldDetail
+            >
+              <FieldDetail
             field={selected}
             precisionFarming={source?.precisionFarming ?? null}
             farmName={
@@ -673,7 +680,9 @@ export function FieldsPage() {
                   ? farmDisplayName(farmByGameId(workspace.id, selected.farmId)!, t)
                   : t("farm.stubName", { id: selected.farmId })
             }
-          />
+              />
+            </FieldMap>
+          </div>
         </div>
       )}
     </section>
@@ -697,7 +706,7 @@ function inActiveGroup(field: DrawnField, hoverId: number | null, selectedId: nu
   return selectedId != null && field.group.includes(selectedId)
 }
 
-/** Quiet at the default view. Numbers appear once the map is enlarged; symbols later still. */
+/** Quiet at the default view. Numbers and crop marks appear once the map is enlarged. */
 function labelScreenPx(zoom: number) {
   return Math.min(18, 11 + 2.5 * Math.max(zoom - 1, 0))
 }
@@ -711,7 +720,6 @@ function visibleLabels(
 ) {
   if (sidePx <= 0) return { scale: 0, ids: new Set<number>() }
   const scale = (labelScreenPx(zoom) / (sidePx * Math.max(zoom, 1))) * 100 / LABEL_HEIGHT
-  const withIcon = zoom >= ICONS_FROM_ZOOM
   const ranked = [...fields].sort((a, b) => {
     if (a.id === pinnedId) return -1
     if (b.id === pinnedId) return 1
@@ -724,7 +732,7 @@ function visibleLabels(
     if (!field.label) continue
     const forced = labelHot(field, hoverId, pinnedId)
     if (!forced && zoom < LABELS_FROM_ZOOM) continue
-    const width = labelWidth(field.label.length, withIcon || forced) * scale
+    const width = labelWidth(field.label.length, true) * scale
     const height = LABEL_HEIGHT * scale
     const labelBox = { x: field.x - width / 2, y: field.y - height / 2, w: width, h: height }
     const fits =
@@ -760,6 +768,7 @@ function FieldMap({
   label,
   onSelect,
   onContentBox,
+  children,
 }: {
   fields: DrawnField[]
   outlines: { key: string; ids: number[]; polygon: string }[]
@@ -772,6 +781,7 @@ function FieldMap({
   label: string
   onSelect: (id: number) => void
   onContentBox: (box: { x: number; y: number; w: number; h: number } | null) => void
+  children?: ReactNode
 }) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -972,6 +982,9 @@ function FieldMap({
                   {fields.map((field) =>
                     field.polygon ? <polygon key={field.id} points={field.polygon} /> : null,
                   )}
+                  {outlines.map((outline) => (
+                    <polygon key={outline.key} points={outline.polygon} />
+                  ))}
                 </clipPath>
                 <image
                   className="precision-raster"
@@ -985,6 +998,20 @@ function FieldMap({
                 />
               </g>
             ) : null}
+            {outlines.map((outline) => {
+              const showRaster = raster != null && rasterOk
+              const fillGap = painted && !showRaster
+              const member = fields.find((field) => field.id === outline.ids[0])
+              return (
+                <polygon
+                  key={`join-${outline.key}`}
+                  data-field={outline.ids[0]}
+                  className={fillGap ? "field-shape is-painted field-joined-hit" : "field-joined-hit"}
+                  points={outline.polygon}
+                  fill={fillGap ? (member?.color ?? "transparent") : "transparent"}
+                />
+              )
+            })}
             {fields.map((field) => {
               const showRaster = raster != null && rasterOk
               const className = [
@@ -1023,7 +1050,7 @@ function FieldMap({
             {fields.map((field) => {
               const hot = labelHot(field, hoverId, selectedId)
               if (!field.label || labels.scale <= 0 || (!labels.ids.has(field.id) && !hot)) return null
-              const withIcon = zoom >= ICONS_FROM_ZOOM || hot
+              const withIcon = true
               const digits = field.label.length
               const width = labelWidth(digits, withIcon)
               const iconX = -width / 2 + 0.28
@@ -1082,6 +1109,7 @@ function FieldMap({
           <Minus className="icon" />
         </button>
       </div>
+      {children}
     </div>
   )
 }

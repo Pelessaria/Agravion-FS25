@@ -24,18 +24,30 @@ class GrleDecoderTest extends TestCase
         $this->assertNull($this->decoder()->decode('not a map'));
     }
 
+    public function test_fitted_keeps_every_nth_pixel(): void
+    {
+        $body = "\x00".$this->run(7, 512).$this->run(0, 512 * 512 - 512);
+        $image = $this->decoder()->decodeFitted($this->file($body, 2), 256);
+
+        $this->assertNotNull($image);
+        $this->assertSame(256, $image['width']);
+        $this->assertSame(256, $image['height']);
+        $this->assertSame(str_repeat(chr(7), 256), substr($image['pixels'], 0, 256));
+        $this->assertSame(0, ord($image['pixels'][256]));
+    }
+
     private function decoder(): GrleDecoder
     {
         return new GrleDecoder;
     }
 
-    private function file(string $body): string
+    private function file(string $body, int $blocks = 1): string
     {
         return 'GRLE'
             .pack('v', 1)
-            .pack('v', 1)
+            .pack('v', $blocks)
             .pack('v', 0)
-            .pack('v', 1)
+            .pack('v', $blocks)
             ."\x00\x01"
             .pack('v', 0)
             .pack('V', strlen($body))
