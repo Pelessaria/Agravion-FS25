@@ -344,7 +344,7 @@ export function ServerPage() {
     try {
       const result = await apiUpdateServerMods(workspace.id, names)
       if (!alive.current) return
-      pushToast("ok", t("server.updateManyDone", { count: result.updated }))
+      pushToast("ok", result.updated === 1 ? t("server.updateOneDone") : t("server.updateManyDone", { count: result.updated }))
       if (result.failed.length > 0) setError(result.failed.map((item) => `${item.name}: ${item.error}`).join(" "))
       setSelected((current) => current.filter((name) => !names.includes(name) || result.failed.some((item) => item.name === name)))
       setPendingUpdate(null)
@@ -870,7 +870,7 @@ export function ServerPage() {
       </div> : null}
       {pendingUpdate && pendingUpdate.length > 0 ? (
         <Modal title={t("server.update")} onClose={() => busy !== "update-many" && setPendingUpdate(null)}>
-          <p>{t("server.updateMany", { count: pendingUpdate.length })}</p>
+          <p>{pendingUpdate.length === 1 ? t("server.updateOne") : t("server.updateMany", { count: pendingUpdate.length })}</p>
           <div className="card-actions">
             <button type="button" className="btn btn-secondary" disabled={busy === "update-many"} onClick={() => setPendingUpdate(null)}>
               {t("server.cancel")}
