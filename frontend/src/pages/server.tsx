@@ -14,6 +14,7 @@ import {
   type ServerSettingField,
   type ServerSnapshot,
 } from "../api"
+import modhubIcon from "../assets/modhub-favicon.png"
 import { MissingWorkspace, PermissionBlock } from "../components/ui"
 import { useStore } from "../store"
 import { useWorkspaceRoute } from "../use-workspace"
@@ -488,7 +489,7 @@ export function ServerPage() {
                             <span className="mod-version-actions">
                               {mod.hubUrl ? (
                                 <a className="btn btn-secondary mod-icon-btn" href={mod.hubUrl} target="_blank" rel="noreferrer" title={t("server.modHub")} aria-label={t("server.modHub")}>
-                                  <img src="/modhub-favicon.png" alt="" width={18} height={18} />
+                                  <img src={modhubIcon} alt="" width={18} height={18} />
                                 </a>
                               ) : null}
                               {mod.updateAvailable ? (
