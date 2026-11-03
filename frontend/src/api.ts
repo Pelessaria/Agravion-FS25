@@ -533,54 +533,40 @@ export async function apiDownloadServerMods(workspaceId: string, names: string[]
       handle = await picker({ suggestedName: "mods.zip" })
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") return
-      await postModDownload(url, names)
+      await saveModArchive(url, names, null)
       return
     }
-    await ensureCsrf()
-    const headers = new Headers({ Accept: "application/zip", "Content-Type": "application/json" })
-    const xsrf = readCookie("XSRF-TOKEN")
-    if (xsrf) headers.set("X-XSRF-TOKEN", xsrf)
-    const response = await fetch(url, {
-      method: "POST",
-      credentials: "include",
-      headers,
-      body: JSON.stringify({ names }),
-    })
-    if (!response.ok || response.body === null) {
-      await handle.remove?.()
-      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
-      throw new ApiError(response.status, readApiErrorMessage(data, response.status))
-    }
+    await saveModArchive(url, names, handle)
+    return
+  }
+  await saveModArchive(url, names, null)
+}
+
+async function saveModArchive(url: string, names: string[], handle: SaveHandle | null): Promise<void> {
+  await ensureCsrf()
+  const headers = new Headers({ Accept: "application/zip", "Content-Type": "application/json" })
+  const xsrf = readCookie("XSRF-TOKEN")
+  if (xsrf) headers.set("X-XSRF-TOKEN", xsrf)
+  const response = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: JSON.stringify({ names }),
+  })
+  if (!response.ok || response.body === null) {
+    await handle?.remove?.()
+    const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
+    throw new ApiError(response.status, readApiErrorMessage(data, response.status))
+  }
+  if (handle) {
     const writable = await handle.createWritable()
     await response.body.pipeTo(writable)
     return
   }
-  await postModDownload(url, names)
-}
-
-async function postModDownload(url: string, names: string[]): Promise<void> {
-  await ensureCsrf()
-  const form = document.createElement("form")
-  form.method = "POST"
-  form.action = url
-  const token = readCookie("XSRF-TOKEN")
-  if (token) {
-    const input = document.createElement("input")
-    input.type = "hidden"
-    input.name = "_token"
-    input.value = token
-    form.appendChild(input)
-  }
-  for (const name of names) {
-    const input = document.createElement("input")
-    input.type = "hidden"
-    input.name = "names[]"
-    input.value = name
-    form.appendChild(input)
-  }
-  document.body.appendChild(form)
-  form.submit()
-  form.remove()
+  const blob = await response.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  startBrowserDownload(objectUrl, "mods.zip")
+  URL.revokeObjectURL(objectUrl)
 }
 
 export async function apiDeleteServerMods(workspaceId: string, names: string[]): Promise<{ ok: boolean; deleted: number }> {

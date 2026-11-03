@@ -113,8 +113,12 @@ export function ServerPage() {
         const next = await apiServerSnapshot(workspace.id)
         if (cancelled) return
         setSnapshot(next)
-        if (!silent) setSettings(next.settings)
-        setError(next.error ?? "")
+        if (!silent) {
+          setSettings(next.settings)
+          setError(next.error ?? "")
+        } else if (next.error) {
+          setError(next.error)
+        }
       } catch (caught) {
         if (!cancelled) setError(caught instanceof ApiError ? caught.message : t("server.missingLogin"))
       } finally {
@@ -360,7 +364,9 @@ export function ServerPage() {
       await apiSetServerModActive(workspace.id, name, active)
       await reload()
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : t("server.actionMissing"))
+      const message = caught instanceof ApiError ? caught.message : t("server.actionMissing")
+      setError(message)
+      pushToast("warn", message)
     } finally {
       setBusy("")
     }
