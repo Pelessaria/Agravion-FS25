@@ -106,7 +106,7 @@ final class DedicatedServerConsole
         $result['pending'] = false;
         $path = $this->cachePath($workspace);
         $this->mutateCache($path, function (?array $existing) use ($result): array {
-            return $this->preferNewerStatus($existing, $result);
+            return $this->preferNewerStatus($existing, $this->keepVerifiedVersions($existing, $result));
         });
 
         return $result;
@@ -416,13 +416,19 @@ final class DedicatedServerConsole
             throw new RuntimeException('ModHub bietet für diese Datei keinen direkten Download.');
         }
         $local = $this->downloadHubZip($zipUrl, $pageUrl);
+        $version = '';
+        $bytes = 0;
         try {
+            $version = self::localZipVersion($local);
+            $size = filesize($local);
+            $bytes = is_int($size) ? $size : 0;
             $workspace->loadMissing('hostAccess');
             if ($workspace->hostAccess !== null) {
                 $this->writeFtpFile($workspace, $name, $local);
-            } elseif (filesize($local) !== false && filesize($local) <= self::MAX_BYTES) {
-                $bytes = file_get_contents($local);
-                if (! is_string($bytes) || ! $this->uploadViaWeb($workspace, $name, $bytes)) {
+                $this->assertRemoteSize($workspace, $name, $bytes);
+            } elseif ($bytes > 0 && $bytes <= self::MAX_BYTES) {
+                $body = file_get_contents($local);
+                if (! is_string($body) || ! $this->uploadViaWeb($workspace, $name, $body)) {
                     throw new RuntimeException('Die Oberfläche hat die Datei nicht angenommen.');
                 }
             } else {
@@ -432,9 +438,138 @@ final class DedicatedServerConsole
             @unlink($local);
         }
 
+        $this->rememberModVersion($workspace, $name, $version, $bytes, $latest);
         $this->bounceMod($workspace, $name);
 
-        return ['ok' => true, 'note' => 'Die Mod wurde ersetzt.'];
+        $note = 'Die Mod wurde ersetzt.';
+        if ($version !== '' && ModHubCatalog::newer($version, $latest)) {
+            $note = 'Die Datei wurde ersetzt, auf ModHub ist aber weiterhin eine neuere Version gelistet.';
+        }
+
+        return ['ok' => true, 'note' => $note];
+    }
+
+    private function assertRemoteSize(Workspace $workspace, string $name, int $bytes): void
+    {
+        if ($bytes < 22) {
+            throw new RuntimeException('Die heruntergeladene Datei ist leer.');
+        }
+        $access = $this->requireAccess($workspace);
+        $client = new HostFileClient($access);
+        $dir = trim(ConnectorDeployService::resolveModsDirectory($client, $access), '/');
+        try {
+            $remote = $client->fileSize($dir.'/'.$name);
+        } catch (Throwable) {
+            throw new RuntimeException('Die neue Datei liegt im Mods-Ordner, ihre Größe ließ sich aber nicht prüfen.');
+        }
+        if ($remote !== $bytes) {
+            throw new RuntimeException('Die Datei im Mods-Ordner hat nach dem Kopieren noch die alte Größe.');
+        }
+    }
+
+    private function rememberModVersion(Workspace $workspace, string $name, string $version, int $bytes, ?string $hub): void
+    {
+        if ($version === '' || $bytes < 22) {
+            return;
+        }
+        $this->mutateCache($this->cachePath($workspace), function (?array $existing) use ($name, $version, $bytes, $hub): array {
+            if (! is_array($existing) || ! is_array($existing['mods'] ?? null)) {
+                return is_array($existing) ? $existing : [];
+            }
+            foreach ($existing['mods'] as $index => $mod) {
+                if (! is_array($mod) || strcasecmp((string) ($mod['name'] ?? ''), $name) !== 0) {
+                    continue;
+                }
+                $existing['mods'][$index]['version'] = $version;
+                $existing['mods'][$index]['bytes'] = $bytes;
+                $existing['mods'][$index]['verifiedBytes'] = $bytes;
+                $existing['mods'][$index]['updateAvailable'] = ModHubCatalog::newer($version, $hub);
+                break;
+            }
+            $existing['at'] = now()->toIso8601String();
+
+            return $existing;
+        });
+    }
+
+    /**
+     * A version read from the replaced zip stays, until the file size changes.
+     * The web UI keeps showing the old number until the mod is switched off and on.
+     *
+     * @param  array<string, mixed>|null  $existing
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function keepVerifiedVersions(?array $existing, array $result): array
+    {
+        $previous = [];
+        foreach ($existing['mods'] ?? [] as $mod) {
+            if (! is_array($mod)) {
+                continue;
+            }
+            $previous[strtolower((string) ($mod['name'] ?? ''))] = $mod;
+        }
+        if ($previous === [] || ! is_array($result['mods'] ?? null)) {
+            return $result;
+        }
+        foreach ($result['mods'] as $index => $mod) {
+            if (! is_array($mod)) {
+                continue;
+            }
+            $prior = $previous[strtolower((string) ($mod['name'] ?? ''))] ?? null;
+            if (! is_array($prior) || ! is_int($prior['verifiedBytes'] ?? null)) {
+                continue;
+            }
+            if (($mod['bytes'] ?? null) !== $prior['verifiedBytes']) {
+                continue;
+            }
+            $kept = trim((string) ($prior['version'] ?? ''));
+            $shown = trim((string) ($mod['version'] ?? ''));
+            if ($kept === '') {
+                continue;
+            }
+            $result['mods'][$index]['verifiedBytes'] = $prior['verifiedBytes'];
+            if ($shown !== '' && ! ModHubCatalog::newer($shown, $kept)) {
+                continue;
+            }
+            $result['mods'][$index]['version'] = $kept;
+            $hub = $mod['hubVersion'] ?? null;
+            $result['mods'][$index]['updateAvailable'] = ModHubCatalog::newer($kept, is_string($hub) ? $hub : null);
+        }
+
+        return $result;
+    }
+
+    private static function localZipVersion(string $path): string
+    {
+        if (! class_exists(\ZipArchive::class)) {
+            return '';
+        }
+        $zip = new \ZipArchive();
+        if ($zip->open($path) !== true) {
+            return '';
+        }
+        $xml = '';
+        $depth = PHP_INT_MAX;
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $entry = $zip->getNameIndex($index);
+            if (! is_string($entry) || ! str_ends_with(strtolower($entry), 'moddesc.xml')) {
+                continue;
+            }
+            $slashes = substr_count($entry, '/');
+            if ($slashes >= $depth) {
+                continue;
+            }
+            $contents = $zip->getFromIndex($index);
+            if (! is_string($contents) || $contents === '') {
+                continue;
+            }
+            $xml = $contents;
+            $depth = $slashes;
+        }
+        $zip->close();
+
+        return self::modDescVersion($xml);
     }
 
     /**

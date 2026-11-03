@@ -694,6 +694,7 @@ export const en = {
     updateTo: "Update {{version}}",
     updateNeedsStop: "Updating is only possible while the game server is stopped.",
     updateDone: "Mod replaced.",
+    updateTimeout: "The update took too long and was cancelled.",
     updateOne: "Update this mod?",
     updateMany: "Update {{count}} mods?",
     updateOneDone: "Mod updated.",

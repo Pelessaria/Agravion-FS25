@@ -314,7 +314,12 @@ export function ServerPage() {
       pushToast("ok", result.note || t("server.updateDone"))
       await reload()
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : t("server.updateNeedsStop"))
+      const message = caught instanceof ApiError && caught.status === 504
+        ? t("server.updateTimeout")
+        : caught instanceof ApiError
+          ? caught.message
+          : t("server.updateNeedsStop")
+      setError(message)
     } finally {
       setBusy("")
     }
@@ -350,7 +355,9 @@ export function ServerPage() {
       setPendingUpdate(null)
       await reload()
     } catch (caught) {
-      if (alive.current) setError(caught instanceof ApiError ? caught.message : t("server.updateManyFailed"))
+      if (alive.current) {
+        setError(caught instanceof ApiError && caught.status === 504 ? t("server.updateTimeout") : caught instanceof ApiError ? caught.message : t("server.updateManyFailed"))
+      }
       setPendingUpdate(null)
     } finally {
       if (alive.current) setBusy("")

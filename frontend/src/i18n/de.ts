@@ -692,6 +692,7 @@ export const de = {
     updateTo: "Update {{version}}",
     updateNeedsStop: "Aktualisieren geht nur, solange der Spielserver aus ist.",
     updateDone: "Mod ersetzt.",
+    updateTimeout: "Das Aktualisieren hat zu lange gedauert und wurde abgebrochen.",
     updateOne: "Diese Mod wirklich aktualisieren?",
     updateMany: "{{count}} Mods wirklich aktualisieren?",
     updateOneDone: "Mod aktualisiert.",

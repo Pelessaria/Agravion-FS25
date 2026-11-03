@@ -166,7 +166,7 @@ class ServerConsoleController extends Controller
             'name' => ['required', 'string', 'max:180'],
         ]);
 
-        return $this->afterChange($row, $console, fn () => $console->updateMod($row, $data['name']));
+        return $this->attempt(fn () => $console->updateMod($row, $data['name']));
     }
 
     public function updateMods(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
@@ -178,7 +178,7 @@ class ServerConsoleController extends Controller
             'names.*' => ['required', 'string', 'max:180'],
         ]);
 
-        return $this->afterChange($row, $console, fn () => $console->updateMods($row, $data['names']));
+        return $this->attempt(fn () => $console->updateMods($row, $data['names']));
     }
 
     public function deleteMods(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
