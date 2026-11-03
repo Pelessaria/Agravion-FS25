@@ -110,6 +110,12 @@ class DedicatedServerPageTest extends TestCase
             <input type="submit" name="restart_server" value="Restart">
           </form>
           <div id="log_textarea">GIANTS Engine Runtime</div>
+          <form action="logs.html?lang=en" method="post">
+            <select name="log_type"><option value="3" selected>Game</option></select>
+            <select name="log_file"></select>
+            <input type="submit" name="delete_log" value="Delete">
+            <input type="submit" name="show_log" value="Select">
+          </form>
         </body></html>
         HTML;
 
@@ -118,6 +124,7 @@ class DedicatedServerPageTest extends TestCase
         $this->assertSame(['stop', 'restart'], array_column($page['actions'], 'id'));
         $this->assertTrue($page['running']);
         $this->assertSame('GIANTS Engine Runtime', $page['logText']);
+        $this->assertNull($page['settingsForm']);
         $this->assertSame(
             'http://games.example:8081',
             DedicatedServerConsole::origin('http://games.example:8081/index.html'),

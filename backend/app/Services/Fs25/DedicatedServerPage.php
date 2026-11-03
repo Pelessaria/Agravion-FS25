@@ -75,7 +75,18 @@ final class DedicatedServerPage
                 ];
             }
             $settingFields = self::settingFields($form, $xpath);
-            if ($settingFields !== [] && $settingsForm === null && $file === null) {
+            $logPicker = false;
+            foreach ($fields as $field) {
+                if (in_array($field['name'], ['log_type', 'log_file'], true)) {
+                    $logPicker = true;
+                }
+            }
+            foreach ($buttons as $button) {
+                if (in_array($button['name'], ['show_log', 'delete_log'], true)) {
+                    $logPicker = true;
+                }
+            }
+            if ($settingFields !== [] && $settingsForm === null && $file === null && ! $logPicker) {
                 $settingsForm = [
                     'action' => $action,
                     'save' => $save,

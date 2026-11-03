@@ -220,13 +220,28 @@ export function ServerPage() {
 
   async function copyLog() {
     if (!snapshot.log?.text) return
+    const text = snapshot.log.text
+    let copiedOk = false
     try {
-      await navigator.clipboard.writeText(snapshot.log.text)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
+      await navigator.clipboard.writeText(text)
+      copiedOk = true
     } catch {
-      pushToast("warn", t("create.copyFailed"))
+      const area = document.createElement("textarea")
+      area.value = text
+      area.setAttribute("readonly", "")
+      area.style.position = "fixed"
+      area.style.left = "-9999px"
+      document.body.appendChild(area)
+      area.select()
+      copiedOk = document.execCommand("copy")
+      area.remove()
     }
+    if (!copiedOk) {
+      pushToast("warn", t("create.copyFailed"))
+      return
+    }
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1600)
   }
 
   function downloadLog() {
