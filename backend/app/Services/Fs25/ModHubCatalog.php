@@ -146,9 +146,10 @@ final class ModHubCatalog
      */
     private static function parts(string $version): array
     {
-        $clean = preg_replace('/[^0-9.]+/', '', $version) ?? '';
-        $pieces = $clean === '' ? [] : explode('.', $clean);
+        if (preg_match('/(\d+(?:\.\d+)*)/', $version, $match) !== 1) {
+            return [];
+        }
 
-        return array_map(static fn (string $part): int => (int) $part, $pieces);
+        return array_map(static fn (string $part): int => (int) $part, explode('.', $match[1]));
     }
 }

@@ -14,6 +14,8 @@ class ModHubCatalogTest extends TestCase
         $this->assertFalse(ModHubCatalog::newer('1.5.1.0', '1.5.1.0'));
         $this->assertFalse(ModHubCatalog::newer('1.6.0.0', '1.5.1.0'));
         $this->assertFalse(ModHubCatalog::newer('', '1.0.0.0'));
+        $this->assertFalse(ModHubCatalog::newer('1.0.0.1', 'v1.0.0.1-rc2'));
+        $this->assertTrue(ModHubCatalog::newer('1.0.0.0', 'v1.0.0.7'));
     }
 
     public function test_zip_url_must_be_the_file_linked_on_the_modhub_page(): void
