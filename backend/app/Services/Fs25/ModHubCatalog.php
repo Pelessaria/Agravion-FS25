@@ -14,7 +14,7 @@ final class ModHubCatalog
 {
     /**
      * @param  list<string>  $techNames
-     * @return array<string, array{version: ?string, pageUrl: ?string, title: ?string}>
+     * @return array<string, array{version: ?string, pageUrl: ?string, title: ?string, downloadUrl: ?string}>
      */
     public function lookup(array $techNames): array
     {
@@ -57,6 +57,7 @@ final class ModHubCatalog
                     'version' => is_string($version) && $version !== '' ? $version : null,
                     'pageUrl' => is_string($page) && self::isModHubPage($page) ? $page : null,
                     'title' => is_string($title) && $title !== '' ? $title : null,
+                    'downloadUrl' => self::directDownload(is_array($row['download'] ?? null) ? $row['download'] : null, $tech),
                 ];
             }
         }
@@ -70,7 +71,7 @@ final class ModHubCatalog
                     break;
                 }
             }
-            $out[$name] = $match ?? ['version' => null, 'pageUrl' => null, 'title' => null];
+            $out[$name] = $match ?? ['version' => null, 'pageUrl' => null, 'title' => null, 'downloadUrl' => null];
         }
 
         return $out;
@@ -104,6 +105,57 @@ final class ModHubCatalog
         }
 
         return null;
+    }
+
+    /**
+     * The catalog sometimes points at a newer release than the zip linked on the ModHub page.
+     * Only a Giants download or a GitHub release of this exact zip is accepted.
+     *
+     * @param  array<string, mixed>|null  $download
+     */
+    public static function directDownload(?array $download, string $techName): ?string
+    {
+        if ($download === null) {
+            return null;
+        }
+        $url = trim((string) ($download['url'] ?? ''));
+        $file = $techName.'.zip';
+        $path = parse_url($url, PHP_URL_PATH);
+        if ($url === '' || ! is_string($path) || strcasecmp(basename($path), $file) !== 0) {
+            return null;
+        }
+        if (! self::isGiantsZip($url) && ! self::isReleaseZip($url)) {
+            return null;
+        }
+
+        return $url;
+    }
+
+    public static function isReleaseZip(string $url): bool
+    {
+        $parts = parse_url($url);
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        $path = (string) ($parts['path'] ?? '');
+
+        return ($parts['scheme'] ?? '') === 'https'
+            && $host === 'github.com'
+            && preg_match('#^/[^/]+/[^/]+/releases/download/[^/]+/[^/]+\.zip$#i', $path) === 1;
+    }
+
+    public static function isAllowedUpdateUrl(string $url): bool
+    {
+        if (self::isGiantsZip($url) || self::isReleaseZip($url)) {
+            return true;
+        }
+        $parts = parse_url($url);
+        $host = strtolower((string) ($parts['host'] ?? ''));
+
+        return ($parts['scheme'] ?? '') === 'https'
+            && in_array($host, [
+                'objects.githubusercontent.com',
+                'release-assets.githubusercontent.com',
+                'github-releases.githubusercontent.com',
+            ], true);
     }
 
     public static function isModHubPage(string $url): bool

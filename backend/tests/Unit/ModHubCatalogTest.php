@@ -52,4 +52,20 @@ class ModHubCatalogTest extends TestCase
         $this->assertSame('1.5.1.0', $mods[0]['version']);
         $this->assertSame([], SavegameModList::parse('<careerSavegame/>'));
     }
+
+    public function test_direct_download_accepts_only_the_matching_release_zip(): void
+    {
+        $release = 'https://github.com/VertexFloat/noMoreAutoLift/releases/download/v1.0.0.7/FS25_noMoreAutoLift.zip';
+
+        $this->assertSame($release, ModHubCatalog::directDownload([
+            'source' => 'github',
+            'url' => $release,
+        ], 'FS25_noMoreAutoLift'));
+        $this->assertNull(ModHubCatalog::directDownload([
+            'url' => 'https://example.test/FS25_noMoreAutoLift.zip',
+        ], 'FS25_noMoreAutoLift'));
+        $this->assertNull(ModHubCatalog::directDownload([
+            'url' => 'https://github.com/VertexFloat/noMoreAutoLift/releases/download/v1.0.0.7/FS25_Other.zip',
+        ], 'FS25_noMoreAutoLift'));
+    }
 }

@@ -42,7 +42,11 @@ final class DedicatedServerConsole
         try {
             $result['mods'] = $this->ftpMods($workspace);
         } catch (Throwable) {
-            $result['error'] = 'Dateizugang fehlgeschlagen.';
+            try {
+                $result['mods'] = $this->ftpMods($workspace);
+            } catch (Throwable) {
+                $result['error'] = 'Dateizugang fehlgeschlagen.';
+            }
         }
 
         $pages = [];
@@ -70,6 +74,9 @@ final class DedicatedServerConsole
             [$result['mods'], $result['savegameRead']] = $this->describeMods($workspace, $result['mods'], $pages, $client, $base);
         } catch (Throwable) {
             $result['savegameRead'] = false;
+        }
+        if ($result['mods'] !== [] && $result['error'] === 'Dateizugang fehlgeschlagen.') {
+            $result['error'] = null;
         }
 
         return $result;
@@ -399,19 +406,23 @@ final class DedicatedServerConsole
         $info = (new ModHubCatalog())->lookup([$stem])[$stem] ?? null;
         $latest = is_array($info) ? ($info['version'] ?? null) : null;
         $pageUrl = is_array($info) ? ($info['pageUrl'] ?? null) : null;
+        $direct = is_array($info) ? ($info['downloadUrl'] ?? null) : null;
         if (! is_string($latest) || ! is_string($pageUrl) || ! ModHubCatalog::newer($installed, $latest)) {
             throw new RuntimeException('Für diese Mod liegt auf ModHub keine neuere Version.');
         }
 
         set_time_limit(0);
-        $page = Http::withHeaders(['User-Agent' => 'AgriVision'])
-            ->withOptions(['allow_redirects' => false])
-            ->timeout(20)
-            ->get($pageUrl);
-        if ($page->status() >= 400) {
-            throw new RuntimeException('Die ModHub-Seite ist nicht erreichbar.');
+        $zipUrl = is_string($direct) && $direct !== '' ? $direct : null;
+        if ($zipUrl === null) {
+            $page = Http::withHeaders(['User-Agent' => 'AgriVision'])
+                ->withOptions(['allow_redirects' => false])
+                ->timeout(20)
+                ->get($pageUrl);
+            if ($page->status() >= 400) {
+                throw new RuntimeException('Die ModHub-Seite ist nicht erreichbar.');
+            }
+            $zipUrl = ModHubCatalog::zipUrl((string) $page->body(), $name);
         }
-        $zipUrl = ModHubCatalog::zipUrl((string) $page->body(), $name);
         if ($zipUrl === null) {
             throw new RuntimeException('ModHub bietet für diese Datei keinen direkten Download.');
         }
@@ -420,6 +431,10 @@ final class DedicatedServerConsole
         $bytes = 0;
         try {
             $version = self::localZipVersion($local);
+            if ($version === '' || ModHubCatalog::newer($version, $latest)) {
+                $found = $version !== '' ? $version : 'keine';
+                throw new RuntimeException('Die heruntergeladene Datei enthält Version '.$found.', ModHub listet '.$latest.'.');
+            }
             $size = filesize($local);
             $bytes = is_int($size) ? $size : 0;
             $workspace->loadMissing('hostAccess');
@@ -441,12 +456,7 @@ final class DedicatedServerConsole
         $this->rememberModVersion($workspace, $name, $version, $bytes, $latest);
         $this->bounceMod($workspace, $name);
 
-        $note = 'Die Mod wurde ersetzt.';
-        if ($version !== '' && ModHubCatalog::newer($version, $latest)) {
-            $note = 'Die Datei wurde ersetzt, auf ModHub ist aber weiterhin eine neuere Version gelistet.';
-        }
-
-        return ['ok' => true, 'note' => $note];
+        return ['ok' => true, 'note' => 'Die Mod wurde ersetzt.'];
     }
 
     private function assertRemoteSize(Workspace $workspace, string $name, int $bytes): void
@@ -1460,11 +1470,42 @@ final class DedicatedServerConsole
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
+    private function resolveUpdateUrl(string $zipUrl): string
+    {
+        $current = $zipUrl;
+        for ($hop = 0; $hop < 5; $hop++) {
+            if (! ModHubCatalog::isAllowedUpdateUrl($current)) {
+                throw new RuntimeException('Die ModHub-Datei hat eine unerwartete Adresse.');
+            }
+            $response = Http::withHeaders(['User-Agent' => 'AgriVision'])
+                ->withOptions(['allow_redirects' => false])
+                ->timeout(30)
+                ->head($current);
+            $status = $response->status();
+            if ($status < 300 || $status >= 400) {
+                return $current;
+            }
+            $location = trim($response->header('Location'));
+            if ($location === '') {
+                return $current;
+            }
+            if (! str_starts_with($location, 'https://')) {
+                $parts = parse_url($current);
+                $origin = ($parts['scheme'] ?? 'https').'://'.($parts['host'] ?? '');
+                if (isset($parts['port'])) {
+                    $origin .= ':'.$parts['port'];
+                }
+                $location = str_starts_with($location, '/') ? $origin.$location : $origin.'/'.$location;
+            }
+            $current = $location;
+        }
+
+        throw new RuntimeException('Die ModHub-Datei hat eine unerwartete Adresse.');
+    }
+
     private function downloadHubZip(string $zipUrl, string $pageUrl): string
     {
-        if (! ModHubCatalog::isGiantsZip($zipUrl)) {
-            throw new RuntimeException('Die ModHub-Datei hat eine unerwartete Adresse.');
-        }
+        $zipUrl = $this->resolveUpdateUrl($zipUrl);
         $tmp = tempnam(sys_get_temp_dir(), 'avmod');
         if ($tmp === false) {
             throw new RuntimeException('Temporäre Datei konnte nicht angelegt werden.');
