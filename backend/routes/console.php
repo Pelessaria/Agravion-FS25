@@ -3,6 +3,7 @@
 use App\Models\Workspace;
 use App\Services\Fs25\ConnectorSnapshotService;
 use App\Services\Fs25\DedicatedServerConsole;
+use App\Services\Fs25\PrecisionLayerService;
 use App\Services\InstanceSchedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -75,6 +76,16 @@ Schedule::call(function () {
     ->everyMinute()
     ->name('connector-state')
     ->withoutOverlapping(2);
+
+Schedule::call(function () {
+    $layers = app(PrecisionLayerService::class);
+    foreach (Workspace::query()->cursor() as $workspace) {
+        $layers->refresh($workspace);
+    }
+})
+    ->everyFiveMinutes()
+    ->name('precision-layers')
+    ->withoutOverlapping(8);
 
 Schedule::command('agrivision:sync-store-icons')
     ->everyFiveMinutes()

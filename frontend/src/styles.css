@@ -2738,7 +2738,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .field-shape {
   fill-opacity: 0;
   stroke: rgba(255, 255, 255, 0.58);
-  stroke-width: 1.15px;
+  stroke-width: calc(1.05px / var(--map-zoom, 1));
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
   cursor: pointer;
@@ -2750,7 +2750,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .field-shape.is-other { fill-opacity: 0; stroke: rgba(255, 255, 255, 0.34); }
 .field-shape.is-joined { stroke: none; }
 .field-shape.is-group-hot { fill-opacity: 0.16; }
-.field-shape.is-selected { stroke: #f3ffd8; stroke-width: 2.2px; fill-opacity: 0.28; }
+.field-shape.is-selected { stroke: #f3ffd8; stroke-width: calc(1.8px / var(--map-zoom, 1)); fill-opacity: 0.28; }
 .field-shape.is-joined.is-selected { stroke: none; }
 .field-shape:hover { fill-opacity: 0.18; stroke: rgba(255, 255, 255, 0.92); }
 .field-shape.is-joined:hover { stroke: none; }
@@ -2765,13 +2765,13 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .field-outline {
   fill: none;
   stroke: #e4b84a;
-  stroke-width: 1.7px;
+  stroke-width: calc(1.15px / var(--map-zoom, 1));
   stroke-linejoin: round;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
-.field-outline.is-hot { stroke: #ffe7a8; stroke-width: 2.4px; }
+.field-outline.is-hot { stroke: #ffe7a8; stroke-width: calc(1.6px / var(--map-zoom, 1)); }
 .field-label { cursor: pointer; }
 .field-label rect { fill: rgba(8, 12, 10, 0.5); }
 .field-label text { fill: #f7f8f7; font-weight: 600; }
@@ -2850,12 +2850,13 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.22);
 }
-.layer-switch select {
+.layer-menu { position: relative; }
+.layer-menu-btn {
   min-width: 9.2rem;
   max-width: 16rem;
   height: 28px;
   margin: 0;
-  padding: 0 8px;
+  padding: 0 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -2863,10 +2864,40 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   font: inherit;
   font-size: 0.92rem;
   font-weight: 600;
-  text-align: center;
   cursor: pointer;
 }
-.layer-switch select:focus { outline: none; }
+.layer-menu-list {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 12.5rem;
+  max-height: 280px;
+  margin: 0;
+  padding: 4px;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+}
+.layer-menu-list button {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+.layer-menu-list button.is-on,
+.layer-menu-list button:hover { background: rgba(255, 255, 255, 0.08); }
 .layer-switch button {
   display: grid;
   place-items: center;
@@ -2880,6 +2911,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .layer-switch button:hover { background: rgba(255, 255, 255, 0.07); }
 .precision-raster { opacity: 0.92; }
+.precision-raster.is-pending { opacity: 0; }
 .field-shape.is-raster,
 .field-shape.is-raster.is-group-hot,
 .field-shape.is-raster.is-selected,
@@ -2887,7 +2919,19 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   fill: transparent;
   fill-opacity: 0;
 }
-.field-shape.is-raster.is-selected { stroke: #f3ffd8; stroke-width: 2.2px; }
+.field-shape.is-raster.is-selected { stroke: #f3ffd8; stroke-width: calc(1.8px / var(--map-zoom, 1)); }
+.field-shape.is-joined,
+.field-shape.is-joined:hover,
+.field-shape.is-joined.is-selected,
+.field-shape.is-raster.is-joined,
+.field-shape.is-raster.is-joined:hover,
+.field-shape.is-raster.is-joined.is-selected,
+.field-shape.is-raster.is-joined.is-group-hot,
+.field-shape.is-painted.is-joined,
+.field-shape.is-painted.is-joined:hover,
+.field-shape.is-painted.is-joined.is-selected {
+  stroke: none;
+}
 .field-joined-hit { stroke: none; }
 .field-shape.field-joined-hit,
 .field-shape.field-joined-hit.is-painted,
@@ -2896,23 +2940,16 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   stroke: none;
 }
 .fields-filters {
-  position: absolute;
-  z-index: 4;
-  left: 12px;
-  right: 352px;
-  bottom: 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
   margin: 0;
-  padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface) 58%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  padding: 8px 12px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
 }
 .fields-filter-label {
   margin-right: 2px;
@@ -3068,11 +3105,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
     max-height: none;
     margin-top: 12px;
   }
-  .fields-filters {
-    position: static;
-    right: auto;
-    margin: 0 12px 12px;
-  }
+  .fields-filters { margin: 0; padding: 8px 12px; }
   .fields-facts div { grid-template-columns: 1fr 1fr; }
 }
 

@@ -461,17 +461,12 @@ export function FieldsPage() {
                 >
                   <ChevronLeft className="icon" />
                 </button>
-                <select
-                  aria-label={t("fields.layer")}
+                <LayerMenu
+                  label={t(`fields.layerName.${activeLayer}`)}
                   value={activeLayer}
-                  onChange={(event) => setLayer(event.target.value as FieldLayerId)}
-                >
-                  {availableLayers.map((id) => (
-                    <option key={id} value={id}>
-                      {t(`fields.layerName.${id}`)}
-                    </option>
-                  ))}
-                </select>
+                  options={availableLayers.map((id) => ({ id, label: t(`fields.layerName.${id}`) }))}
+                  onChange={setLayer}
+                />
                 <button
                   type="button"
                   aria-label={t("fields.layerNext")}
@@ -689,6 +684,69 @@ export function FieldsPage() {
   )
 }
 
+function LayerMenu({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: FieldLayerId
+  options: { id: FieldLayerId; label: string }[]
+  onChange: (id: FieldLayerId) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false)
+    }
+    window.addEventListener("pointerdown", close)
+    window.addEventListener("keydown", onKey)
+    return () => {
+      window.removeEventListener("pointerdown", close)
+      window.removeEventListener("keydown", onKey)
+    }
+  }, [open])
+  return (
+    <div className="layer-menu" ref={rootRef}>
+      <button
+        type="button"
+        className="layer-menu-btn"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        {label}
+      </button>
+      {open ? (
+        <ul className="layer-menu-list" role="listbox">
+          {options.map((option) => (
+            <li key={option.id}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={option.id === value}
+                className={option.id === value ? "is-on" : undefined}
+                onClick={() => {
+                  onChange(option.id)
+                  setOpen(false)
+                }}
+              >
+                {option.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  )
+}
+
 function labelWidth(chars: number, withIcon: boolean) {
   return (withIcon ? 2.55 : 0.7) + chars * 1.02 + 0.5
 }
@@ -790,8 +848,10 @@ function FieldMap({
   const { t } = useTranslation()
   const [dragging, setDragging] = useState(false)
   const [mapFailed, setMapFailed] = useState(false)
+  const [loadedRasters, setLoadedRasters] = useState<ReadonlySet<string>>(() => new Set())
   const [failedRaster, setFailedRaster] = useState<string | null>(null)
-  const rasterOk = raster != null && failedRaster !== raster.href
+  const [brokenIcons, setBrokenIcons] = useState<ReadonlySet<string>>(() => new Set())
+  const rasterReady = raster != null && failedRaster !== raster.href && loadedRasters.has(raster.href)
   const [zoom, setZoom] = useState(1)
   const [sidePx, setSidePx] = useState(0)
   const [hoverId, setHoverId] = useState<number | null>(null)
@@ -975,32 +1035,47 @@ function FieldMap({
           ) : (
             <div className="fields-terrain" aria-hidden="true" />
           )}
-          <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label={label}>
-            {raster && rasterOk ? (
+          <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="xMidYMid meet"
+            role="img"
+            aria-label={label}
+            style={{ "--map-zoom": zoom } as CSSProperties}
+          >
+            {raster ? (
               <g clipPath="url(#precision-fields)">
                 <clipPath id="precision-fields">
                   {fields.map((field) =>
-                    field.polygon ? <polygon key={field.id} points={field.polygon} /> : null,
+                    field.polygon && !field.group ? <polygon key={field.id} points={field.polygon} /> : null,
                   )}
                   {outlines.map((outline) => (
                     <polygon key={outline.key} points={outline.polygon} />
                   ))}
                 </clipPath>
                 <image
-                  className="precision-raster"
+                  key={raster.href}
+                  className={rasterReady ? "precision-raster" : "precision-raster is-pending"}
                   href={raster.href}
                   x={raster.x}
                   y={raster.y}
                   width={raster.w}
                   height={raster.h}
                   preserveAspectRatio="none"
+                  onLoad={() => {
+                    const href = raster.href
+                    setLoadedRasters((current) => {
+                      if (current.has(href)) return current
+                      const next = new Set(current)
+                      next.add(href)
+                      return next
+                    })
+                  }}
                   onError={() => setFailedRaster(raster.href)}
                 />
               </g>
             ) : null}
             {outlines.map((outline) => {
-              const showRaster = raster != null && rasterOk
-              const fillGap = painted && !showRaster
+              const fillGap = painted && (raster == null || failedRaster === raster?.href)
               const member = fields.find((field) => field.id === outline.ids[0])
               return (
                 <polygon
@@ -1013,11 +1088,12 @@ function FieldMap({
               )
             })}
             {fields.map((field) => {
-              const showRaster = raster != null && rasterOk
+              const showRaster = raster != null && rasterReady
+              const holdForRaster = raster != null && !showRaster && failedRaster !== raster.href
               const className = [
                 "field-shape",
-                showRaster ? "is-raster" : "",
-                painted && !showRaster ? "is-painted" : "",
+                showRaster || holdForRaster ? "is-raster" : "",
+                painted && !showRaster && !holdForRaster ? "is-painted" : "",
                 field.group ? "is-joined" : "",
                 inActiveGroup(field, hoverId, selectedId) ? "is-group-hot" : "",
                 field.id === selectedId ? "is-selected" : "",
@@ -1063,10 +1139,26 @@ function FieldMap({
                   transform={`translate(${field.x} ${field.y}) scale(${labels.scale})`}
                 >
                   <rect x={-width / 2} y={-1.35} width={width} height={LABEL_HEIGHT} rx="0.45" />
-                  {withIcon && field.iconUrl ? (
-                    <image href={field.iconUrl} x={iconX} y={-1.05} width="2.1" height="2.1" />
+                  {withIcon && field.iconUrl && !brokenIcons.has(field.iconUrl) ? (
+                    <image
+                      href={field.iconUrl}
+                      x={iconX}
+                      y={-1.05}
+                      width="2.1"
+                      height="2.1"
+                      onError={() => {
+                        const href = field.iconUrl
+                        if (!href) return
+                        setBrokenIcons((current) => {
+                          if (current.has(href)) return current
+                          const next = new Set(current)
+                          next.add(href)
+                          return next
+                        })
+                      }}
+                    />
                   ) : null}
-                  {withIcon && !field.iconUrl ? (
+                  {withIcon && (!field.iconUrl || brokenIcons.has(field.iconUrl)) ? (
                     <g transform={`translate(${iconX} -1.05)`}>
                       <rect width="2.1" height="2.1" rx="0.35" fill={field.color} />
                       <g transform="scale(0.131)" style={{ color: "#172016" }}>
@@ -1151,7 +1243,15 @@ function FieldDetail({
           <svg viewBox="0 0 16 16">
             <CropMark kind={cropKey(field.fruitName)} />
           </svg>
-          {field.iconUrl ? <img src={field.iconUrl} alt="" /> : null}
+          {field.iconUrl ? (
+            <img
+              src={field.iconUrl}
+              alt=""
+              onError={(event) => {
+                event.currentTarget.style.display = "none"
+              }}
+            />
+          ) : null}
         </span>
         <div>
           <h2>{t("fields.numberValue", { id: field.id })}</h2>

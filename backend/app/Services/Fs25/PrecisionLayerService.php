@@ -87,44 +87,63 @@ final class PrecisionLayerService
         private readonly PngRgbWriter $png = new PngRgbWriter,
     ) {}
 
+    /** Serve a map that the scheduler already painted. Opening a layer does not convert it. */
     public function pngPath(Workspace $workspace, string $layer): ?string
     {
         if (! isset(self::FILES[$layer])) {
             return null;
         }
+        $png = storage_path('app/connector/'.$workspace->public_id.'/precision/'.$layer.'.png');
+
+        return is_file($png) ? $png : null;
+    }
+
+    public function refresh(Workspace $workspace): void
+    {
         $workspace->loadMissing('hostAccess');
         $access = $workspace->hostAccess;
         if ($access === null) {
-            return null;
+            return;
         }
         $save = trim(str_replace('\\', '/', (string) $access->remote_savegame_path), '/');
         if ($save === '') {
-            return null;
+            return;
         }
+        foreach (array_keys(self::FILES) as $layer) {
+            try {
+                $this->rebuild($workspace, $access, $save, $layer);
+            } catch (Throwable $e) {
+                Log::warning(HostConnectionError::format($e, 'Applikationskarte'));
+            }
+        }
+    }
+
+    private function rebuild(Workspace $workspace, HostAccess $access, string $save, string $layer): void
+    {
         $directory = storage_path('app/connector/'.$workspace->public_id.'/precision');
         if (! is_dir($directory) && ! mkdir($directory, 0775, true) && ! is_dir($directory)) {
-            return null;
+            return;
         }
         $png = $directory.'/'.$layer.'.png';
         $stamp = $directory.'/'.$layer.'.sha';
-        if (is_file($png) && is_file($stamp) && (time() - (int) filemtime($stamp)) < 180) {
-            return $png;
+        if (is_file($png) && is_file($stamp) && (time() - (int) filemtime($stamp)) < 240) {
+            return;
         }
 
         $bytes = $this->download($access, $save.'/'.self::FILES[$layer]);
         if ($bytes === null) {
-            return is_file($png) ? $png : null;
+            return;
         }
         $hash = hash('sha256', $bytes);
         if (is_file($png) && is_file($stamp) && trim((string) file_get_contents($stamp)) === $hash) {
             touch($stamp);
 
-            return $png;
+            return;
         }
         $image = $this->decoder->decodeFitted($bytes, 2048);
         unset($bytes);
         if ($image === null) {
-            return is_file($png) ? $png : null;
+            return;
         }
         $rgb = $this->colorize($layer, $image['pixels']);
         $width = $image['width'];
@@ -134,10 +153,8 @@ final class PrecisionLayerService
             $this->png->write($png, $width, $height, $rgb);
             file_put_contents($stamp, $hash);
         } catch (Throwable) {
-            return is_file($png) ? $png : null;
+            return;
         }
-
-        return $png;
     }
 
     private function download(HostAccess $access, string $path): ?string
