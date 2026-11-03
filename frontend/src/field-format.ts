@@ -29,6 +29,18 @@ const CROP_COLOR: Record<string, string> = {
   parsnip: "#e6d2a0",
   beetroot: "#a33a52",
   sorghum: "#c4883a",
+  rye: "#c4a15a",
+  spelt: "#d4b56a",
+  triticale: "#c9a86a",
+  summerbarley: "#d2ae62",
+  fieldgrass: "#6aaa52",
+  meadow: "#7eb85a",
+  greenrye: "#8aaa4a",
+  vetchrye: "#6a9a48",
+  fieldbean: "#5a9a52",
+  onion: "#e2c07a",
+  mustard: "#e6d24a",
+  silagemaize: "#b6c44a",
 }
 
 export function cropKey(name: string | null | undefined) {

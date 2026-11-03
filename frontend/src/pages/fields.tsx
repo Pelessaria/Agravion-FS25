@@ -22,6 +22,7 @@ import {
   terrainFrame,
   type MapFrame,
 } from "../field-format"
+import { joinedContours } from "../field-outline"
 import { useStore } from "../store"
 import type { FieldSnapshot, FieldsResponse } from "../types"
 
@@ -48,7 +49,17 @@ const LABELS_FROM_ZOOM = 1.7
 const ICONS_FROM_ZOOM = 2.6
 
 function CropMark({ kind }: { kind: string }) {
-  if (kind === "wheat" || kind === "barley" || kind === "oat" || kind === "rice" || kind === "ricelonggrain") {
+  if (
+    kind === "wheat" ||
+    kind === "barley" ||
+    kind === "summerbarley" ||
+    kind === "oat" ||
+    kind === "rye" ||
+    kind === "spelt" ||
+    kind === "triticale" ||
+    kind === "rice" ||
+    kind === "ricelonggrain"
+  ) {
     return (
       <path
         d="M8 15 V3 M8 5 L5.2 3.2 M8 7.2 L10.8 5.4 M8 9.4 L5.2 7.6 M8 11.6 L10.8 9.8"
@@ -59,7 +70,7 @@ function CropMark({ kind }: { kind: string }) {
       />
     )
   }
-  if (kind === "canola" || kind === "sunflower" || kind === "oilseedradish") {
+  if (kind === "canola" || kind === "sunflower" || kind === "oilseedradish" || kind === "mustard") {
     return (
       <>
         <circle cx="8" cy="6" r="3.1" fill="currentColor" />
@@ -67,10 +78,10 @@ function CropMark({ kind }: { kind: string }) {
       </>
     )
   }
-  if (kind === "maize" || kind === "corn" || kind === "sorghum") {
+  if (kind === "maize" || kind === "silagemaize" || kind === "corn" || kind === "sorghum") {
     return <path d="M8 15 V4 M5.5 6.5 H10.5 M5 9 H11 M5.5 11.5 H10.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
   }
-  if (kind === "grass" || kind === "poplar") {
+  if (kind === "grass" || kind === "fieldgrass" || kind === "meadow" || kind === "greenrye" || kind === "vetchrye" || kind === "poplar") {
     return <path d="M4 14 C5 8 6 6 8 3 C10 6 11 8 12 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
   }
   if (kind === "potato" || kind === "sugarbeet" || kind === "carrot" || kind === "parsnip" || kind === "beetroot") {
@@ -79,7 +90,15 @@ function CropMark({ kind }: { kind: string }) {
   if (kind === "cotton") {
     return <circle cx="8" cy="8" r="3.4" fill="currentColor" />
   }
-  if (kind === "soybean" || kind === "pea" || kind === "greenbean" || kind === "spinach") {
+  if (kind === "onion") {
+    return (
+      <>
+        <circle cx="8" cy="9" r="3.2" fill="currentColor" />
+        <path d="M8 6 V3.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </>
+    )
+  }
+  if (kind === "soybean" || kind === "pea" || kind === "fieldbean" || kind === "greenbean" || kind === "spinach") {
     return (
       <path
         d="M8 15 V7 M8 9 C4.2 8 3 4.5 6 3.2 M8 10 C12 8.6 13.2 5 10.2 3.6"
@@ -262,14 +281,6 @@ export function FieldsPage() {
     () => projectFields(fields, frame, farm?.gameFarmId ?? null),
     [farm?.gameFarmId, fields, frame],
   )
-  const bridges = useMemo(() => {
-    const source = fields.filter((field) => {
-      if (onlyMine && farm && field.farmId !== farm.gameFarmId) return false
-      if (!showUnowned && field.owned === false) return false
-      return true
-    })
-    return mergeBridges(source, frame)
-  }, [farm, fields, frame, onlyMine, showUnowned])
   const visible = useMemo(
     () =>
       drawn.filter((field) => {
@@ -279,6 +290,35 @@ export function FieldsPage() {
       }),
     [drawn, farm, onlyMine, showUnowned],
   )
+  const outlines = useMemo(() => {
+    const shown = new Set(visible.map((field) => field.id))
+    const groups = new Map<string, { ids: number[]; polygons: [number, number][][] }>()
+    for (const field of fields) {
+      if (!shown.has(field.id) || !field.group || field.group.length < 2 || field.points.length < 3) continue
+      const key = field.group.join(",")
+      const row = groups.get(key) ?? { ids: [], polygons: [] }
+      row.ids.push(field.id)
+      row.polygons.push(field.points)
+      groups.set(key, row)
+    }
+    const result: { key: string; ids: number[]; polygon: string }[] = []
+    for (const [key, row] of groups) {
+      if (row.polygons.length < 2) continue
+      joinedContours(row.polygons).forEach((ring, index) => {
+        result.push({
+          key: `${key}-${index}`,
+          ids: row.ids,
+          polygon: ring
+            .map(([x, z]) => {
+              const point = projectPoint(x, z, frame)
+              return `${point.x},${point.y}`
+            })
+            .join(" "),
+        })
+      })
+    }
+    return result
+  }, [fields, frame, visible])
   const selected = fields.find((field) => field.id === selectedId) ?? null
   const owned = fields.filter((field) => field.owned).length
   const harvest = fields.filter((field) => field.crop === "harvestReady").length
@@ -393,7 +433,7 @@ export function FieldsPage() {
             </div>
             <FieldMap
               fields={visible}
-              bridges={bridges}
+              outlines={outlines}
               mapUrl={
                 source?.pdaMap
                   ? `/api/workspaces/${workspace.id}/pda-map`
@@ -494,58 +534,9 @@ function visibleLabels(
   return { scale, ids }
 }
 
-function mergeBridges(fields: FieldSnapshot[], frame: MapFrame): string[] {
-  const byId = new Map(fields.map((field) => [field.id, field]))
-  const bridges: string[] = []
-  for (const field of fields) {
-    const group = field.group
-    if (!group || group.length < 2 || field.id !== Math.min(...group)) continue
-    for (let i = 0; i < group.length; i += 1) {
-      for (let j = i + 1; j < group.length; j += 1) {
-        const a = byId.get(group[i])
-        const b = byId.get(group[j])
-        if (!a || !b || a.points.length < 2 || b.points.length < 2) continue
-        let best = Infinity
-        let pair: [[number, number], [number, number]] | null = null
-        for (const left of a.points) {
-          for (const right of b.points) {
-            const dist = (left[0] - right[0]) ** 2 + (left[1] - right[1]) ** 2
-            if (dist < best) {
-              best = dist
-              pair = [left, right]
-            }
-          }
-        }
-        if (!pair || Math.sqrt(best) > 55) continue
-        const [left, right] = pair
-        const dx = right[0] - left[0]
-        const dz = right[1] - left[1]
-        const len = Math.hypot(dx, dz) || 1
-        const ox = (-dz / len) * 14
-        const oz = (dx / len) * 14
-        const quad: [number, number][] = [
-          [left[0] + ox, left[1] + oz],
-          [left[0] - ox, left[1] - oz],
-          [right[0] - ox, right[1] - oz],
-          [right[0] + ox, right[1] + oz],
-        ]
-        bridges.push(
-          quad
-            .map((point) => {
-              const projected = projectPoint(point[0], point[1], frame)
-              return `${projected.x},${projected.y}`
-            })
-            .join(" "),
-        )
-      }
-    }
-  }
-  return bridges
-}
-
 function FieldMap({
   fields,
-  bridges,
+  outlines,
   mapUrl,
   live,
   selectedId,
@@ -555,7 +546,7 @@ function FieldMap({
   onContentBox,
 }: {
   fields: DrawnField[]
-  bridges: string[]
+  outlines: { key: string; ids: number[]; polygon: string }[]
   mapUrl: string | null
   live: boolean
   selectedId: number | null
@@ -755,9 +746,6 @@ function FieldMap({
             <div className="fields-terrain" aria-hidden="true" />
           )}
           <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label={label}>
-            {bridges.map((points, index) => (
-              <polygon key={`bridge-${index}`} className="field-shape field-bridge" points={points} />
-            ))}
             {fields.map((field) => {
               const className = [
                 "field-shape",
@@ -772,6 +760,16 @@ function FieldMap({
                 <polygon key={field.id} data-field={field.id} className={className} points={field.polygon} fill={field.color} />
               ) : (
                 <circle key={field.id} data-field={field.id} className={className} cx={field.x} cy={field.y} r="1.1" fill={field.color} />
+              )
+            })}
+            {outlines.map((outline) => {
+              const hot = outline.ids.some((id) => id === hoverId || id === selectedId)
+              return (
+                <polygon
+                  key={outline.key}
+                  className={hot ? "field-outline is-hot" : "field-outline"}
+                  points={outline.polygon}
+                />
               )
             })}
             {fields.map((field) => {
@@ -794,8 +792,11 @@ function FieldMap({
                     <image href={field.iconUrl} x={iconX} y={-1.05} width="2.1" height="2.1" />
                   ) : null}
                   {withIcon && !field.iconUrl ? (
-                    <g transform={`translate(${iconX} -1.05) scale(0.131)`} style={{ color: field.color }}>
-                      <CropMark kind={field.mark} />
+                    <g transform={`translate(${iconX} -1.05)`}>
+                      <rect width="2.1" height="2.1" rx="0.35" fill={field.color} />
+                      <g transform="scale(0.131)" style={{ color: "#172016" }}>
+                        <CropMark kind={field.mark} />
+                      </g>
                     </g>
                   ) : null}
                   <text x={textX} y="0.55" textAnchor="middle" fontSize="1.7">

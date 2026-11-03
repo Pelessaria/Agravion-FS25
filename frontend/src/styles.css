@@ -2731,13 +2731,22 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   cursor: pointer;
 }
 .field-shape.is-other { fill-opacity: 0; stroke: rgba(255, 255, 255, 0.34); }
-.field-shape.is-joined { stroke: #e4b84a; stroke-width: 2px; }
-.field-shape.is-group-hot { stroke: #ffe7a8; stroke-width: 2.6px; fill-opacity: 0.2; }
+.field-shape.is-joined { stroke: none; }
+.field-shape.is-group-hot { fill-opacity: 0.16; }
 .field-shape.is-selected { stroke: #f3ffd8; stroke-width: 2.2px; fill-opacity: 0.28; }
-.field-shape.is-joined.is-selected { stroke: #ffe7a8; }
+.field-shape.is-joined.is-selected { stroke: none; }
 .field-shape:hover { fill-opacity: 0.18; stroke: rgba(255, 255, 255, 0.92); }
-.field-shape.is-joined:hover { stroke: #ffe7a8; }
-.field-bridge { fill: rgba(228, 184, 74, 0.45); fill-opacity: 1; stroke: rgba(228, 184, 74, 0.95); stroke-width: 1.6px; pointer-events: none; }
+.field-shape.is-joined:hover { stroke: none; }
+.field-outline {
+  fill: none;
+  stroke: #e4b84a;
+  stroke-width: 1.7px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.field-outline.is-hot { stroke: #ffe7a8; stroke-width: 2.4px; }
 .field-label { cursor: pointer; }
 .field-label rect { fill: rgba(8, 12, 10, 0.5); }
 .field-label text { fill: #f7f8f7; font-weight: 600; }

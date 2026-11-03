@@ -226,29 +226,10 @@ local function pointsFromTable(candidate)
 end
 
 local function collectPolygon(field)
-    local roots = {
-        field.rootNode,
-        field.fieldNode,
-        field.node,
-        field.i3dNode,
-    }
-    if field.nameIndicator ~= nil and getParent ~= nil then
-        local parent = safeCall(getParent, field.nameIndicator)
-        roots[#roots + 1] = parent
-    end
-
-    for _, root in ipairs(roots) do
-        local node = findPolygonNode(root)
-        local points = pointsFromNode(node)
-        if #points >= 3 then
-            return points
-        end
-    end
-
-    if type(field.polygonPoints) == "number" then
-        local points = pointsFromNode(field.polygonPoints)
-        if #points >= 3 then
-            return points
+    local best = {}
+    local function consider(points)
+        if type(points) == "table" and #points > #best then
+            best = points
         end
     end
 
@@ -260,13 +241,27 @@ local function collectPolygon(field)
         field.polygonPoints,
     }
     for _, candidate in ipairs(tables) do
-        local points = pointsFromTable(candidate)
-        if #points >= 3 then
-            return points
-        end
+        consider(pointsFromTable(candidate))
     end
 
-    return {}
+    local roots = {
+        field.rootNode,
+        field.fieldNode,
+        field.node,
+        field.i3dNode,
+    }
+    if field.nameIndicator ~= nil and getParent ~= nil then
+        local parent = safeCall(getParent, field.nameIndicator)
+        roots[#roots + 1] = parent
+    end
+    for _, root in ipairs(roots) do
+        consider(pointsFromNode(findPolygonNode(root)))
+    end
+    if type(field.polygonPoints) == "number" then
+        consider(pointsFromNode(field.polygonPoints))
+    end
+
+    return best
 end
 
 local function polygonArea(points)
@@ -722,6 +717,142 @@ local function samplePrecision(precisionFarming, farmlandId, cx, cz, fruitTypeIn
     }
 end
 
+local FORAGE_FRUIT = {
+    GRASS = true,
+    MEADOW = true,
+    FIELDGRASS = true,
+}
+
+local function pointInside(points, x, z)
+    local inside = false
+    local count = #points
+    local j = count
+    local i = 1
+    while i <= count do
+        local pi = points[i]
+        local pj = points[j]
+        if (pi.z > z) ~= (pj.z > z) then
+            local denom = pj.z - pi.z
+            if denom ~= 0 and x < (pj.x - pi.x) * (z - pi.z) / denom + pi.x then
+                inside = not inside
+            end
+        end
+        j = i
+        i = i + 1
+    end
+    return inside
+end
+
+-- getFieldState() is a cache. On a dedicated server it stays on the previous
+-- fruit (grass) after the density map has been sown. FieldState:update reads
+-- the density map at a world position. A grass margin must not hide the crop.
+local function sampleFruit(points)
+    if FieldState == nil or type(points) ~= "table" or #points < 3 then
+        return nil
+    end
+    if FieldSnapshot._sampler == nil then
+        local ok, created = pcall(FieldState.new)
+        if not ok or created == nil or created.update == nil then
+            FieldSnapshot._sampler = false
+            return nil
+        end
+        FieldSnapshot._sampler = created
+    end
+    if FieldSnapshot._sampler == false then
+        return nil
+    end
+    local state = FieldSnapshot._sampler
+    local minX, maxX, minZ, maxZ = 1e12, -1e12, 1e12, -1e12
+    for _, point in ipairs(points) do
+        if point.x < minX then minX = point.x end
+        if point.x > maxX then maxX = point.x end
+        if point.z < minZ then minZ = point.z end
+        if point.z > maxZ then maxZ = point.z end
+    end
+    local span = math.max(maxX - minX, maxZ - minZ)
+    if span < 1 then
+        return nil
+    end
+    local step = math.max(16, span / 5)
+    local unknown = FruitType ~= nil and FruitType.UNKNOWN or 0
+    local tally = {}
+    local growth = {}
+    local extra = {}
+    local total = 0
+    local taken = 0
+    local z = minZ + step * 0.5
+    while z < maxZ and taken < 24 do
+        local x = minX + step * 0.5
+        while x < maxX and taken < 24 do
+            if pointInside(points, x, z) then
+                taken = taken + 1
+                local updated = pcall(function()
+                    state:update(x, z)
+                end)
+                local index = updated and state.isValid and num(state.fruitTypeIndex) or nil
+                if index ~= nil and index ~= unknown and index > 0 then
+                    tally[index] = (tally[index] or 0) + 1
+                    total = total + 1
+                    local stage = num(state.growthState)
+                    if stage ~= nil then
+                        growth[index] = growth[index] or {}
+                        growth[index][stage] = (growth[index][stage] or 0) + 1
+                    end
+                    if extra[index] == nil then
+                        extra[index] = {
+                            weed = num(state.weedState),
+                            weedFactor = state.weedFactor,
+                            stones = num(state.stoneLevel),
+                            ground = num(state.groundType),
+                            spray = num(state.sprayLevel),
+                            sprayType = num(state.sprayType),
+                            lime = num(state.limeLevel),
+                            roller = num(state.rollerLevel),
+                            plow = num(state.plowLevel),
+                            stubble = num(state.stubbleShredLevel),
+                            water = num(state.waterLevel),
+                        }
+                    end
+                end
+            end
+            x = x + step
+        end
+        z = z + step
+    end
+    if total == 0 then
+        return nil
+    end
+    local cropIndex, cropCount = nil, 0
+    local anyIndex, anyCount = nil, 0
+    for index, count in pairs(tally) do
+        if count > anyCount then
+            anyIndex = index
+            anyCount = count
+        end
+        local name = fruitInfo(index)
+        local upper = name ~= nil and string.upper(name) or ""
+        if not FORAGE_FRUIT[upper] and count > cropCount then
+            cropIndex = index
+            cropCount = count
+        end
+    end
+    local index = anyIndex
+    if cropIndex ~= nil and (cropCount >= anyCount or (cropCount >= 2 and cropCount / total >= 0.15)) then
+        index = cropIndex
+    end
+    local stage, stageCount = nil, 0
+    local bucket = growth[index]
+    if bucket ~= nil then
+        for value, count in pairs(bucket) do
+            if count > stageCount then
+                stage = value
+                stageCount = count
+            end
+        end
+    end
+    return index, stage, extra[index]
+end
+
 local function collectState(connector, field, id)
     local record = { id = id }
     if field == nil then
@@ -743,13 +874,21 @@ local function collectState(connector, field, id)
         record.owned = "0"
     end
 
-    if fieldState ~= nil then
-        local fruitTypeIndex = num(fieldState.fruitTypeIndex)
+    if fieldState ~= nil or field ~= nil then
+        local fruitTypeIndex = fieldState ~= nil and num(fieldState.fruitTypeIndex) or nil
+        local growth = fieldState ~= nil and num(fieldState.growthState) or nil
+        local liveIndex, liveGrowth, live = sampleFruit(collectPolygon(field))
+        if liveIndex ~= nil then
+            fruitTypeIndex = liveIndex
+            if liveGrowth ~= nil then
+                growth = liveGrowth
+            end
+        end
         local fruitName, fruitTitle, fruit = fruitInfo(fruitTypeIndex)
         record.fruit = fruitName
         record.fruitTitle = fruitTitle
         record.fruitIcon = queueFruitIcon(connector, fruit)
-        record.growth = num(fieldState.growthState)
+        record.growth = growth
         if fruit ~= nil then
             record.growthMax = num(fruit.numGrowthStates)
             record.harvestMin = num(fruit.minHarvestingGrowthState)
@@ -758,17 +897,23 @@ local function collectState(connector, field, id)
         else
             record.crop = "noCrop"
         end
-        record.ground = num(fieldState.groundType)
-        record.weed = num(fieldState.weedState)
-        record.weedFactor = round(fieldState.weedFactor, 3)
-        record.stones = num(fieldState.stoneLevel)
-        record.spray = num(fieldState.sprayLevel)
-        record.sprayType = num(fieldState.sprayType)
-        record.lime = num(fieldState.limeLevel)
-        record.roller = num(fieldState.rollerLevel)
-        record.plow = num(fieldState.plowLevel)
-        record.stubble = num(fieldState.stubbleShredLevel)
-        record.water = num(fieldState.waterLevel)
+        local function pick(liveValue, cached)
+            if liveIndex ~= nil and liveValue ~= nil then
+                return liveValue
+            end
+            return cached
+        end
+        record.ground = pick(live ~= nil and live.ground or nil, fieldState ~= nil and num(fieldState.groundType) or nil)
+        record.weed = pick(live ~= nil and live.weed or nil, fieldState ~= nil and num(fieldState.weedState) or nil)
+        record.weedFactor = round(pick(live ~= nil and live.weedFactor or nil, fieldState ~= nil and fieldState.weedFactor or nil), 3)
+        record.stones = pick(live ~= nil and live.stones or nil, fieldState ~= nil and num(fieldState.stoneLevel) or nil)
+        record.spray = pick(live ~= nil and live.spray or nil, fieldState ~= nil and num(fieldState.sprayLevel) or nil)
+        record.sprayType = pick(live ~= nil and live.sprayType or nil, fieldState ~= nil and num(fieldState.sprayType) or nil)
+        record.lime = pick(live ~= nil and live.lime or nil, fieldState ~= nil and num(fieldState.limeLevel) or nil)
+        record.roller = pick(live ~= nil and live.roller or nil, fieldState ~= nil and num(fieldState.rollerLevel) or nil)
+        record.plow = pick(live ~= nil and live.plow or nil, fieldState ~= nil and num(fieldState.plowLevel) or nil)
+        record.stubble = pick(live ~= nil and live.stubble or nil, fieldState ~= nil and num(fieldState.stubbleShredLevel) or nil)
+        record.water = pick(live ~= nil and live.water or nil, fieldState ~= nil and num(fieldState.waterLevel) or nil)
     end
 
     local precision = samplePrecision(getPrecisionFarming(), farmlandId, cx, cz, fieldState ~= nil and fieldState.fruitTypeIndex or nil)
@@ -1301,7 +1446,7 @@ function FieldSnapshot.writeIfDue(connector)
 
     if connector.fieldStateIndex == nil then
         if connector.fieldStateWritten and connector.fieldAccumMs < FieldSnapshot.STATE_EVERY_MS then
-            copyPendingFruitIcons(connector, 2)
+            copyPendingFruitIcons(connector, 24)
             writeFruitManifest(connector)
             return
         end
@@ -1322,7 +1467,7 @@ function FieldSnapshot.writeIfDue(connector)
 
     if connector.fieldStateIndex > #stateIds then
         writeState(connector, stateIds, connector.fieldStateRecords)
-        copyPendingFruitIcons(connector, 4)
+        copyPendingFruitIcons(connector, 24)
         writeFruitManifest(connector)
         if not connector.fieldStateLogged then
             log(string.format("fields state written count=%s", tostring(#stateIds)))

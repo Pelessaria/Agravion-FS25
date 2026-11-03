@@ -264,7 +264,7 @@ final class ConnectorSnapshotService
         $dir = storage_path('app/connector/'.$workspace->public_id.'/icons/fruits');
         $pulled = 0;
         foreach ($entries as $entry) {
-            if ($pulled >= 6) {
+            if ($pulled >= 24) {
                 return;
             }
             if ($this->fruitIconPath($workspace, $entry['key']) !== null) {
