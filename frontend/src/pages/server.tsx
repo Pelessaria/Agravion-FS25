@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
-import { ChevronDown, ChevronRight, Copy, Download, Link2, Pause, Play, RotateCcw, Square, Trash2, Weight } from "lucide-react"
+import { ChevronDown, ChevronRight, Copy, Download, Link2, Pause, Play, RotateCcw, Search, Square, Trash2 } from "lucide-react"
 import {
   apiDeleteServerMods,
   apiDownloadServerMod,
@@ -17,6 +17,7 @@ import {
 } from "../api"
 import modhubIcon from "../assets/modhub-favicon.png"
 import { MissingWorkspace, Modal, PermissionBlock } from "../components/ui"
+import { serverCapabilities } from "../modules"
 import { useStore } from "../store"
 import { useWorkspaceRoute } from "../use-workspace"
 
@@ -74,7 +75,10 @@ export function ServerPage() {
   const { liveMode, moduleAccess, canManageUsers, pushToast } = useStore()
   const { workspace, allowed } = useWorkspaceRoute()
   const access = workspace ? moduleAccess(workspace.id, "server") : null
-  const canWrite = access === "write"
+  const caps = serverCapabilities(access)
+  const canWrite = caps.control
+  const canMods = caps.mods
+  const canLog = caps.log
   const [snapshot, setSnapshot] = useState<ServerSnapshot>(EMPTY_SNAPSHOT)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -372,7 +376,7 @@ export function ServerPage() {
             {stampText && !snapshot.pending ? <span className="faint">{t("server.cachedAt", { time: stampText })}</span> : null}
           </div>
         </div>
-        <div className="server-actions">
+        {canWrite ? <div className="server-actions">
           {actions.map((action) => {
             const Icon = action.icon
             const ready = actionIds.has(action.id)
@@ -402,8 +406,8 @@ export function ServerPage() {
               </Tip>
             )
           })}
-        </div>
-        {!snapshot.webConfigured ? (
+        </div> : null}
+        {canWrite && !snapshot.webConfigured ? (
           <p className="hint server-hero-note">
             {t("server.missingLogin")}{" "}
             {canManageUsers() ? <Link to={`/w/${workspace.id}/settings`}>{t("server.openSettings")}</Link> : null}
@@ -411,7 +415,7 @@ export function ServerPage() {
         ) : null}
       </div>
 
-      <div className="panel">
+      {canMods ? <div className="panel">
         <div className="server-panel-head">
           <h2>{t("server.mods")}</h2>
           <div className="server-actions">
@@ -430,11 +434,15 @@ export function ServerPage() {
         {!snapshot.ftpConfigured ? <p className="hint">{t("server.missingFiles")}</p> : null}
         <p className="hint">{snapshot.savegameRead ? t("server.savegameKnown") : t("server.savegameUnknown")}</p>
         <div className="server-toolbar">
-          <input
-            value={modQuery}
-            placeholder={t("server.modSearch")}
-            onChange={(event) => setModQuery(event.target.value)}
-          />
+          <label className="mod-search">
+            <Search className="icon" aria-hidden="true" />
+            <input
+              value={modQuery}
+              placeholder={t("server.modSearch")}
+              onChange={(event) => setModQuery(event.target.value)}
+            />
+          </label>
+          <div className="server-toolbar-actions">
           {canWrite ? (
             <Tip
               text={
@@ -476,6 +484,7 @@ export function ServerPage() {
               />
             </label>
           ) : null}
+          </div>
         </div>
         {visibleMods.length === 0 ? (
           <p className="muted">{t("server.noMods")}</p>
@@ -544,7 +553,7 @@ export function ServerPage() {
                         ? t("server.deleteNeedsStop")
                         : t("server.busy")
                   return (
-                    <tr key={mod.name}>
+                    <tr key={mod.name} className={unused ? "is-unused" : mod.mapDependency ? "is-dependency" : undefined}>
                       {canWrite ? (
                         <td className="mod-select">
                           <input
@@ -555,14 +564,9 @@ export function ServerPage() {
                           />
                         </td>
                       ) : null}
-                      <td className="mod-name">
+                      <td className="mod-name" title={unused ? t("server.unusedTip") : undefined}>
                         <div className="mod-title-line">
                           <strong>{mod.title || mod.name}</strong>
-                          {unused ? (
-                            <span className="mod-unused" title={t("server.unusedTip")} aria-label={t("server.unused")}>
-                              <Weight className="icon" aria-hidden="true" />
-                            </span>
-                          ) : null}
                           {mod.mapDependency ? (
                             <span className="mod-dependency" title={t("server.mapDependencyTip")} aria-label={t("server.mapDependency")}>
                               <Link2 className="icon" aria-hidden="true" />
@@ -660,9 +664,9 @@ export function ServerPage() {
             </table>
           </div>
         )}
-      </div>
+      </div> : null}
 
-      {settings.length > 0 ? (
+      {canWrite && settings.length > 0 ? (
         <form className="panel" onSubmit={(event) => void saveSettings(event)}>
           <div className="server-panel-head">
             <h2>{t("server.settings")}</h2>
@@ -719,7 +723,7 @@ export function ServerPage() {
         </form>
       ) : null}
 
-      <div className="panel">
+      {canLog ? <div className="panel">
         <div className="server-panel-head">
           <h2>{t("server.log")}</h2>
           <div className="server-actions">
@@ -742,7 +746,7 @@ export function ServerPage() {
         ) : (
           <p className="muted">{t("server.noLog")}</p>
         )}
-      </div>
+      </div> : null}
       {pendingDelete && pendingDelete.length > 0 ? (
         <Modal title={t("server.delete")} onClose={() => busy !== "delete" && setPendingDelete(null)}>
           <p>

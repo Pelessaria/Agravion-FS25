@@ -87,7 +87,7 @@ export async function apiSaveModuleAccess(
   workspaceId: string,
   userId: string,
   moduleId: string,
-  access: "none" | "read" | "write",
+  access: string,
 ): Promise<{ ok: boolean }> {
   return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/modules/access`, {
     method: "PUT",
@@ -504,7 +504,7 @@ export async function apiServerAccess(workspaceId: string): Promise<{ users: Ser
 export async function apiSaveServerAccess(
   workspaceId: string,
   userId: string,
-  access: "none" | "read" | "write",
+  access: string,
 ): Promise<{ ok: boolean }> {
   return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/access`, {
     method: "PUT",

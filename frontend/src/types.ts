@@ -25,7 +25,8 @@ export interface Membership {
 
 export interface ModuleGrant {
   moduleId: string
-  access: ModuleAccess
+  /** read or write for most modules. The server module stores control,mods,log. */
+  access: string
 }
 
 export interface AppUser {

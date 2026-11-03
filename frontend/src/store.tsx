@@ -33,7 +33,6 @@ import type {
   Farm,
   GlobalRole,
   MailSettings,
-  ModuleAccess,
   ModuleGrant,
   ToastItem,
   Vehicle,
@@ -119,8 +118,8 @@ interface Store {
   updateProfile: (id: string, patch: ProfilePatch) => void
   setMailSettings: (settings: MailSettings) => void
   assign: (userId: string, workspaceId: string, role: WorkspaceRole) => void
-  setModuleAccess: (userId: string, workspaceId: string, moduleId: string, access: ModuleAccess | null) => void
-  moduleAccess: (workspaceId: string, moduleId: string) => ModuleAccess | null
+  setModuleAccess: (userId: string, workspaceId: string, moduleId: string, access: string | null) => void
+  moduleAccess: (workspaceId: string, moduleId: string) => string | null
   unassign: (userId: string, workspaceId: string) => void
   createGroup: (input: Omit<AccessGroup, "id" | "system" | "memberIds">) => string
   updateGroup: (id: string, patch: Partial<Omit<AccessGroup, "id" | "system" | "memberIds">>) => void
@@ -438,7 +437,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, 4200)
   }
 
-  function moduleAccess(workspaceId: string, moduleId: string): ModuleAccess | null {
+  function moduleAccess(workspaceId: string, moduleId: string): string | null {
     if (!actor?.active) return null
     if (actor.globalRole === "admin") return "write"
     const membership = actor.memberships.find((item) => item.workspaceId === workspaceId)

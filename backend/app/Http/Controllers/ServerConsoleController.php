@@ -19,9 +19,21 @@ class ServerConsoleController extends Controller
     public function show(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
     {
         $row = $this->workspace($workspace);
-        $this->requireAccess($request, $row, $grants, 'read');
+        $this->requireServer($request, $row, $grants, 'any');
+        $payload = $console->cached($row);
+        $caps = $grants->serverFlagsFor($request->user(), $row);
+        if (! $caps['mods']) {
+            $payload['mods'] = [];
+        }
+        if (! $caps['log']) {
+            $payload['log'] = null;
+        }
+        if (! $caps['control']) {
+            $payload['actions'] = [];
+            $payload['settings'] = [];
+        }
 
-        return response()->json($console->cached($row));
+        return response()->json($payload);
     }
 
     public function saveLogin(Request $request, string $workspace, DedicatedServerConsole $console): JsonResponse
@@ -66,7 +78,7 @@ class ServerConsoleController extends Controller
     public function action(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
     {
         $row = $this->workspace($workspace);
-        $this->requireAccess($request, $row, $grants, 'write');
+        $this->requireServer($request, $row, $grants, 'control');
         $data = $request->validate([
             'action' => ['required', 'in:start,stop,restart'],
         ]);
@@ -77,7 +89,7 @@ class ServerConsoleController extends Controller
     public function settings(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
     {
         $row = $this->workspace($workspace);
-        $this->requireAccess($request, $row, $grants, 'write');
+        $this->requireServer($request, $row, $grants, 'control');
         $data = $request->validate([
             'values' => ['required', 'array'],
         ]);
@@ -88,7 +100,7 @@ class ServerConsoleController extends Controller
     public function upload(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
     {
         $row = $this->workspace($workspace);
-        $this->requireAccess($request, $row, $grants, 'write');
+        $this->requireServer($request, $row, $grants, 'control');
         $request->validate([
             'file' => ['required', 'file', 'max:81920'],
         ]);
@@ -107,7 +119,7 @@ class ServerConsoleController extends Controller
     public function download(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): Response
     {
         $row = $this->workspace($workspace);
-        $this->requireAccess($request, $row, $grants, 'read');
+        $this->requireServer($request, $row, $grants, 'mods');
         $name = (string) $request->query('name', '');
         try {
             $file = $console->download($row, $name);
@@ -126,7 +138,7 @@ class ServerConsoleController extends Controller
     public function updateMod(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
     {
         $row = $this->workspace($workspace);
-        $this->requireAccess($request, $row, $grants, 'write');
+        $this->requireServer($request, $row, $grants, 'control');
         $data = $request->validate([
             'name' => ['required', 'string', 'max:180'],
         ]);
@@ -137,7 +149,7 @@ class ServerConsoleController extends Controller
     public function deleteMods(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
     {
         $row = $this->workspace($workspace);
-        $this->requireAccess($request, $row, $grants, 'write');
+        $this->requireServer($request, $row, $grants, 'control');
         $data = $request->validate([
             'names' => ['required', 'array', 'min:1', 'max:100'],
             'names.*' => ['required', 'string', 'max:180'],
@@ -149,7 +161,7 @@ class ServerConsoleController extends Controller
     public function active(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
     {
         $row = $this->workspace($workspace);
-        $this->requireAccess($request, $row, $grants, 'write');
+        $this->requireServer($request, $row, $grants, 'control');
         $data = $request->validate([
             'name' => ['required', 'string', 'max:180'],
             'active' => ['required', 'boolean'],
@@ -198,13 +210,19 @@ class ServerConsoleController extends Controller
         $data = $request->validate([
             'userId' => ['required', 'integer'],
             'moduleId' => ['required', 'in:map,fields,equipment,animals,storage,finance,trade,farm,server'],
-            'access' => ['required', 'in:none,read,write'],
+            'access' => ['required', 'string', 'max:40'],
         ]);
+        $access = (string) $data['access'];
+        if ($data['moduleId'] === 'server') {
+            $access = ModuleGrantService::encodeServerFlags($access) ?? 'none';
+        } elseif (! in_array($access, ['none', 'read', 'write'], true)) {
+            throw ValidationException::withMessages(['access' => 'Unbekannte Berechtigung.']);
+        }
         $user = User::query()->find($data['userId']);
         if ($user === null) {
             throw ValidationException::withMessages(['userId' => 'Benutzer nicht gefunden.']);
         }
-        if ($data['access'] === 'none' || ($user->global_role ?? 'admin') !== 'member') {
+        if ($access === 'none' || ($user->global_role ?? 'admin') !== 'member') {
             ModuleGrant::query()
                 ->where('user_id', $user->id)
                 ->where('workspace_id', $row->id)
@@ -217,7 +235,7 @@ class ServerConsoleController extends Controller
                     'workspace_id' => $row->id,
                     'module_id' => $data['moduleId'],
                 ],
-                ['access' => $data['access']],
+                ['access' => $access],
             );
         }
 
@@ -242,9 +260,9 @@ class ServerConsoleController extends Controller
         }
     }
 
-    private function requireAccess(Request $request, Workspace $workspace, ModuleGrantService $grants, string $need): void
+    private function requireServer(Request $request, Workspace $workspace, ModuleGrantService $grants, string $cap): void
     {
-        if (! $grants->allows($request->user(), $workspace, 'server', $need)) {
+        if (! $grants->serverAllows($request->user(), $workspace, $cap)) {
             abort(403, 'Kein Zugriff auf die Serververwaltung.');
         }
     }

@@ -15,7 +15,8 @@ import {
   Wallet,
 } from "lucide-react"
 import { apiSaveModuleAccess, ApiError } from "../api"
-import { APP_MODULES, type ModuleId } from "../modules"
+import { ServerCapToggles } from "../components/server-caps"
+import { APP_MODULES, encodeServerCapabilities, serverCapabilities, type ModuleId, type ServerCap } from "../modules"
 import { useStore } from "../store"
 import type { AppUser, GlobalRole, ModuleAccess, Workspace, WorkspaceRole } from "../types"
 import { isEmail } from "../validate"
@@ -106,6 +107,21 @@ export function UsersPanel() {
       }
     }
     store.setModuleAccess(user.id, workspaceId, moduleId, next)
+  }
+
+  async function setServerCap(user: AppUser, workspaceId: string, current: string | null, cap: ServerCap) {
+    const nextCaps = serverCapabilities(current)
+    nextCaps[cap] = !nextCaps[cap]
+    const next = encodeServerCapabilities(nextCaps)
+    if (store.liveMode && user.globalRole !== "admin") {
+      try {
+        await apiSaveModuleAccess(workspaceId, user.id, "server", next ?? "none")
+      } catch (caught) {
+        store.pushToast("warn", caught instanceof ApiError ? caught.message : t("users.accessFailed"))
+        return
+      }
+    }
+    store.setModuleAccess(user.id, workspaceId, "server", next)
   }
 
   return (
@@ -319,12 +335,19 @@ export function UsersPanel() {
                                   <Icon className="icon" aria-hidden="true" />
                                   {t(module.labelKey)}
                                 </span>
+                                {module.id === "server" ? (
+                                  <ServerCapToggles
+                                    access={admin || fullModules ? "write" : access}
+                                    disabled={admin || fullModules || !enabled}
+                                    onToggle={(cap) => void setServerCap(selected, workspace.id, access, cap)}
+                                  />
+                                ) : (
                                 <button
                                   type="button"
                                   className={access ? `perm ${access}` : "perm"}
                                   disabled={admin || fullModules || !enabled}
                                   aria-label={t("modules.cycle", { module: t(module.labelKey), right })}
-                                  onClick={() => void setModule(selected, workspace.id, module.id, access)}
+                                  onClick={() => void setModule(selected, workspace.id, module.id, access === "read" || access === "write" ? access : null)}
                                 >
                                   <span className="perm-checks" aria-hidden="true">
                                     <Check className={access ? "icon perm-mark on" : "icon perm-mark"} />
@@ -332,6 +355,7 @@ export function UsersPanel() {
                                   </span>
                                   <span>{right}</span>
                                 </button>
+                                )}
                               </li>
                             )
                           })}

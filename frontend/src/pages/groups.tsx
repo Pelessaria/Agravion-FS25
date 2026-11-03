@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import { APP_MODULES } from "../modules"
+import { ServerCapToggles } from "../components/server-caps"
+import { APP_MODULES, encodeServerCapabilities, serverCapabilities, type ServerCap } from "../modules"
 import { useStore } from "../store"
 import type { AccessGroup, ModuleAccess, WorkspaceRole } from "../types"
 
@@ -40,6 +41,15 @@ export function GroupsPanel() {
 
   function patch(group: AccessGroup, next: Partial<AccessGroup>) {
     store.updateGroup(group.id, next)
+  }
+
+  function toggleServer(group: AccessGroup, cap: ServerCap) {
+    const current = group.modules.find((item) => item.moduleId === "server")?.access ?? null
+    const caps = serverCapabilities(current)
+    caps[cap] = !caps[cap]
+    const next = encodeServerCapabilities(caps)
+    const modules = group.modules.filter((item) => item.moduleId !== "server")
+    patch(group, { modules: next ? [...modules, { moduleId: "server", access: next }] : modules })
   }
 
   function cycleModule(group: AccessGroup, moduleId: string) {
@@ -202,13 +212,17 @@ export function GroupsPanel() {
                         return (
                           <li className="module-row" key={module.id}>
                             <span className="module-name">{t(module.labelKey)}</span>
-                            <button
-                              type="button"
-                              className={access ? `perm ${access}` : "perm"}
-                              onClick={() => cycleModule(selected, module.id)}
-                            >
-                              {right}
-                            </button>
+                            {module.id === "server" ? (
+                              <ServerCapToggles access={access} onToggle={(cap) => toggleServer(selected, cap)} />
+                            ) : (
+                              <button
+                                type="button"
+                                className={access ? `perm ${access}` : "perm"}
+                                onClick={() => cycleModule(selected, module.id)}
+                              >
+                                {right}
+                              </button>
+                            )}
                           </li>
                         )
                       })}

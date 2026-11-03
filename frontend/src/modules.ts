@@ -36,12 +36,37 @@ export function moduleById(id: string) {
   return APP_MODULES.find((item) => item.id === id) ?? null
 }
 
+export const SERVER_CAPS = ["control", "mods", "log"] as const
+export type ServerCap = (typeof SERVER_CAPS)[number]
+
+/** Older grants used read and write. Read could see mods and the log, write could also control the server. */
+export function serverCapabilities(access: string | null | undefined): Record<ServerCap, boolean> {
+  if (access === "write") return { control: true, mods: true, log: true }
+  if (access === "read") return { control: false, mods: true, log: true }
+  const parts = new Set(
+    (access ?? "")
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean),
+  )
+  return {
+    control: parts.has("control"),
+    mods: parts.has("mods"),
+    log: parts.has("log"),
+  }
+}
+
+export function encodeServerCapabilities(caps: Record<ServerCap, boolean>): string | null {
+  const on = SERVER_CAPS.filter((cap) => caps[cap])
+  return on.length === 0 ? null : on.join(",")
+}
+
 export function normalizeModuleId(id: string): ModuleId | null {
   if (moduleById(id)) return id as ModuleId
   return LEGACY_MODULE_IDS[id] ?? null
 }
 
-export function normalizeModuleGrants<T extends { moduleId: string; access: "read" | "write" }>(
+export function normalizeModuleGrants<T extends { moduleId: string; access: string }>(
   grants: T[],
 ): T[] {
   const map = new Map<string, T>()
