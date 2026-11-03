@@ -69,7 +69,7 @@ export function terrainFrame(mapSize: number): MapFrame {
 
 /**
  * `box` is the visible map inside the image, in 0..1, origin top-left.
- * North stays up: padZ is the margin under the south edge.
+ * World +Z lies toward the bottom of a PDA overview, so padZ is the margin above the low-Z edge.
  */
 export function frameFromContentBox(
   mapSize: number,
@@ -81,14 +81,19 @@ export function frameFromContentBox(
     scaleX: box.w,
     scaleZ: box.h,
     padX: box.x,
-    padZ: 1 - (box.y + box.h),
+    padZ: box.y,
   }
 }
 
+/**
+ * Same placement the game uses for PDA hotspots. `nz` grows with world +Z and
+ * is already the top-down image coordinate: the overview texture has +Z toward
+ * the bottom. Inverting it puts every outline on the opposite parcel.
+ */
 export function projectPoint(x: number, z: number, frame: MapFrame) {
   const nx = ((x + frame.originX) / frame.sizeX) * frame.scaleX + frame.padX
   const nz = ((z + frame.originZ) / frame.sizeZ) * frame.scaleZ + frame.padZ
-  return { x: nx * 100, y: (1 - nz) * 100 }
+  return { x: nx * 100, y: nz * 100 }
 }
 
 /**
