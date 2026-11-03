@@ -281,10 +281,94 @@ final class CurlFtpClient
         };
     }
 
+    public function fileSize(string $path): int
+    {
+        $ch = $this->open($this->urlForPath($path, false));
+        curl_setopt($ch, CURLOPT_NOBODY, true);
+        curl_exec($ch);
+        $errno = curl_errno($ch);
+        $error = curl_error($ch);
+        $size = (int) curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
+        curl_close($ch);
+        if ($errno !== 0 || $size < 0) {
+            $detail = $error !== '' ? $error : "cURL errno {$errno}";
+            throw new RuntimeException('SIZE '.$path.' fehlgeschlagen: '.$detail);
+        }
+
+        return $size;
+    }
+
+    public function readRange(string $path, int $offset, int $length): string
+    {
+        $buf = '';
+        $ch = $this->open($this->urlForPath($path, false));
+        $resume = defined('CURLOPT_RESUME_FROM_LARGE') ? CURLOPT_RESUME_FROM_LARGE : CURLOPT_RESUME_FROM;
+        curl_setopt($ch, $resume, $offset);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 180);
+        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, string $data) use (&$buf, $length): int {
+            $need = $length - strlen($buf);
+            if ($need <= 0) {
+                return 0;
+            }
+            if (strlen($data) > $need) {
+                $buf .= substr($data, 0, $need);
+
+                return 0;
+            }
+            $buf .= $data;
+
+            return strlen($data);
+        });
+        curl_exec($ch);
+        $errno = curl_errno($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
+        // Returning 0 from the write callback aborts with CURLE_WRITE_ERROR once the slice is full.
+        if ($errno !== 0 && $errno !== 23) {
+            $detail = $error !== '' ? $error : "cURL errno {$errno}";
+            throw new RuntimeException('Bereich '.$path.' fehlgeschlagen: '.$detail);
+        }
+        if ($buf === '') {
+            throw new RuntimeException('Bereich '.$path.' ist leer.');
+        }
+
+        return $buf;
+    }
+
     /**
      * @param  array<int, mixed>  $extra
      */
     private function exec(string $url, array $extra, string $op): string
+    {
+        $ch = $this->open($url);
+        if ($extra !== []) {
+            curl_setopt_array($ch, $extra);
+        }
+        $body = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $error = curl_error($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $primary = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($body === false || $errno !== 0) {
+            $detail = $error !== '' ? $error : "cURL errno {$errno}";
+            throw new RuntimeException(
+                "{$op} fehlgeschlagen ({$this->modeLabel()} → {$this->host}:{$this->port}): {$detail}"
+            );
+        }
+
+        // FTP response codes via curl are often 0 for successful transfers; treat clear failures.
+        if ($status >= 400 || $primary >= 400) {
+            throw new RuntimeException(
+                "{$op} abgelehnt ({$this->modeLabel()} → {$this->host}:{$this->port}, Code ".max($status, $primary).').'
+            );
+        }
+
+        return (string) $body;
+    }
+
+    private function open(string $url): \CurlHandle
     {
         $ch = curl_init($url);
         if ($ch === false) {
@@ -313,33 +397,9 @@ final class CurlFtpClient
             $opts[CURLOPT_SSL_VERIFYHOST] = 0;
         }
 
-        foreach ($extra as $key => $value) {
-            $opts[$key] = $value;
-        }
-
         curl_setopt_array($ch, $opts);
-        $body = curl_exec($ch);
-        $errno = curl_errno($ch);
-        $error = curl_error($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        $primary = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
 
-        if ($body === false || $errno !== 0) {
-            $detail = $error !== '' ? $error : "cURL errno {$errno}";
-            throw new RuntimeException(
-                "{$op} fehlgeschlagen ({$this->modeLabel()} → {$this->host}:{$this->port}): {$detail}"
-            );
-        }
-
-        // FTP response codes via curl are often 0 for successful transfers; treat clear failures.
-        if ($status >= 400 || $primary >= 400) {
-            throw new RuntimeException(
-                "{$op} abgelehnt ({$this->modeLabel()} → {$this->host}:{$this->port}, Code ".max($status, $primary).').'
-            );
-        }
-
-        return (string) $body;
+        return $ch;
     }
 
     private function urlForPath(string $path, bool $asDirectory): string

@@ -184,6 +184,7 @@ final class GithubUpdateService
             // Never touch secrets / runtime while overlaying application code.
             $backendRoot = $this->locateBackendRoot($extractPath);
             $filesWritten = $this->overlayDirectory($backendRoot, base_path());
+            $this->compileDdsTool();
 
             $frontendDist = $this->locateFrontendDist($extractPath);
             if ($frontendDist !== null) {
@@ -493,6 +494,25 @@ final class GithubUpdateService
         }
 
         return null;
+    }
+
+    private function compileDdsTool(): void
+    {
+        $src = base_path('tools/dds2rgba/main.c');
+        $out = base_path('bin/dds2rgba');
+        if (! is_file($src)) {
+            return;
+        }
+        $gcc = trim((string) shell_exec('command -v gcc 2>/dev/null'));
+        if ($gcc === '') {
+            return;
+        }
+        File::ensureDirectoryExists(dirname($out));
+        $cmd = escapeshellarg($gcc).' -O2 -o '.escapeshellarg($out).' '.escapeshellarg($src);
+        shell_exec($cmd.' 2>/dev/null');
+        if (is_file($out)) {
+            @chmod($out, 0755);
+        }
     }
 
     private function overlayDirectory(string $source, string $destination): int

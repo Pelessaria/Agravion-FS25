@@ -27,6 +27,12 @@ final class HostFileClient
 
     private int $port;
 
+    private string $username = '';
+
+    private string $password = '';
+
+    private string $root = '';
+
     public function __construct(HostAccess $access)
     {
         $password = $access->password();
@@ -39,6 +45,9 @@ final class HostFileClient
         $this->port = $access->port > 0
             ? $access->port
             : ($this->protocol === 'sftp' ? 22 : 21);
+        $this->username = $access->username;
+        $this->password = $password;
+        $this->root = $this->normalizePath((string) ($access->remote_root ?? ''));
 
         $tcp = HostConnectionError::tcpProbe($this->host, $this->port, 8.0);
         if (! $tcp['ok']) {
@@ -50,7 +59,6 @@ final class HostFileClient
 
         try {
             if ($this->protocol === 'sftp') {
-                $root = $this->normalizePath((string) ($access->remote_root ?? ''));
                 $provider = new SftpConnectionProvider(
                     host: $this->host,
                     username: $access->username,
@@ -58,7 +66,7 @@ final class HostFileClient
                     port: $this->port,
                     timeout: 12,
                 );
-                $this->sftp = new Filesystem(new SftpAdapter($provider, $root === '' ? '/' : $root));
+                $this->sftp = new Filesystem(new SftpAdapter($provider, $this->root === '' ? '/' : $this->root));
             } elseif ($this->protocol === 'ftps' || $this->protocol === 'ftp') {
                 $this->ftp = new CurlFtpClient($access);
             } else {
@@ -166,6 +174,61 @@ final class HostFileClient
         } catch (Throwable $e) {
             throw new RuntimeException(
                 HostConnectionError::format($e, 'Lesen '.$path.' @ '.$this->endpointLabel()),
+                0,
+                $e
+            );
+        }
+    }
+
+    public function fileSize(string $path): int
+    {
+        try {
+            if ($this->ftp) {
+                return $this->ftp->fileSize($path);
+            }
+            $size = $this->sftp()->fileSize($this->normalizePath($path));
+            if (! is_int($size) || $size < 0) {
+                throw new RuntimeException('Dateigröße unbekannt: '.$path);
+            }
+
+            return $size;
+        } catch (Throwable $e) {
+            throw new RuntimeException(
+                HostConnectionError::format($e, 'Größe '.$path.' @ '.$this->endpointLabel()),
+                0,
+                $e
+            );
+        }
+    }
+
+    public function readRange(string $path, int $offset, int $length): string
+    {
+        if ($length < 1) {
+            return '';
+        }
+        try {
+            if ($this->ftp) {
+                return $this->ftp->readRange($path, $offset, $length);
+            }
+
+            $remote = $this->normalizePath($path);
+            if ($this->root !== '') {
+                $remote = $this->root.'/'.$remote;
+            }
+            $sftp = new \phpseclib3\Net\SFTP($this->host, $this->port, 20);
+            if (! $sftp->login($this->username, $this->password)) {
+                throw new RuntimeException('SFTP-Login für Bereichslesung fehlgeschlagen.');
+            }
+            $sftp->setTimeout(180);
+            $data = $sftp->get($remote, false, $offset, $length);
+            if (! is_string($data)) {
+                throw new RuntimeException('Bereichslesung leer: '.$path);
+            }
+
+            return $data;
+        } catch (Throwable $e) {
+            throw new RuntimeException(
+                HostConnectionError::format($e, 'Bereich '.$path.' @ '.$this->endpointLabel()),
                 0,
                 $e
             );

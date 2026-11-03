@@ -17,7 +17,7 @@ final class DdsToPng
         return self::dds2rgbaBinary() !== null;
     }
 
-    public static function convert(string $ddsBytes): ?string
+    public static function convert(string $ddsBytes, int $maxEdge = 2048): ?string
     {
         if (strlen($ddsBytes) < 128 || substr($ddsBytes, 0, 4) !== 'DDS ') {
             return null;
@@ -25,8 +25,19 @@ final class DdsToPng
 
         $height = unpack('V', substr($ddsBytes, 12, 4))[1] ?? 0;
         $width = unpack('V', substr($ddsBytes, 16, 4))[1] ?? 0;
-        if ($width < 1 || $height < 1 || $width > 2048 || $height > 2048) {
+        if ($width < 1 || $height < 1 || $width > $maxEdge || $height > $maxEdge) {
             return null;
+        }
+
+        // A 4096² PDA overview is too slow to decode in PHP. The helper scales it down.
+        if ($width > 2048 || $height > 2048) {
+            $rgba = self::decodeViaExternalTool($ddsBytes);
+            if ($rgba === null) {
+                return null;
+            }
+            [$outW, $outH] = self::fittedSize($width, $height);
+
+            return self::encodePngRgba($rgba, $outW, $outH);
         }
 
         $pfFlags = unpack('V', substr($ddsBytes, 80, 4))[1] ?? 0;
@@ -71,6 +82,21 @@ final class DdsToPng
         // Always zlib. php-gd's per-pixel write on a 512² store icon takes long
         // enough to kill the PHP worker, so the rest of the queue never runs.
         return self::encodePngRgba($rgba, $width, $height);
+    }
+
+    /** Matches dds2rgba: edges above 4096 are divided down to at most 4096. */
+    private static function fittedSize(int $width, int $height): array
+    {
+        if ($width <= 4096 && $height <= 4096) {
+            return [$width, $height];
+        }
+        $factor = 2;
+        $max = max($width, $height);
+        while (intdiv($max, $factor) > 4096) {
+            $factor++;
+        }
+
+        return [intdiv($width, $factor), intdiv($height, $factor)];
     }
 
     /** Header plus enough bytes for one full image. Short files are truncated downloads. */

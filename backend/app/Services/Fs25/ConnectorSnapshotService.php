@@ -1000,6 +1000,33 @@ final class ConnectorSnapshotService
             }
         }
         $this->ensurePdaPng($workspace);
+        if ($this->pdaMapPath($workspace) !== null) {
+            return;
+        }
+
+        $marker = $dir.'/overview.failed';
+        if (is_file($marker) && time() - (int) filemtime($marker) < 600) {
+            return;
+        }
+
+        try {
+            $access = $this->hostAccess($workspace);
+            $png = $access === null ? null : (new MapOverviewExtractor)->pngFromMapZip($client, $access, (string) ($workspace->map_name ?? ''));
+            if (is_string($png) && str_starts_with($png, "\x89PNG")) {
+                File::ensureDirectoryExists($dir);
+                File::put($dir.'/overview.png', $png);
+                if (is_file($marker)) {
+                    File::delete($marker);
+                }
+
+                return;
+            }
+        } catch (Throwable $e) {
+            Log::warning('AgriVision PDA map: '.$e->getMessage());
+        }
+
+        File::ensureDirectoryExists($dir);
+        File::put($marker, gmdate('c'));
     }
 
     public function pdaMapPath(Workspace $workspace): ?string
@@ -1028,7 +1055,7 @@ final class ConnectorSnapshotService
         if (! is_string($bytes) || $bytes === '') {
             return;
         }
-        $converted = DdsToPng::convert($bytes);
+        $converted = DdsToPng::convert($bytes, 8192);
         if ($converted === null || ! str_starts_with($converted, "\x89PNG")) {
             return;
         }

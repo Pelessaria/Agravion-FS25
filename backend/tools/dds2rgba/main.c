@@ -71,7 +71,8 @@ int main(int argc, char **argv) {
     memcpy(fourCc, dds + 84, 4);
     fourCc[4] = 0;
 
-    if (width < 1 || height < 1 || width > 2048 || height > 2048) {
+    /* PDA overviews are 4096 or 8192. Output is reduced to 4096 below. */
+    if (width < 1 || height < 1 || width > 8192 || height > 8192) {
         free(dds);
         return 1;
     }
@@ -179,6 +180,54 @@ int main(int argc, char **argv) {
     }
 
     free(dds);
+
+    if (width > 4096 || height > 4096) {
+        uint32_t factor = 2;
+        uint32_t nw, nh, sx, sy, ox, oy, n;
+        unsigned char *small;
+        uint32_t acc[4];
+
+        while (((width > height ? width : height) / factor) > 4096) {
+            factor++;
+        }
+        nw = width / factor;
+        nh = height / factor;
+        if (nw < 1 || nh < 1) {
+            free(rgba);
+            return 1;
+        }
+        small = (unsigned char *)malloc((size_t)nw * (size_t)nh * 4);
+        if (!small) {
+            free(rgba);
+            return 1;
+        }
+        for (sy = 0; sy < nh; ++sy) {
+            for (sx = 0; sx < nw; ++sx) {
+                acc[0] = acc[1] = acc[2] = acc[3] = 0;
+                n = 0;
+                for (oy = 0; oy < factor; ++oy) {
+                    for (ox = 0; ox < factor; ++ox) {
+                        size_t src = (((size_t)sy * factor + oy) * width + ((size_t)sx * factor + ox)) * 4;
+                        acc[0] += rgba[src];
+                        acc[1] += rgba[src + 1];
+                        acc[2] += rgba[src + 2];
+                        acc[3] += rgba[src + 3];
+                        n++;
+                    }
+                }
+                small[((size_t)sy * nw + sx) * 4] = (unsigned char)(acc[0] / n);
+                small[((size_t)sy * nw + sx) * 4 + 1] = (unsigned char)(acc[1] / n);
+                small[((size_t)sy * nw + sx) * 4 + 2] = (unsigned char)(acc[2] / n);
+                small[((size_t)sy * nw + sx) * 4 + 3] = (unsigned char)(acc[3] / n);
+            }
+        }
+        free(rgba);
+        rgba = small;
+        width = nw;
+        height = nh;
+        rgbaLen = (size_t)nw * (size_t)nh * 4;
+    }
+
     if (!write_u32(width) || !write_u32(height) || fwrite(rgba, 1, rgbaLen, stdout) != rgbaLen) {
         free(rgba);
         return 1;
