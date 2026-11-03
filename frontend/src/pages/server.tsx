@@ -493,6 +493,7 @@ export function ServerPage() {
                           <span className="mod-version-spacer" />
                           <span className="mod-version-rule" aria-hidden="true" />
                           <span className="mod-update-slot">
+                            <span className="mod-update-reserve" aria-hidden="true">{t("server.update")}</span>
                             {mod.updateAvailable ? (
                               <Tip text={updateReason}>
                                 <button

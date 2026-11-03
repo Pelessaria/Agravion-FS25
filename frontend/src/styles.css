@@ -3012,7 +3012,6 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   min-height: 32px;
 }
 .mod-version-spacer { min-width: 0; }
-.mod-update-slot:empty { margin-left: -6px; }
 .mod-version-current,
 .mod-version-next {
   font-variant-numeric: tabular-nums;
@@ -3038,8 +3037,22 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   width: 32px;
   height: 32px;
 }
-.mod-update-slot { min-height: 32px; display: flex; align-items: center; justify-content: flex-end; }
-.mod-update-slot .btn { min-height: 32px; }
+.mod-update-slot { position: relative; display: inline-grid; min-height: 32px; }
+.mod-update-reserve {
+  visibility: hidden;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 30px;
+}
+.mod-update-slot .btn-tip,
+.mod-update-slot > .btn {
+  position: absolute;
+  inset: 0;
+}
+.mod-update-slot .btn { width: 100%; min-height: 32px; }
 .mod-icon-btn {
   width: 32px;
   min-height: 32px;

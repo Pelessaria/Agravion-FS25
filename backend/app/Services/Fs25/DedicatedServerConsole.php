@@ -507,7 +507,7 @@ final class DedicatedServerConsole
     }
 
     /**
-     * A mod is unused when a player farm owns none of its vehicles or buildings
+     * A mod is unused when nothing from it appears in the savegame
      * and the mod actually sells something. Map dependencies are marked separately
      * so they are not offered as unused.
      *
@@ -519,13 +519,12 @@ final class DedicatedServerConsole
         if ($files === null) {
             return false;
         }
-        $playerFarms = SavegameUsage::playerFarmIds($files['farms.xml']);
-        $owned = SavegameUsage::ownedModStems($files['vehicles.xml'], $playerFarms);
-        foreach (SavegameUsage::ownedModStems($files['placeables.xml'], $playerFarms) as $stem => $_) {
+        $owned = SavegameUsage::ownedModStems($files['vehicles.xml']);
+        foreach (SavegameUsage::ownedModStems($files['placeables.xml']) as $stem => $_) {
             $owned[$stem] = true;
         }
         if (isset($files['items.xml'])) {
-            foreach (SavegameUsage::ownedModStems($files['items.xml'], $playerFarms) as $stem => $_) {
+            foreach (SavegameUsage::ownedModStems($files['items.xml']) as $stem => $_) {
                 $owned[$stem] = true;
             }
         }
@@ -543,19 +542,6 @@ final class DedicatedServerConsole
         foreach ($catalog['dependencies'] as $name) {
             $dependencies[strtolower($name)] = true;
         }
-        if ($playerFarms === []) {
-            foreach ($rows as $index => $row) {
-                $stem = strtolower((string) preg_replace('/\.zip$/i', '', (string) $row['name']));
-                $dependency = isset($dependencies[$stem]);
-                $rows[$index]['mapDependency'] = $dependency;
-                if ($dependency) {
-                    $rows[$index]['used'] = true;
-                }
-            }
-
-            return true;
-        }
-
         foreach ($rows as $index => $row) {
             $stem = strtolower((string) preg_replace('/\.zip$/i', '', (string) $row['name']));
             $dependency = isset($dependencies[$stem]);

@@ -3,64 +3,26 @@
 namespace App\Services\Fs25;
 
 /**
- * Decides which installed mods are actually bought or placed on a player farm,
+ * Decides which installed mods appear anywhere in the savegame,
  * and which mods a map declares as dependencies.
  */
 final class SavegameUsage
 {
     /**
-     * Farms that have at least one player. Dealer and placeable farms without
-     * a player do not count as "bought".
+     * Mod stems referenced by any vehicle, placeable or item.
+     * The owning farm does not matter: a dealer yard without players still counts as use.
      *
-     * @return list<int>
-     */
-    public static function playerFarmIds(string $xml): array
-    {
-        if (preg_match_all('/<farm\b([^>]*)>(.*?)<\/farm>/is', $xml, $matches, PREG_SET_ORDER) < 1) {
-            return [];
-        }
-
-        $ids = [];
-        foreach ($matches as $match) {
-            if (preg_match('/<player\b/i', $match[2]) !== 1) {
-                continue;
-            }
-            if (preg_match('/\bfarmId="(\d+)"/i', $match[1], $id) !== 1) {
-                continue;
-            }
-            $ids[] = (int) $id[1];
-        }
-
-        return array_values(array_unique($ids));
-    }
-
-    /**
-     * Mod stems referenced by a vehicle, placeable or item that belongs to a player farm.
-     * Traffic and dealer stock (propertyState NONE, or a farm without players) is ignored.
-     *
-     * @param  list<int>  $playerFarms
      * @return array<string, true>
      */
-    public static function ownedModStems(string $xml, array $playerFarms): array
+    public static function ownedModStems(string $xml): array
     {
-        $allowed = [];
-        foreach ($playerFarms as $id) {
-            $allowed[(int) $id] = true;
-        }
-        if ($allowed === [] || preg_match_all('/<(vehicle|placeable|item)\b([^>]*)>/i', $xml, $matches, PREG_SET_ORDER) < 1) {
+        if (preg_match_all('/<(vehicle|placeable|item)\b([^>]*)>/i', $xml, $matches, PREG_SET_ORDER) < 1) {
             return [];
         }
 
         $found = [];
         foreach ($matches as $match) {
-            $tag = strtolower($match[1]);
             $attrs = $match[2];
-            if (preg_match('/\bfarmId="(\d+)"/i', $attrs, $farm) !== 1 || ! isset($allowed[(int) $farm[1]])) {
-                continue;
-            }
-            if ($tag === 'vehicle' && preg_match('/\bpropertyState="([^"]*)"/i', $attrs, $state) === 1 && strcasecmp($state[1], 'NONE') === 0) {
-                continue;
-            }
             $stem = null;
             if (preg_match('/\bmodName="([^"]+)"/i', $attrs, $name) === 1) {
                 $stem = ModKey::clean(html_entity_decode($name[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));

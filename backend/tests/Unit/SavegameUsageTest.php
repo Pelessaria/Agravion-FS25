@@ -9,20 +9,13 @@ use ZipArchive;
 
 class SavegameUsageTest extends TestCase
 {
-    public function test_only_player_farms_count_as_owning_a_mod(): void
+    public function test_any_savegame_reference_counts_as_used(): void
     {
-        $farms = <<<'XML'
-        <farms>
-          <farm farmId="1" name="Eekenwarft"><players><player uniqueUserId="a"/></players></farm>
-          <farm farmId="2" name="Landhandel"><statistics/></farm>
-          <farm farmId="3" name="Friesenmilch"><players><player uniqueUserId="b"/></players></farm>
-        </farms>
-        XML;
         $vehicles = <<<'XML'
         <vehicles>
           <vehicle modName="FS25_StrautmannAperion2401" filename="$moddir$FS25_StrautmannAperion2401/aperion2401.xml" farmId="2" propertyState="OWNED"/>
           <vehicle filename="$moddir$FS25_OwnedPack/tractor.xml" farmId="1" propertyState="OWNED"/>
-          <vehicle modName="FS25_Traffic" filename="$moddir$FS25_Traffic/car.xml" farmId="1" propertyState="NONE"/>
+          <vehicle modName="FS25_Traffic" filename="$moddir$FS25_Traffic/car.xml" farmId="0" propertyState="NONE"/>
           <vehicle filename="data/vehicles/johnDeere/series6R/series6R.xml" farmId="1" propertyState="OWNED"/>
         </vehicles>
         XML;
@@ -30,20 +23,16 @@ class SavegameUsageTest extends TestCase
         <placeables>
           <placeable filename="$moddir$FS25_Shed/shed.xml" farmId="1"/>
           <placeable modName="FS25_MapDecor" filename="$moddir$FS25_MapDecor/house.xml" farmId="0"/>
-          <placeable filename="$moddir$FS25_SecondFarmBarn/barn.xml" farmId="3"/>
         </placeables>
         XML;
 
-        $players = SavegameUsage::playerFarmIds($farms);
-        $this->assertSame([1, 3], $players);
-
-        $owned = SavegameUsage::ownedModStems($vehicles, $players) + SavegameUsage::ownedModStems($placeables, $players);
+        $owned = SavegameUsage::ownedModStems($vehicles) + SavegameUsage::ownedModStems($placeables);
+        $this->assertArrayHasKey('fs25_strautmannaperion2401', $owned);
         $this->assertArrayHasKey('fs25_ownedpack', $owned);
+        $this->assertArrayHasKey('fs25_traffic', $owned);
         $this->assertArrayHasKey('fs25_shed', $owned);
-        $this->assertArrayHasKey('fs25_secondfarmbarn', $owned);
-        $this->assertArrayNotHasKey('fs25_strautmannaperion2401', $owned);
-        $this->assertArrayNotHasKey('fs25_traffic', $owned);
-        $this->assertArrayNotHasKey('fs25_mapdecor', $owned);
+        $this->assertArrayHasKey('fs25_mapdecor', $owned);
+        $this->assertArrayNotHasKey('fs25_missingpack', $owned);
     }
 
     public function test_map_stem_and_dependencies_come_from_the_map_mod(): void
