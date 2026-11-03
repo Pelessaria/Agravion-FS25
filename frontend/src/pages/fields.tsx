@@ -708,7 +708,6 @@ function FilterMenu({
         className={value ? "is-set" : undefined}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={label}
         onClick={() => setOpen((currentOpen) => !currentOpen)}
       >
         {current}
