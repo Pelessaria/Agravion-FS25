@@ -432,7 +432,54 @@ final class DedicatedServerConsole
             @unlink($local);
         }
 
+        $this->bounceMod($workspace, $name);
+
         return ['ok' => true, 'note' => 'Die Mod wurde ersetzt.'];
+    }
+
+    /**
+     * The web UI keeps the version from the last time the mod was switched on.
+     * Turning it off and on again makes that page read the replaced zip.
+     * The mod ends in the state it had before.
+     */
+    private function bounceMod(Workspace $workspace, string $name): void
+    {
+        $name = $this->safeZip($name);
+        try {
+            [$client, $base, $home] = $this->open($workspace);
+        } catch (Throwable) {
+            return;
+        }
+        unset($client, $base);
+        if (($home['running'] ?? null) !== false) {
+            return;
+        }
+        $match = null;
+        foreach ($home['modToggles'] ?? [] as $toggle) {
+            if (is_array($toggle) && strcasecmp((string) ($toggle['name'] ?? ''), $name) === 0) {
+                $match = $toggle;
+                break;
+            }
+        }
+        if (! is_array($match) || ($match['disabled'] ?? false) === true) {
+            return;
+        }
+        $active = ($match['active'] ?? null) === true;
+        try {
+            $this->setActive($workspace, $name, ! $active);
+        } catch (Throwable) {
+            return;
+        }
+        try {
+            $this->setActive($workspace, $name, $active);
+        } catch (Throwable $e) {
+            try {
+                $this->setActive($workspace, $name, $active);
+            } catch (Throwable) {
+                $back = $active ? 'aktivieren' : 'deaktivieren';
+                throw new RuntimeException('Die Mod wurde ersetzt, ließ sich danach aber nicht wieder '.$back.'.', 0, $e);
+            }
+        }
     }
 
     /**
@@ -728,6 +775,10 @@ final class DedicatedServerConsole
             }
             $version = self::modDescVersion(is_string($xml) ? $xml : '');
             if ($version === '') {
+                continue;
+            }
+            $shown = trim((string) $rows[$index]['version']);
+            if ($shown !== '' && ! ModHubCatalog::newer($shown, $version)) {
                 continue;
             }
             $rows[$index]['version'] = $version;
