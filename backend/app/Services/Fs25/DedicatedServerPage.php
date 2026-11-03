@@ -505,6 +505,23 @@ final class DedicatedServerPage
                 return $text;
             }
         }
+        $current = $node->parentNode;
+        while ($current instanceof DOMElement && strtolower($current->tagName) !== 'form') {
+            foreach ($current->childNodes as $child) {
+                if (! $child instanceof DOMElement) {
+                    continue;
+                }
+                $class = ' '.preg_replace('/\s+/', ' ', $child->getAttribute('class')).' ';
+                if (! str_contains($class, ' column-label ')) {
+                    continue;
+                }
+                $text = trim(preg_replace('/\s+/', ' ', $child->textContent) ?? '');
+                if ($text !== '') {
+                    return $text;
+                }
+            }
+            $current = $current->parentNode;
+        }
 
         return $fallback;
     }

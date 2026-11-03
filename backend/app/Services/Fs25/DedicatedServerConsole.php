@@ -432,7 +432,7 @@ final class DedicatedServerConsole
             @unlink($local);
         }
 
-        return ['ok' => true, 'note' => 'Die Mod wurde ersetzt. Die neue Version erscheint, sobald die Oberfläche die Datei neu liest.'];
+        return ['ok' => true, 'note' => 'Die Mod wurde ersetzt.'];
     }
 
     /**
@@ -662,6 +662,8 @@ final class DedicatedServerConsole
             }
         }
 
+        $this->applyFileVersions($workspace, $rows);
+
         $savegameRead = $this->applyPurchaseMarks($workspace, $rows);
 
         usort($rows, static function (array $a, array $b): int {
@@ -672,6 +674,75 @@ final class DedicatedServerConsole
         });
 
         return [$rows, $savegameRead];
+    }
+
+    /**
+     * The web UI keeps the version it read when the game last loaded the mod.
+     * Replacing the zip does not change that, so an offered update is checked
+     * against the modDesc inside the file.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function applyFileVersions(Workspace $workspace, array &$rows): void
+    {
+        $targets = [];
+        foreach ($rows as $index => $row) {
+            if (($row['updateAvailable'] ?? false) !== true) {
+                continue;
+            }
+            if (! is_int($row['bytes'] ?? null) || $row['bytes'] < 22) {
+                continue;
+            }
+            $targets[] = $index;
+        }
+        if ($targets === []) {
+            return;
+        }
+        usort($targets, static function (int $left, int $right) use ($rows): int {
+            return $rows[$left]['bytes'] <=> $rows[$right]['bytes'];
+        });
+        $workspace->loadMissing('hostAccess');
+        $access = $workspace->hostAccess;
+        if ($access === null) {
+            return;
+        }
+        try {
+            $client = new HostFileClient($access);
+            $dir = trim(ConnectorDeployService::resolveModsDirectory($client, $access), '/');
+        } catch (Throwable) {
+            return;
+        }
+        $reads = 0;
+        $deadline = microtime(true) + 25;
+        foreach ($targets as $index) {
+            if ($reads >= 8 || microtime(true) > $deadline) {
+                break;
+            }
+            $reads++;
+            try {
+                $name = $this->safeZip((string) $rows[$index]['name']);
+                $path = $dir.'/'.$name;
+                $xml = ZipModDescReader::xml((int) $rows[$index]['bytes'], static fn (int $offset, int $length): string => $client->readRange($path, $offset, $length));
+            } catch (Throwable) {
+                continue;
+            }
+            $version = self::modDescVersion(is_string($xml) ? $xml : '');
+            if ($version === '') {
+                continue;
+            }
+            $rows[$index]['version'] = $version;
+            $hub = $rows[$index]['hubVersion'] ?? null;
+            $rows[$index]['updateAvailable'] = ModHubCatalog::newer($version, is_string($hub) ? $hub : null);
+        }
+    }
+
+    private static function modDescVersion(string $xml): string
+    {
+        if (preg_match('/<version>\s*([^<]+)\s*<\/version>/i', $xml, $match) !== 1) {
+            return '';
+        }
+
+        return trim($match[1]);
     }
 
     /**

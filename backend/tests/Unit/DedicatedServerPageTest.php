@@ -213,4 +213,37 @@ class DedicatedServerPageTest extends TestCase
         $this->assertSame('activate_mods', $byName['FS25_Parked.zip']['submitName']);
         $this->assertSame('Activate', $byName['FS25_Parked.zip']['submitValue']);
     }
+
+    public function test_setting_labels_come_from_the_column_beside_the_field(): void
+    {
+        $html = <<<'HTML'
+        <html><body>
+          <form name="configuration" method="post" action="index.html">
+            <div class="row column">
+              <div class="medium-3 columns column-label">Game</div>
+              <div class="medium-9 columns">Farming Simulator 25</div>
+            </div>
+            <div class="row column">
+              <div class="medium-3 columns column-label">Server Game Name</div>
+              <div class="medium-9 columns"><input type="text" name="game_name" value="Farm"></div>
+            </div>
+            <div class="row column">
+              <div class="medium-3 columns column-label">Port</div>
+              <div class="medium-9 columns"><input type="text" name="server_port" value="10823"></div>
+            </div>
+            <input type="submit" name="save_settings" value="Save">
+          </form>
+        </body></html>
+        HTML;
+
+        $page = DedicatedServerPage::parse($html, 'http://games.example/index.html');
+        $labels = [];
+        foreach ($page['settingsForm']['fields'] as $field) {
+            $labels[$field['name']] = $field['label'];
+        }
+
+        $this->assertSame('Server Game Name', $labels['game_name']);
+        $this->assertSame('Port', $labels['server_port']);
+        $this->assertSame('Farm', $page['settingsForm']['fields'][0]['value']);
+    }
 }

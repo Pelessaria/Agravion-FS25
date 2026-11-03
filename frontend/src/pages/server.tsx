@@ -807,7 +807,7 @@ export function ServerPage() {
                     }
                   />
                 ) : null}
-                <span>{field.label}</span>
+                <span>{t(`server.fields.${field.name}`, { defaultValue: field.label })}</span>
                 {field.type === "select" ? (
                   <select
                     value={field.value}
