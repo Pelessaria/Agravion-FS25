@@ -57,11 +57,34 @@ final class ConnectorDeployService
         if (! is_string($raw) || $raw === '') {
             return $this->versionFromModDescFile();
         }
+        $fromZip = null;
         if (preg_match('/<version>\s*([^<]+)\s*<\/version>/i', $raw, $m)) {
-            return trim($m[1]) ?: null;
+            $fromZip = trim($m[1]) ?: null;
+        }
+        $fromFile = $this->versionFromModDescFile();
+        if ($fromFile !== null && ($fromZip === null || $this->versionIsNewer($fromFile, $fromZip))) {
+            return $fromFile;
         }
 
-        return null;
+        return $fromZip;
+    }
+
+    private function versionIsNewer(string $left, string $right): bool
+    {
+        $a = array_map('intval', explode('.', preg_replace('/[^0-9.]/', '', $left) ?? '0'));
+        $b = array_map('intval', explode('.', preg_replace('/[^0-9.]/', '', $right) ?? '0'));
+        $len = max(count($a), count($b), 4);
+        for ($i = 0; $i < $len; $i++) {
+            $av = $a[$i] ?? 0;
+            $bv = $b[$i] ?? 0;
+            if ($av === $bv) {
+                continue;
+            }
+
+            return $av > $bv;
+        }
+
+        return false;
     }
 
     private function versionFromModDescFile(): ?string

@@ -2969,6 +2969,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   stroke: none;
 }
 .fields-filters {
+  position: relative;
+  z-index: 5;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -2995,17 +2997,57 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   font-size: 0.8rem;
 }
 .fields-filters .chip-check:disabled { opacity: 0.4; cursor: not-allowed; }
-.fields-filter-select {
+.fields-filter-menu { position: relative; }
+.fields-filter-menu > button {
   min-height: 30px;
-  max-width: 180px;
-  padding: 0 28px 0 10px;
+  max-width: 220px;
+  padding: 0 12px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
-  background: transparent;
+  background: #1c2420;
   color: var(--text-muted);
+  font: inherit;
   font-size: 0.8rem;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
 }
-.fields-filter-select:focus { outline: none; border-color: var(--accent); color: var(--text); }
+.fields-filter-menu > button.is-set { color: var(--text); border-color: var(--accent); }
+.fields-filter-menu ul {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 4px);
+  left: 0;
+  width: max-content;
+  min-width: 100%;
+  max-height: 220px;
+  margin: 0;
+  padding: 3px;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #1c2420;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+.fields-filter-menu li button {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-align: left;
+  cursor: pointer;
+}
+.fields-filter-menu li button.is-on,
+.fields-filter-menu li button:hover { background: rgba(255, 255, 255, 0.08); }
 .fields-filter-count {
   margin-left: auto;
   color: var(--text-faint);

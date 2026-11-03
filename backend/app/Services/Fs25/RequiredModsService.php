@@ -2,12 +2,11 @@
 
 namespace App\Services\Fs25;
 
-use App\Models\HostAccess;
 use App\Models\Workspace;
 use Throwable;
 
 /**
- * Required game-host mods: installed (zip on FTP) vs activated (loaded in feed / hello.xml).
+ * Required game-host mods: installed and activated according to the server mod list.
  */
 final class RequiredModsService
 {
@@ -59,7 +58,9 @@ final class RequiredModsService
             // optional
         }
 
-        $feedMods = $this->fetchFeedMods($workspace);
+        // The stats feed does not list mods. The server page already stored
+        // which zip is active. Reading that cache avoids a minute-long FTP pull.
+        $feedMods = [];
         $host = $this->hostProbe($workspace);
 
         $mods = [];
@@ -225,33 +226,6 @@ final class RequiredModsService
     }
 
     /**
-     * @return list<array{name: string, title: string|null, version: string|null}>
-     */
-    private function fetchFeedMods(Workspace $workspace): array
-    {
-        $base = trim((string) $workspace->feed_base_url);
-        $code = $workspace->feedCode();
-        if ($base === '' || $code === null || $code === '') {
-            return [];
-        }
-
-        try {
-            $client = DedicatedServerFeedClient::fromParts($base, $code, 6);
-            $snapshot = $client->fetchLightSnapshot();
-
-            return array_map(static function (array $mod): array {
-                return [
-                    'name' => (string) ($mod['name'] ?? ''),
-                    'title' => isset($mod['title']) ? (string) $mod['title'] : null,
-                    'version' => isset($mod['version']) ? (string) $mod['version'] : null,
-                ];
-            }, $snapshot->mods);
-        } catch (Throwable) {
-            return [];
-        }
-    }
-
-    /**
      * @return array{
      *   ok: bool,
      *   installed: array<string, bool>,
@@ -262,70 +236,29 @@ final class RequiredModsService
      */
     private function hostProbe(Workspace $workspace): array
     {
-        $empty = ['ok' => false, 'installed' => [], 'paths' => [], 'hello' => [], 'zipVersions' => []];
-        $access = HostAccess::query()->where('workspace_id', $workspace->id)->first();
-        if (! $access || ! $access->hasPassword()) {
-            return $empty;
-        }
-
-        try {
-            $client = new HostFileClient($access);
-        } catch (Throwable) {
-            return $empty;
-        }
-
         $installed = [];
         $paths = [];
         $hello = [];
         $zipVersions = [];
-
-        $modSettings = trim(str_replace('\\', '/', (string) ($access->remote_mod_settings_path ?? '')), '/');
-        $parent = $modSettings === '' ? '' : trim(dirname($modSettings), '/.');
-        $modsDir = ($parent === '' || $parent === '.') ? 'mods' : $parent.'/mods';
+        $cached = $this->cachedMods($workspace);
 
         foreach ($this->catalog() as $item) {
-            $path = rtrim($modsDir, '/').'/'.$item['zipName'];
-            $isInstalled = false;
-            $zipVersions[$item['id']] = null;
-            try {
-                $raw = $client->read($path, 20);
-                if (str_starts_with($raw, "PK")) {
-                    $isInstalled = true;
-                    $zipVersions[$item['id']] = $this->versionFromZipBytes($raw);
-                }
-            } catch (Throwable) {
-                $isInstalled = false;
-            }
-            if (! $isInstalled) {
-                try {
-                    $isInstalled = $client->fileExists($path);
-                } catch (Throwable) {
-                    $isInstalled = false;
-                }
-            }
+            $row = $this->cachedMatch($item, $cached);
+            $version = is_array($row) && is_string($row['version'] ?? null) && $row['version'] !== ''
+                ? $row['version']
+                : null;
+            $isInstalled = $row !== null;
+            $active = is_array($row) && ($row['active'] ?? null) === true;
             $installed[$item['id']] = $isInstalled;
-            $paths[$item['id']] = $isInstalled ? $path : null;
-
-            $hello[$item['id']] = ['present' => false, 'version' => null];
-            if ($item['id'] === 'FS25_AgriVisionConnector' && $modSettings !== '') {
-                $helloPath = $modSettings.'/'.$item['folderName'].'/hello.xml';
-                try {
-                    $raw = $client->read($helloPath, 12);
-                    $version = null;
-                    if (preg_match('/<agrivisionConnector\b[^>]*\bversion="([^"]+)"/i', $raw, $m)) {
-                        $version = trim($m[1]) ?: null;
-                    }
-                    if ($raw !== '') {
-                        $hello[$item['id']] = ['present' => true, 'version' => $version];
-                    }
-                } catch (Throwable) {
-                    // hello.xml is written when the connector runs. A missing file does not mean the zip is gone.
-                }
-            }
+            $paths[$item['id']] = $isInstalled ? 'mods/'.$item['zipName'] : null;
+            $zipVersions[$item['id']] = $version;
+            // "active" on the cached row is the dedicated-server mod list
+            // (Aktive Mods), not a guess from a missing hello.xml.
+            $hello[$item['id']] = ['present' => $active, 'version' => $active ? $version : null];
         }
 
         return [
-            'ok' => true,
+            'ok' => $cached !== [],
             'installed' => $installed,
             'paths' => $paths,
             'hello' => $hello,
@@ -333,33 +266,39 @@ final class RequiredModsService
         ];
     }
 
-    private function versionFromZipBytes(string $bytes): ?string
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function cachedMods(Workspace $workspace): array
     {
-        if (! str_starts_with($bytes, "PK\x03\x04") || ! class_exists(\ZipArchive::class)) {
-            return null;
+        $path = storage_path('app/connector/'.$workspace->public_id.'/state/server_console.json');
+        if (! is_file($path)) {
+            return [];
         }
-        $tmp = tempnam(sys_get_temp_dir(), 'avzip');
-        if ($tmp === false) {
-            return null;
+        $data = json_decode((string) file_get_contents($path), true);
+        if (! is_array($data) || ! is_array($data['mods'] ?? null)) {
+            return [];
         }
-        try {
-            if (file_put_contents($tmp, $bytes) === false) {
-                return null;
-            }
-            $zip = new \ZipArchive;
-            if ($zip->open($tmp) !== true) {
-                return null;
-            }
-            $xml = $zip->getFromName('modDesc.xml');
-            $zip->close();
-            if (! is_string($xml) || ! preg_match('/<version>\s*([^<]+)\s*<\/version>/i', $xml, $match)) {
-                return null;
-            }
 
-            return trim($match[1]) ?: null;
-        } finally {
-            @unlink($tmp);
+        return array_values(array_filter($data['mods'], 'is_array'));
+    }
+
+    /**
+     * @param  array{matchNames: list<string>}  $item
+     * @param  list<array<string, mixed>>  $mods
+     * @return array<string, mixed>|null
+     */
+    private function cachedMatch(array $item, array $mods): ?array
+    {
+        foreach ($mods as $mod) {
+            $name = (string) ($mod['name'] ?? '');
+            $title = isset($mod['title']) ? (string) $mod['title'] : null;
+            if ($this->matches($item['matchNames'], $name, $title)) {
+                return $mod;
+            }
         }
+
+        return null;
     }
 
 }

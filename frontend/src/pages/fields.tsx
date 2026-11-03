@@ -573,46 +573,34 @@ export function FieldsPage() {
                   </button>
                 </>
               )}
-              <select
-                className="fields-filter-select"
-                aria-label={t("fields.filterFruit")}
+              <FilterMenu
+                label={t("fields.filterFruit")}
                 value={fieldQuery.fruit}
-                onChange={(event) => patchQuery({ fruit: event.target.value })}
-              >
-                <option value="">{t("fields.filterFruit")}</option>
-                {fruitOptions.map(([name, title]) => (
-                  <option key={name} value={name}>
-                    {title}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="fields-filter-select"
-                aria-label={t("fields.filterCrop")}
+                options={[
+                  { id: "", label: t("fields.filterFruit") },
+                  ...fruitOptions.map(([name, title]) => ({ id: name, label: title })),
+                ]}
+                onChange={(fruit) => patchQuery({ fruit })}
+              />
+              <FilterMenu
+                label={t("fields.filterCrop")}
                 value={fieldQuery.crop}
-                onChange={(event) => patchQuery({ crop: event.target.value })}
-              >
-                <option value="">{t("fields.filterCrop")}</option>
-                {cropFilters.map((crop) => (
-                  <option key={crop} value={crop}>
-                    {t(`fields.crop.${crop}`)}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { id: "", label: t("fields.filterCrop") },
+                  ...cropFilters.map((crop) => ({ id: crop, label: t(`fields.crop.${crop}`) })),
+                ]}
+                onChange={(crop) => patchQuery({ crop })}
+              />
               {precisionFarming === true ? (
-                <select
-                  className="fields-filter-select"
-                  aria-label={t("fields.filterSoil")}
+                <FilterMenu
+                  label={t("fields.filterSoil")}
                   value={fieldQuery.soil}
-                  onChange={(event) => patchQuery({ soil: event.target.value })}
-                >
-                  <option value="">{t("fields.filterSoil")}</option>
-                  {[1, 2, 3, 4].map((soil) => (
-                    <option key={soil} value={String(soil)}>
-                      {t(`fields.soilType.${soil}`)}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { id: "", label: t("fields.filterSoil") },
+                    ...[1, 2, 3, 4].map((soil) => ({ id: String(soil), label: t(`fields.soilType.${soil}`) })),
+                  ]}
+                  onChange={(soil) => patchQuery({ soil })}
+                />
               ) : null}
               <span className="fields-filter-count">
                 {t("fields.shown", {
@@ -681,6 +669,71 @@ export function FieldsPage() {
         </div>
       )}
     </section>
+  )
+}
+
+function FilterMenu({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: { id: string; label: string }[]
+  onChange: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const current = options.find((option) => option.id === value)?.label ?? label
+  useEffect(() => {
+    if (!open) return
+    const close = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false)
+    }
+    window.addEventListener("pointerdown", close)
+    window.addEventListener("keydown", onKey)
+    return () => {
+      window.removeEventListener("pointerdown", close)
+      window.removeEventListener("keydown", onKey)
+    }
+  }, [open])
+  return (
+    <div className="fields-filter-menu" ref={rootRef}>
+      <button
+        type="button"
+        className={value ? "is-set" : undefined}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={label}
+        onClick={() => setOpen((currentOpen) => !currentOpen)}
+      >
+        {current}
+      </button>
+      {open ? (
+        <ul role="listbox">
+          {options.map((option) => (
+            <li key={option.id || "all"}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={option.id === value}
+                className={option.id === value ? "is-on" : undefined}
+                onClick={() => {
+                  onChange(option.id)
+                  setOpen(false)
+                }}
+              >
+                {option.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   )
 }
 
