@@ -2,6 +2,7 @@
 
 use App\Models\Workspace;
 use App\Services\Fs25\ConnectorSnapshotService;
+use App\Services\Fs25\DedicatedServerConsole;
 use App\Services\InstanceSchedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -79,6 +80,20 @@ Schedule::command('agrivision:sync-store-icons')
     ->everyFiveMinutes()
     ->withoutOverlapping(20)
     ->appendOutputTo(storage_path('logs/icon-sync.log'));
+
+Schedule::call(function () {
+    $console = app(DedicatedServerConsole::class);
+    foreach (Workspace::query()->cursor() as $workspace) {
+        $workspace->loadMissing('hostAccess');
+        if (! $workspace->consoleConfigured() && $workspace->hostAccess === null) {
+            continue;
+        }
+        $console->refresh($workspace);
+    }
+})
+    ->everyMinute()
+    ->name('server-console')
+    ->withoutOverlapping(3);
 
 Schedule::call(fn () => InstanceSchedule::touchHeartbeat())
     ->everyMinute()

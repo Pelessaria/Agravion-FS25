@@ -58,23 +58,25 @@ export function ServerPage() {
   useEffect(() => {
     if (!workspace || !allowed || !access || !liveMode) return
     let cancelled = false
-    const load = async () => {
-      setLoading(true)
+    const load = async (silent: boolean) => {
+      if (!silent) setLoading(true)
       try {
         const next = await apiServerSnapshot(workspace.id)
         if (cancelled) return
         setSnapshot(next)
-        setSettings(next.settings)
+        if (!silent) setSettings(next.settings)
         setError(next.error ?? "")
       } catch (caught) {
         if (!cancelled) setError(caught instanceof ApiError ? caught.message : t("server.missingLogin"))
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!silent && !cancelled) setLoading(false)
       }
     }
-    void load()
+    void load(false)
+    const timer = window.setInterval(() => void load(true), 20000)
     return () => {
       cancelled = true
+      window.clearInterval(timer)
     }
   }, [access, allowed, liveMode, t, workspace])
 
@@ -232,6 +234,8 @@ export function ServerPage() {
   }
 
   const actionIds = new Set(snapshot.actions.map((action) => action.id))
+  const stamp = snapshot.at ? new Date(snapshot.at) : null
+  const stampText = stamp && !Number.isNaN(stamp.getTime()) ? stamp.toLocaleString() : snapshot.at
 
   return (
     <section className="page">
@@ -278,6 +282,12 @@ export function ServerPage() {
 
       <div className="panel">
         <h2>{t("modules.server")}</h2>
+        {snapshot.pending || stampText || snapshot.running != null ? (
+          <p className="hint">
+            {snapshot.pending ? t("server.pending") : stampText ? t("server.cachedAt", { time: stampText }) : ""}
+            {snapshot.running === true ? ` · ${t("server.running")}` : snapshot.running === false ? ` · ${t("server.stopped")}` : ""}
+          </p>
+        ) : null}
         {!snapshot.webConfigured ? <p className="hint">{t("server.missingLogin")}</p> : null}
         <div className="setting-actions">
           {(["start", "stop", "restart"] as const).map((id) => (

@@ -364,11 +364,14 @@ export interface ServerSnapshot {
   webConfigured: boolean
   ftpConfigured: boolean
   loggedIn: boolean
+  running?: boolean | null
   actions: { id: "start" | "stop" | "restart" | string; label: string }[]
   mods: ServerModRow[]
   settings: ServerSettingField[]
   log: { name: string; text: string; truncated: boolean } | null
   error: string | null
+  at?: string | null
+  pending?: boolean
 }
 
 export interface ServerAccessUser {

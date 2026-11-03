@@ -21,10 +21,10 @@ class ServerConsoleController extends Controller
         $row = $this->workspace($workspace);
         $this->requireAccess($request, $row, $grants, 'read');
 
-        return response()->json($console->snapshot($row));
+        return response()->json($console->cached($row));
     }
 
-    public function saveLogin(Request $request, string $workspace): JsonResponse
+    public function saveLogin(Request $request, string $workspace, DedicatedServerConsole $console): JsonResponse
     {
         $this->requireAdmin($request);
         $row = $this->workspace($workspace);
@@ -45,12 +45,23 @@ class ServerConsoleController extends Controller
                 'password' => 'Passwort fehlt.',
             ]);
         }
-        $row->console_base_url = $base !== '' ? rtrim($base, '/') : null;
+        try {
+            $row->console_base_url = $base !== '' ? DedicatedServerConsole::origin($base) : null;
+        } catch (RuntimeException $e) {
+            throw ValidationException::withMessages([
+                'baseUrl' => $e->getMessage(),
+            ]);
+        }
         $row->console_username = trim($data['username']);
         if (($data['keepPassword'] ?? false) !== true) {
             $row->setConsolePassword((string) $data['password']);
         }
         $row->save();
+        try {
+            $console->refresh($row);
+        } catch (Throwable) {
+            // The saved login is kept. The minute job retries the snapshot.
+        }
 
         return response()->json([
             'ok' => true,
@@ -66,7 +77,7 @@ class ServerConsoleController extends Controller
             'action' => ['required', 'in:start,stop,restart'],
         ]);
 
-        return $this->attempt(fn () => $console->run($row, $data['action']));
+        return $this->afterChange($row, $console, fn () => $console->run($row, $data['action']));
     }
 
     public function settings(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
@@ -77,7 +88,7 @@ class ServerConsoleController extends Controller
             'values' => ['required', 'array'],
         ]);
 
-        return $this->attempt(fn () => $console->saveSettings($row, $data['values']));
+        return $this->afterChange($row, $console, fn () => $console->saveSettings($row, $data['values']));
     }
 
     public function upload(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
@@ -96,7 +107,7 @@ class ServerConsoleController extends Controller
             throw ValidationException::withMessages(['file' => 'Datei konnte nicht gelesen werden.']);
         }
 
-        return $this->attempt(fn () => $console->upload($row, $file->getClientOriginalName(), $bytes));
+        return $this->afterChange($row, $console, fn () => $console->upload($row, $file->getClientOriginalName(), $bytes));
     }
 
     public function download(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): Response
@@ -127,7 +138,7 @@ class ServerConsoleController extends Controller
             'active' => ['required', 'boolean'],
         ]);
 
-        return $this->attempt(fn () => $console->setActive($row, $data['name'], (bool) $data['active']));
+        return $this->afterChange($row, $console, fn () => $console->setActive($row, $data['name'], (bool) $data['active']));
     }
 
     public function access(Request $request, string $workspace): JsonResponse
@@ -211,6 +222,23 @@ class ServerConsoleController extends Controller
         if (! $grants->allows($request->user(), $workspace, 'server', $need)) {
             abort(403, 'Kein Zugriff auf die Serververwaltung.');
         }
+    }
+
+    /**
+     * @param  callable(): array<string, mixed>  $call
+     */
+    private function afterChange(Workspace $workspace, DedicatedServerConsole $console, callable $call): JsonResponse
+    {
+        $response = $this->attempt($call);
+        if ($response->isSuccessful()) {
+            try {
+                $console->refresh($workspace);
+            } catch (Throwable) {
+                // The change itself succeeded. The minute job rewrites the cache.
+            }
+        }
+
+        return $response;
     }
 
     /**

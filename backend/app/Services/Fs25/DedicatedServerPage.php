@@ -20,7 +20,9 @@ final class DedicatedServerPage
      *   modForm: array{action: string, save: array{name: string, value: string}|null, file: string|null, fields: list<array{name: string, value: string, checked: bool}>}|null,
      *   modRows: list<array{name: string, active: bool|null, checkbox: string|null, download: string|null, buttonName: string|null, buttonValue: string|null}>,
      *   settingsForm: array{action: string, save: array{name: string, value: string}|null, fields: list<array{name: string, label: string, type: string, value: string, checked: bool, options: list<array{value: string, label: string}>}>}|null,
-     *   logLinks: list<array{href: string, text: string}>
+     *   logLinks: list<array{href: string, text: string}>,
+     *   logText: string,
+     *   running: bool|null
      * }
      */
     public static function parse(string $html, string $pageUrl): array
@@ -46,7 +48,7 @@ final class DedicatedServerPage
             $buttons = self::buttons($form);
             $file = self::fileInput($form);
             foreach ($buttons as $button) {
-                $id = self::actionId($button['label']);
+                $id = self::actionIdFromName($button['name']) ?? self::actionId($button['label']);
                 if ($id === null) {
                     continue;
                 }
@@ -101,6 +103,9 @@ final class DedicatedServerPage
         }
 
         $loginForm = self::hasLoginForm($dom) && $actions === [];
+        $logNodes = $xpath->query('//*[@id="log_textarea"]');
+        $logNode = $logNodes !== false ? $logNodes->item(0) : null;
+        $logText = $logNode instanceof DOMElement ? trim($logNode->textContent) : '';
 
         return [
             'loginForm' => $loginForm,
@@ -110,7 +115,41 @@ final class DedicatedServerPage
             'modRows' => $modRows,
             'settingsForm' => $settingsForm,
             'logLinks' => $logLinks,
+            'logText' => $logText,
+            'running' => self::running($xpath),
         ];
+    }
+
+    public static function actionIdFromName(string $name): ?string
+    {
+        return match ($name) {
+            'start_server' => 'start',
+            'stop_server' => 'stop',
+            'restart_server' => 'restart',
+            default => null,
+        };
+    }
+
+    private static function running(DOMXPath $xpath): ?bool
+    {
+        $nodes = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " status-indicator ")]');
+        if ($nodes === false) {
+            return null;
+        }
+        foreach ($nodes as $node) {
+            if (! $node instanceof DOMElement) {
+                continue;
+            }
+            $class = ' '.strtolower($node->getAttribute('class')).' ';
+            if (str_contains($class, ' offline')) {
+                return false;
+            }
+            if (str_contains($class, ' online')) {
+                return true;
+            }
+        }
+
+        return null;
     }
 
     public static function actionId(string $label): ?string

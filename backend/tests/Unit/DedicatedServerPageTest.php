@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Services\Fs25\DedicatedServerConsole;
 use App\Services\Fs25\DedicatedServerPage;
 use PHPUnit\Framework\TestCase;
 
@@ -97,5 +98,29 @@ class DedicatedServerPageTest extends TestCase
         $this->assertNotNull($difficulty);
         $this->assertSame('2', $difficulty['value']);
         $this->assertSame('Speichern', $page['settingsForm']['save']['value']);
+    }
+
+    public function test_named_controls_status_and_inline_log_come_from_the_page(): void
+    {
+        $html = <<<'HTML'
+        <html><body>
+          <div class="status-indicator online"><span>ONLINE</span></div>
+          <form action="index.html?lang=en" method="post">
+            <input type="submit" name="stop_server" value="Stop">
+            <input type="submit" name="restart_server" value="Restart">
+          </form>
+          <div id="log_textarea">GIANTS Engine Runtime</div>
+        </body></html>
+        HTML;
+
+        $page = DedicatedServerPage::parse($html, 'http://games.example/index.html');
+
+        $this->assertSame(['stop', 'restart'], array_column($page['actions'], 'id'));
+        $this->assertTrue($page['running']);
+        $this->assertSame('GIANTS Engine Runtime', $page['logText']);
+        $this->assertSame(
+            'http://games.example:8081',
+            DedicatedServerConsole::origin('http://games.example:8081/index.html'),
+        );
     }
 }

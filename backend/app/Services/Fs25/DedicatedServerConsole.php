@@ -28,11 +28,14 @@ final class DedicatedServerConsole
             'webConfigured' => $workspace->consoleConfigured(),
             'ftpConfigured' => $workspace->hostAccess !== null,
             'loggedIn' => false,
+            'running' => null,
             'actions' => [],
             'mods' => [],
             'settings' => [],
             'log' => null,
             'error' => null,
+            'at' => null,
+            'pending' => false,
         ];
 
         try {
@@ -46,10 +49,10 @@ final class DedicatedServerConsole
         }
 
         try {
-            [$client, $base, , $home] = $this->open($workspace);
-            $home['pageUrl'] = $base.'/index.html';
-            $pages = array_merge([$home], $this->related($client, $base, $home));
+            [$client, $base, $home] = $this->open($workspace);
+            $pages = $this->withPages($client, $base, $home, ['logs.html', 'settings.html']);
             $result['loggedIn'] = true;
+            $result['running'] = $home['running'];
             $result['actions'] = $this->publicActions($pages);
             $result['mods'] = $this->mergeMods($result['mods'], $pages);
             $result['settings'] = $this->publicSettings($pages);
@@ -64,6 +67,45 @@ final class DedicatedServerConsole
     }
 
     /**
+     * The page reads this file. Opening the page does not contact the game server.
+     *
+     * @return array<string, mixed>
+     */
+    public function cached(Workspace $workspace): array
+    {
+        $workspace->loadMissing('hostAccess');
+        $path = $this->cachePath($workspace);
+        if (! is_file($path)) {
+            return $this->blank($workspace, true);
+        }
+        try {
+            $data = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            return $this->blank($workspace, true);
+        }
+
+        return is_array($data) ? $data : $this->blank($workspace, true);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function refresh(Workspace $workspace): array
+    {
+        $result = $this->snapshot($workspace);
+        $result['at'] = now()->toIso8601String();
+        $result['pending'] = false;
+        $path = $this->cachePath($workspace);
+        $dir = dirname($path);
+        if (! is_dir($dir) && ! mkdir($dir, 0775, true) && ! is_dir($dir)) {
+            return $result;
+        }
+        file_put_contents($path, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        return $result;
+    }
+
+    /**
      * @return array{ok: true, note?: string}
      */
     public function run(Workspace $workspace, string $actionId): array
@@ -71,9 +113,8 @@ final class DedicatedServerConsole
         if (! in_array($actionId, ['start', 'stop', 'restart'], true)) {
             throw new RuntimeException('Unbekannte Aktion.');
         }
-        [$client, $base, , $home] = $this->open($workspace);
-        $home['pageUrl'] = $base.'/index.html';
-        $pages = array_merge([$home], $this->related($client, $base, $home));
+        [$client, $base, $home] = $this->open($workspace);
+        $pages = $this->withPages($client, $base, $home, []);
         if ($actionId === 'restart') {
             $restart = $this->findAction($pages, 'restart');
             if ($restart !== null) {
@@ -87,9 +128,8 @@ final class DedicatedServerConsole
             }
             $this->submit($client, $base, $stop);
             sleep(3);
-            [$client, $base, , $home] = $this->open($workspace);
-            $home['pageUrl'] = $base.'/index.html';
-            $pages = array_merge([$home], $this->related($client, $base, $home));
+            [$client, $base, $home] = $this->open($workspace);
+            $pages = $this->withPages($client, $base, $home, []);
             $start = $this->findAction($pages, 'start');
             if ($start === null) {
                 return ['ok' => true, 'note' => 'stopped'];
@@ -113,9 +153,8 @@ final class DedicatedServerConsole
      */
     public function saveSettings(Workspace $workspace, array $values): array
     {
-        [$client, $base, , $home] = $this->open($workspace);
-        $home['pageUrl'] = $base.'/index.html';
-        $pages = array_merge([$home], $this->related($client, $base, $home));
+        [$client, $base, $home] = $this->open($workspace);
+        $pages = $this->withPages($client, $base, $home, ['settings.html']);
         $form = null;
         $pageUrl = null;
         foreach ($pages as $page) {
@@ -216,9 +255,8 @@ final class DedicatedServerConsole
     public function setActive(Workspace $workspace, string $filename, bool $active): array
     {
         $name = $this->safeZip($filename);
-        [$client, $base, , $home] = $this->open($workspace);
-        $home['pageUrl'] = $base.'/index.html';
-        $pages = array_merge([$home], $this->related($client, $base, $home));
+        [$client, $base, $home] = $this->open($workspace);
+        $pages = $this->withPages($client, $base, $home, ['mods.html']);
         foreach ($pages as $page) {
             foreach ($page['modRows'] as $row) {
                 if (strcasecmp($row['name'], $name) !== 0) {
@@ -272,7 +310,10 @@ final class DedicatedServerConsole
     }
 
     /**
-     * @return array{0: PendingRequest, 1: string, 2: string, 3: array<string, mixed>}
+     * Login answers with a redirect whose body is only an error stub.
+     * The home page is loaded afterwards with the session cookie, without following that redirect.
+     *
+     * @return array{0: PendingRequest, 1: string, 2: array<string, mixed>}
      */
     private function open(Workspace $workspace): array
     {
@@ -280,59 +321,53 @@ final class DedicatedServerConsole
         $jar = new CookieJar();
         $client = Http::withOptions([
             'cookies' => $jar,
-            'allow_redirects' => true,
+            'allow_redirects' => false,
             'http_errors' => false,
-        ])->timeout(20)->connectTimeout(8);
-        $response = $client->asForm()->post($base.'/index.html?lang=de', [
+        ])->timeout(25)->connectTimeout(8);
+        $homeUrl = $base.'/index.html?lang=en';
+        $client->asForm()->post($homeUrl, [
             'username' => (string) $workspace->console_username,
             'password' => (string) $workspace->consolePassword(),
             'login' => 'Login',
         ]);
-        $body = (string) $response->body();
-        if ($response->status() === 404) {
-            $response = $client->asForm()->post($base.'/', [
-                'username' => (string) $workspace->console_username,
-                'password' => (string) $workspace->consolePassword(),
-                'login' => 'Login',
-            ]);
-            $body = (string) $response->body();
+        $response = $client->get($homeUrl);
+        if ($response->status() >= 400) {
+            throw new RuntimeException('Die Serveroberfläche ist nicht erreichbar.');
         }
-        $page = DedicatedServerPage::parse($body, $base.'/index.html');
+        $page = DedicatedServerPage::parse((string) $response->body(), $homeUrl);
         if ($page['loginForm']) {
             throw new RuntimeException('Anmeldung an der Serveroberfläche fehlgeschlagen.');
         }
+        $page['pageUrl'] = $homeUrl;
 
-        return [$client, $base, $body, $page];
+        return [$client, $base, $page];
     }
 
     /**
      * @param  array<string, mixed>  $home
+     * @param  list<string>  $names
      * @return list<array<string, mixed>>
      */
-    private function related(PendingRequest $client, string $base, array $home): array
+    private function withPages(PendingRequest $client, string $base, array $home, array $names): array
     {
-        $pages = [];
-        $seen = [];
-        foreach ($home['links'] as $link) {
-            $kind = $this->linkKind($link['href'].' '.$link['text']);
-            if ($kind === null || isset($seen[$kind])) {
+        $home['pageUrl'] = $base.'/index.html?lang=en';
+        $pages = [$home];
+        foreach ($names as $name) {
+            $url = $base.'/'.$name.'?lang=en';
+            try {
+                $response = $client->get($url);
+            } catch (Throwable) {
                 continue;
             }
-            $url = $this->absolute($base, $base.'/index.html', $link['href']);
-            if ($url === null) {
-                continue;
-            }
-            $seen[$kind] = true;
-            $response = $client->get($url);
             if ($response->status() >= 400) {
                 continue;
             }
             $parsed = DedicatedServerPage::parse((string) $response->body(), $url);
+            if ($parsed['loginForm']) {
+                continue;
+            }
             $parsed['pageUrl'] = $url;
             $pages[] = $parsed;
-            if (count($pages) >= 4) {
-                break;
-            }
         }
 
         return $pages;
@@ -457,9 +492,14 @@ final class DedicatedServerConsole
     private function readLog(PendingRequest $client, string $base, array $pages, Workspace $workspace): ?array
     {
         foreach ($pages as $page) {
+            $inline = trim((string) ($page['logText'] ?? ''));
+            if ($inline !== '') {
+                return $this->tail('log', $inline);
+            }
             foreach ($page['logLinks'] as $link) {
-                $url = $this->absolute($base, $page['pageUrl'] ?? $base, $link['href']);
-                if ($url === null) {
+                try {
+                    $url = $this->absolute($base, $page['pageUrl'] ?? $base, $link['href']);
+                } catch (RuntimeException) {
                     continue;
                 }
                 $response = $client->get($url);
@@ -571,9 +611,8 @@ final class DedicatedServerConsole
 
     private function uploadViaWeb(Workspace $workspace, string $name, string $bytes): bool
     {
-        [$client, $base, , $home] = $this->open($workspace);
-        $home['pageUrl'] = $base.'/index.html';
-        foreach (array_merge([$home], $this->related($client, $base, $home)) as $page) {
+        [$client, $base, $home] = $this->open($workspace);
+        foreach ($this->withPages($client, $base, $home, ['mods.html']) as $page) {
             $form = $page['modForm'] ?? null;
             if (! is_array($form) || $form['file'] === null) {
                 continue;
@@ -604,9 +643,8 @@ final class DedicatedServerConsole
 
     private function downloadViaWeb(Workspace $workspace, string $name): ?string
     {
-        [$client, $base, , $home] = $this->open($workspace);
-        $home['pageUrl'] = $base.'/index.html';
-        foreach (array_merge([$home], $this->related($client, $base, $home)) as $page) {
+        [$client, $base, $home] = $this->open($workspace);
+        foreach ($this->withPages($client, $base, $home, ['mods.html']) as $page) {
             foreach ($page['modRows'] as $row) {
                 if (strcasecmp($row['name'], $name) !== 0 || $row['download'] === null) {
                     continue;
@@ -664,25 +702,70 @@ final class DedicatedServerConsole
         throw new RuntimeException('Die Mod liegt nicht im Mods-Ordner.');
     }
 
+    public static function origin(string $raw): string
+    {
+        $parts = parse_url(trim($raw));
+        if (! is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            throw new RuntimeException('Die Adresse der Serveroberfläche muss mit http oder https beginnen.');
+        }
+        $scheme = strtolower((string) $parts['scheme']);
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            throw new RuntimeException('Die Adresse der Serveroberfläche muss mit http oder https beginnen.');
+        }
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+
+        return $scheme.'://'.$parts['host'].$port;
+    }
+
+    public static function displayOrigin(?string $raw): string
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return '';
+        }
+        try {
+            return self::origin($raw);
+        } catch (RuntimeException) {
+            return $raw;
+        }
+    }
+
     private function baseUrl(Workspace $workspace): string
     {
         $raw = trim((string) $workspace->console_base_url);
         if ($raw === '') {
-            $parts = parse_url(trim((string) $workspace->feed_base_url));
-            if (! is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
-                throw new RuntimeException('Keine Adresse für die Serveroberfläche.');
-            }
-            if (! in_array(strtolower((string) $parts['scheme']), ['http', 'https'], true)) {
-                throw new RuntimeException('Keine Adresse für die Serveroberfläche.');
-            }
-            $port = isset($parts['port']) ? ':'.$parts['port'] : '';
-            $raw = $parts['scheme'].'://'.$parts['host'].$port;
+            $raw = trim((string) $workspace->feed_base_url);
         }
-        if (preg_match('#^https?://#i', $raw) !== 1) {
-            throw new RuntimeException('Die Adresse der Serveroberfläche muss mit http oder https beginnen.');
+        if ($raw === '') {
+            throw new RuntimeException('Keine Adresse für die Serveroberfläche.');
         }
 
-        return rtrim($raw, '/');
+        return self::origin($raw);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function blank(Workspace $workspace, bool $pending): array
+    {
+        return [
+            'webConfigured' => $workspace->consoleConfigured(),
+            'ftpConfigured' => $workspace->hostAccess !== null,
+            'loggedIn' => false,
+            'running' => null,
+            'actions' => [],
+            'mods' => [],
+            'settings' => [],
+            'log' => null,
+            'error' => null,
+            'at' => null,
+            'pending' => $pending,
+        ];
+    }
+
+    private function cachePath(Workspace $workspace): string
+    {
+        return storage_path('app/connector/'.$workspace->public_id.'/state/server_console.json');
     }
 
     private function absolute(string $base, string $pageUrl, string $href): string
@@ -709,22 +792,6 @@ final class DedicatedServerConsole
         }
 
         return $target;
-    }
-
-    private function linkKind(string $value): ?string
-    {
-        $haystack = strtolower($value);
-        if (str_contains($haystack, 'log') || str_contains($haystack, 'protokoll')) {
-            return 'log';
-        }
-        if (str_contains($haystack, 'mod')) {
-            return 'mod';
-        }
-        if (str_contains($haystack, 'setting') || str_contains($haystack, 'einstell')) {
-            return 'setting';
-        }
-
-        return null;
     }
 
     private function safeZip(string $name): string
