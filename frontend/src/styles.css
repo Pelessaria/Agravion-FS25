@@ -3102,10 +3102,23 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .server-mod-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .server-mod-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 .mod-title-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.mod-dependency { display: inline-flex; flex: none; color: var(--accent-2); }
+.mod-unused,
+.mod-dependency { display: inline-flex; flex: none; }
+.mod-unused { color: #f5c518; }
+.mod-dependency { color: #e6c36a; }
+.mod-unused .icon,
 .mod-dependency .icon { width: 15px; height: 15px; }
-.server-mods tr.is-unused td { background: color-mix(in srgb, #f5c518 8%, transparent); }
-.server-mods tr.is-dependency td { background: color-mix(in srgb, #7aa2ff 9%, transparent); }
+.server-mods tr.is-dependency td {
+  border-bottom-color: #e6c36a;
+  box-shadow: inset 0 1px 0 #e6c36a;
+}
+.server-mods tr.is-dependency td:first-child {
+  box-shadow: inset 1px 0 0 #e6c36a, inset 0 1px 0 #e6c36a;
+}
+.server-mods tr.is-dependency td:last-child {
+  box-shadow: inset -1px 0 0 #e6c36a, inset 0 1px 0 #e6c36a;
+}
+.server-mods tr.is-dependency:hover td { background: transparent; }
 .server-mods .mod-name strong { display: block; }
 .server-mods .mod-title-line strong { display: inline; min-width: 0; }
 .server-mods .mod-file { display: block; color: var(--text-muted); font-size: var(--small); }

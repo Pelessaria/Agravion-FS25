@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
-import { ChevronDown, ChevronRight, Copy, Download, Link2, Pause, Play, RotateCcw, Search, Square, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronRight, Copy, Download, Link2, Pause, Play, RotateCcw, Search, Square, Trash2, Weight } from "lucide-react"
 import {
   apiDeleteServerMods,
   apiDownloadServerMod,
@@ -553,7 +553,7 @@ export function ServerPage() {
                         ? t("server.deleteNeedsStop")
                         : t("server.busy")
                   return (
-                    <tr key={mod.name} className={unused ? "is-unused" : mod.mapDependency ? "is-dependency" : undefined}>
+                    <tr key={mod.name} className={mod.mapDependency ? "is-dependency" : undefined}>
                       {canWrite ? (
                         <td className="mod-select">
                           <input
@@ -564,9 +564,14 @@ export function ServerPage() {
                           />
                         </td>
                       ) : null}
-                      <td className="mod-name" title={unused ? t("server.unusedTip") : undefined}>
+                      <td className="mod-name">
                         <div className="mod-title-line">
                           <strong>{mod.title || mod.name}</strong>
+                          {unused ? (
+                            <span className="mod-unused" title={t("server.unusedTip")} aria-label={t("server.unused")}>
+                              <Weight className="icon" aria-hidden="true" />
+                            </span>
+                          ) : null}
                           {mod.mapDependency ? (
                             <span className="mod-dependency" title={t("server.mapDependencyTip")} aria-label={t("server.mapDependency")}>
                               <Link2 className="icon" aria-hidden="true" />
