@@ -3004,7 +3004,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .server-mods td.mod-version { vertical-align: middle; }
 .mod-version-row {
   display: grid;
-  grid-template-columns: 9ch 11ch 13px 32px 32px 32px max-content;
+  width: 100%;
+  grid-template-columns: 9ch 11ch minmax(8px, 1fr) max-content 13px 32px 32px 32px;
   align-items: center;
   justify-content: start;
   column-gap: 6px;
@@ -3035,7 +3036,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   width: 32px;
   height: 32px;
 }
-.mod-update-slot { min-height: 32px; display: flex; align-items: center; }
+.mod-update-slot { min-height: 32px; display: flex; align-items: center; justify-content: flex-end; }
 .mod-update-slot .btn { min-height: 32px; }
 .mod-icon-btn {
   width: 32px;

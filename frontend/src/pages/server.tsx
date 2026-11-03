@@ -482,6 +482,20 @@ export function ServerPage() {
                         <div className="mod-version-row">
                           <span className="mod-version-current">{mod.version || "—"}</span>
                           <span className="mod-version-next">{mod.updateAvailable && mod.hubVersion ? mod.hubVersion : ""}</span>
+                          <span className="mod-update-slot">
+                            {mod.updateAvailable ? (
+                              <Tip text={updateReason}>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary"
+                                  disabled={updateDisabled}
+                                  onClick={() => void updateMod(mod.name)}
+                                >
+                                  {busy === `update:${mod.name}` ? t("server.loading") : t("server.update")}
+                                </button>
+                              </Tip>
+                            ) : null}
+                          </span>
                           <span className="mod-version-rule" aria-hidden="true" />
                           <span className="mod-icon-slot">
                             {mod.hubUrl ? (
@@ -517,20 +531,6 @@ export function ServerPage() {
                               >
                                 <Download className="icon" aria-hidden="true" />
                               </button>
-                            ) : null}
-                          </span>
-                          <span className="mod-update-slot">
-                            {mod.updateAvailable ? (
-                              <Tip text={updateReason}>
-                                <button
-                                  type="button"
-                                  className="btn btn-primary"
-                                  disabled={updateDisabled}
-                                  onClick={() => void updateMod(mod.name)}
-                                >
-                                  {busy === `update:${mod.name}` ? t("server.loading") : t("server.update")}
-                                </button>
-                              </Tip>
                             ) : null}
                           </span>
                         </div>
