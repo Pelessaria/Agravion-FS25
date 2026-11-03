@@ -7,6 +7,7 @@ use App\Services\Fs25\ConnectorDeployService;
 use App\Services\Fs25\ConnectorSnapshotService;
 use App\Services\Fs25\HostAccessService;
 use App\Services\Fs25\ModIconCacheService;
+use App\Services\Fs25\PrecisionLayerService;
 use App\Services\Fs25\RequiredModsService;
 use App\Services\Fs25\WorkspaceFeedService;
 use Illuminate\Http\JsonResponse;
@@ -169,6 +170,23 @@ class WorkspaceController extends Controller
         return response()->file($path, [
             'Content-Type' => 'image/png',
             'Cache-Control' => 'private, max-age=86400',
+        ]);
+    }
+
+    public function precisionLayer(string $workspace, string $layer, PrecisionLayerService $layers): BinaryFileResponse|Response
+    {
+        $row = $this->findWorkspace($workspace);
+        if ($row->lifecycle === 'disabled') {
+            return response('', 404);
+        }
+        $path = $layers->pngPath($row, $layer);
+        if ($path === null) {
+            return response('', 404);
+        }
+
+        return response()->file($path, [
+            'Content-Type' => 'image/png',
+            'Cache-Control' => 'private, max-age=60',
         ]);
     }
 

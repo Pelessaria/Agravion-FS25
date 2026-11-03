@@ -8,6 +8,8 @@ export type FieldLayerId =
   | "soil"
   | "nitrogen"
   | "ph"
+  | "yield"
+  | "seed"
   | "growth"
   | "ground"
   | "weed"
@@ -71,9 +73,13 @@ const GROUND_COLOR: Record<number, string> = {
 
 const NEUTRAL = "#5c6560"
 
+export function precisionRasterLayer(layer: FieldLayerId) {
+  return layer === "soil" || layer === "nitrogen" || layer === "ph" || layer === "yield" || layer === "seed"
+}
+
 export function layersFor(precisionFarming: boolean | null): FieldLayerId[] {
   const shared: FieldLayerId[] = ["off", "fruit", "growth", "ground", "weed", "stones"]
-  if (precisionFarming === true) return [...shared, "soil", "nitrogen", "ph"]
+  if (precisionFarming === true) return [...shared, "soil", "nitrogen", "ph", "yield", "seed"]
   return [...shared, "spray", "lime"]
 }
 
@@ -103,6 +109,19 @@ const PH_STOPS: Array<[number, string]> = [
   [7.5, "#2f86c8"],
   [8.0, "#244f9a"],
 ]
+
+const YIELD_STOPS: Array<[number, string]> = [
+  [50, "#d23a32"],
+  [70, "#e6c23a"],
+  [90, "#6fbe45"],
+  [115, "#1f6a34"],
+]
+
+const SEED_COLOR: Record<number, string> = {
+  1: "#2f86c8",
+  2: "#6fbe45",
+  3: "#e6c23a",
+}
 
 const NITROGEN_STOPS: Array<[number, string]> = [
   [0, "#d23a32"],
@@ -157,6 +176,12 @@ export function legendStops(layer: FieldLayerId, t: TFunction): { color: string;
       color,
       label: value.toFixed(2),
     }))
+  }
+  if (layer === "yield") {
+    return YIELD_STOPS.map(([value, color]) => ({ color, label: `${value}%` }))
+  }
+  if (layer === "seed") {
+    return [1, 2, 3].map((id) => ({ color: SEED_COLOR[id], label: t(`fields.seedRate.${id}`) }))
   }
   if (layer === "growth") {
     return [

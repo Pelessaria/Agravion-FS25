@@ -258,6 +258,7 @@ final class CurlFtpClient
         $extra = [];
         if ($timeoutSec !== null && $timeoutSec > 0) {
             $extra[CURLOPT_TIMEOUT] = $timeoutSec;
+            $extra[CURLOPT_CONNECTTIMEOUT] = min(20, $timeoutSec);
         }
 
         return $this->exec($url, $extra, 'READ '.$path);

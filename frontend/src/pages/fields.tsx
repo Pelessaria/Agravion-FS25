@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
-import { LocateFixed, Minus, Plus } from "lucide-react"
+import { ChevronLeft, ChevronRight, LocateFixed, Minus, Plus } from "lucide-react"
 import { apiWorkspaceFields } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { demoFields } from "../demo-fields"
@@ -26,18 +26,17 @@ import {
   layersFor,
   legendStops,
   matchesFieldQuery,
-  nitrogenColor,
   paintColor,
-  phColor,
+  precisionRasterLayer,
   type FieldLayerId,
   type FieldQuery,
 } from "../field-layers"
 import { joinedContours } from "../field-outline"
 import { useStore } from "../store"
 import type { FieldSnapshot, FieldsResponse } from "../types"
+import { useWorkspaceRoute } from "../use-workspace"
 
 const EMPTY_FIELDS: FieldSnapshot[] = []
-import { useWorkspaceRoute } from "../use-workspace"
 
 type DrawnField = {
   id: number
@@ -52,7 +51,6 @@ type DrawnField = {
   iconUrl: string | null
   mark: string
   label: string
-  cells: Array<{ x: number; y: number; w: number; h: number; color: string }>
 }
 
 const LABEL_HEIGHT = 2.7
@@ -160,22 +158,6 @@ function groupCaption(field: FieldSnapshot, fields: FieldSnapshot[]) {
   }
 }
 
-function projectSamples(field: FieldSnapshot, frame: MapFrame, layer: FieldLayerId) {
-  if (layer !== "ph" && layer !== "nitrogen") return []
-  const grid = field.precisionGrid
-  if (!grid || grid.step < 1 || grid.cells.length === 0) return []
-  const colorOf = layer === "ph" ? phColor : nitrogenColor
-  return grid.cells.map((cell) => {
-    const value = layer === "ph" ? cell.ph : cell.n
-    const origin = projectPoint(cell.x, cell.z, frame)
-    const east = projectPoint(cell.x + grid.step, cell.z, frame)
-    const south = projectPoint(cell.x, cell.z + grid.step, frame)
-    const w = Math.max(0.15, Math.abs(east.x - origin.x) * 1.08)
-    const h = Math.max(0.15, Math.abs(south.y - origin.y) * 1.08)
-    return { x: origin.x - w / 2, y: origin.y - h / 2, w, h, color: colorOf(value) }
-  })
-}
-
 function projectFields(
   fields: FieldSnapshot[],
   frame: MapFrame,
@@ -230,7 +212,6 @@ function projectFields(
       iconUrl: field.iconUrl,
       mark: key,
       label: caption.show ? caption.text : "",
-      cells: projectSamples(field, frame, layer),
     }
   })
 }
@@ -393,6 +374,12 @@ export function FieldsPage() {
     setFieldQuery((current) => ({ ...current, ...patch }))
   }
 
+  function stepLayer(direction: -1 | 1) {
+    const index = availableLayers.indexOf(activeLayer)
+    const next = (index + direction + availableLayers.length) % availableLayers.length
+    setLayer(availableLayers[next] ?? "off")
+  }
+
   if (!workspace) return <MissingWorkspace />
   if (!allowed || !access) return <PermissionBlock />
 
@@ -467,16 +454,23 @@ export function FieldsPage() {
                 <LocateFixed className="icon" />
                 {t("fields.pick")}
               </button>
-              <label className="field fields-layer">
-                <span className="sr-only">{t("fields.layer")}</span>
-                <select value={activeLayer} onChange={(event) => setLayer(event.target.value as FieldLayerId)}>
-                  {availableLayers.map((id) => (
-                    <option key={id} value={id}>
-                      {t(`fields.layerName.${id}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="layer-switch" role="group" aria-label={t("fields.layer")}>
+                <button
+                  type="button"
+                  aria-label={t("fields.layerPrev")}
+                  onClick={() => stepLayer(-1)}
+                >
+                  <ChevronLeft className="icon" />
+                </button>
+                <strong>{t(`fields.layerName.${activeLayer}`)}</strong>
+                <button
+                  type="button"
+                  aria-label={t("fields.layerNext")}
+                  onClick={() => stepLayer(1)}
+                >
+                  <ChevronRight className="icon" />
+                </button>
+              </div>
             </div>
             <div className="fields-filters">
               <span className="fields-filter-label">{t("fields.filterBar")}</span>
@@ -643,6 +637,17 @@ export function FieldsPage() {
               fields={visible}
               outlines={outlines}
               painted={activeLayer !== "off"}
+              raster={
+                liveMode && precisionRasterLayer(activeLayer)
+                  ? {
+                      href: `/api/workspaces/${workspace.id}/precision-layer/${activeLayer}`,
+                      x: frame.padX * 100,
+                      y: frame.padZ * 100,
+                      w: frame.scaleX * 100,
+                      h: frame.scaleZ * 100,
+                    }
+                  : null
+              }
               mapUrl={
                 source?.pdaMap
                   ? `/api/workspaces/${workspace.id}/pda-map`
@@ -747,6 +752,7 @@ function FieldMap({
   fields,
   outlines,
   painted,
+  raster,
   mapUrl,
   live,
   selectedId,
@@ -758,6 +764,7 @@ function FieldMap({
   fields: DrawnField[]
   outlines: { key: string; ids: number[]; polygon: string }[]
   painted: boolean
+  raster: { href: string; x: number; y: number; w: number; h: number } | null
   mapUrl: string | null
   live: boolean
   selectedId: number | null
@@ -773,6 +780,8 @@ function FieldMap({
   const { t } = useTranslation()
   const [dragging, setDragging] = useState(false)
   const [mapFailed, setMapFailed] = useState(false)
+  const [failedRaster, setFailedRaster] = useState<string | null>(null)
+  const rasterOk = raster != null && failedRaster !== raster.href
   const [zoom, setZoom] = useState(1)
   const [sidePx, setSidePx] = useState(0)
   const [hoverId, setHoverId] = useState<number | null>(null)
@@ -957,10 +966,31 @@ function FieldMap({
             <div className="fields-terrain" aria-hidden="true" />
           )}
           <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label={label}>
+            {raster && rasterOk ? (
+              <g clipPath="url(#precision-fields)">
+                <clipPath id="precision-fields">
+                  {fields.map((field) =>
+                    field.polygon ? <polygon key={field.id} points={field.polygon} /> : null,
+                  )}
+                </clipPath>
+                <image
+                  className="precision-raster"
+                  href={raster.href}
+                  x={raster.x}
+                  y={raster.y}
+                  width={raster.w}
+                  height={raster.h}
+                  preserveAspectRatio="none"
+                  onError={() => setFailedRaster(raster.href)}
+                />
+              </g>
+            ) : null}
             {fields.map((field) => {
+              const showRaster = raster != null && rasterOk
               const className = [
                 "field-shape",
-                painted ? "is-painted" : "",
+                showRaster ? "is-raster" : "",
+                painted && !showRaster ? "is-painted" : "",
                 field.group ? "is-joined" : "",
                 inActiveGroup(field, hoverId, selectedId) ? "is-group-hot" : "",
                 field.id === selectedId ? "is-selected" : "",
@@ -969,32 +999,13 @@ function FieldMap({
                 .filter(Boolean)
                 .join(" ")
               return field.polygon ? (
-                <g key={field.id}>
-                  {field.cells.length > 0 ? (
-                    <g clipPath={`url(#field-clip-${field.id})`}>
-                      <clipPath id={`field-clip-${field.id}`}>
-                        <polygon points={field.polygon} />
-                      </clipPath>
-                      {field.cells.map((cell, index) => (
-                        <rect
-                          key={`${field.id}-${index}`}
-                          className="field-cell"
-                          x={cell.x}
-                          y={cell.y}
-                          width={cell.w}
-                          height={cell.h}
-                          fill={cell.color}
-                        />
-                      ))}
-                    </g>
-                  ) : null}
-                  <polygon
-                    data-field={field.id}
-                    className={className}
-                    points={field.polygon}
-                    fill={field.cells.length > 0 ? "transparent" : field.color}
-                  />
-                </g>
+                <polygon
+                  key={field.id}
+                  data-field={field.id}
+                  className={className}
+                  points={field.polygon}
+                  fill={showRaster ? "transparent" : field.color}
+                />
               ) : (
                 <circle key={field.id} data-field={field.id} className={className} cx={field.x} cy={field.y} r="1.1" fill={field.color} />
               )
