@@ -279,13 +279,30 @@ final class RequiredModsService
         $hello = [];
         $zipVersions = [];
 
-        try {
-            $modsDir = ConnectorDeployService::resolveModsDirectory($client, $access);
-        } catch (Throwable) {
-            $modsDir = null;
-        }
-
         $modSettings = trim(str_replace('\\', '/', (string) ($access->remote_mod_settings_path ?? '')), '/');
+        $modsDir = null;
+        if ($modSettings !== '') {
+            $parent = trim(dirname($modSettings), '/.');
+            $sibling = ($parent === '' || $parent === '.') ? 'mods' : $parent.'/mods';
+            foreach ($this->catalog() as $item) {
+                $candidate = $sibling.'/'.$item['zipName'];
+                try {
+                    if ($client->fileSize($candidate) > 0) {
+                        $modsDir = $sibling;
+                        break;
+                    }
+                } catch (Throwable) {
+                    // The sibling folder is not the mods directory. Probe below.
+                }
+            }
+        }
+        if ($modsDir === null) {
+            try {
+                $modsDir = ConnectorDeployService::resolveModsDirectory($client, $access);
+            } catch (Throwable) {
+                $modsDir = null;
+            }
+        }
 
         foreach ($this->catalog() as $item) {
             $path = null;
@@ -348,33 +365,16 @@ final class RequiredModsService
 
     private function versionFromRemoteZip(HostFileClient $client, string $remoteZip): ?string
     {
-        $tmp = tempnam(sys_get_temp_dir(), 'avmod');
-        if ($tmp === false) {
-            return null;
-        }
         try {
-            $bytes = $client->read($remoteZip);
-            if ($bytes === '' || strlen($bytes) > 12 * 1024 * 1024) {
-                return null;
-            }
-            if (@file_put_contents($tmp, $bytes) === false) {
-                return null;
-            }
-            $zip = new \ZipArchive;
-            if ($zip->open($tmp) !== true) {
-                return null;
-            }
-            $raw = $zip->getFromName('modDesc.xml');
-            $zip->close();
-            if (! is_string($raw) || ! preg_match('/<version>\s*([^<]+)\s*<\/version>/i', $raw, $m)) {
+            $size = $client->fileSize($remoteZip);
+            $xml = ZipModDescReader::xml($size, static fn (int $offset, int $length): string => $client->readRange($remoteZip, $offset, $length));
+            if (! is_string($xml) || ! preg_match('/<version>\s*([^<]+)\s*<\/version>/i', $xml, $match)) {
                 return null;
             }
 
-            return trim($m[1]) ?: null;
+            return trim($match[1]) ?: null;
         } catch (Throwable) {
             return null;
-        } finally {
-            @unlink($tmp);
         }
     }
 

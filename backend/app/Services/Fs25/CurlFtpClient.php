@@ -113,10 +113,14 @@ final class CurlFtpClient
 
     public function fileExists(string $path): bool
     {
-        // Avoid downloading the whole file: LIST parent and match basename.
         $normalized = $this->normalizePath($path);
         if ($normalized === '') {
             return false;
+        }
+        try {
+            return $this->fileSize($path) >= 0;
+        } catch (RuntimeException) {
+            // Some servers reject SIZE. Fall back to one directory listing.
         }
         $parent = dirname(str_replace('\\', '/', $normalized));
         if ($parent === '.' || $parent === '/') {

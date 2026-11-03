@@ -26,7 +26,9 @@ import {
   layersFor,
   legendStops,
   matchesFieldQuery,
+  nitrogenColor,
   paintColor,
+  phColor,
   type FieldLayerId,
   type FieldQuery,
 } from "../field-layers"
@@ -50,6 +52,7 @@ type DrawnField = {
   iconUrl: string | null
   mark: string
   label: string
+  cells: Array<{ x: number; y: number; w: number; h: number; color: string }>
 }
 
 const LABEL_HEIGHT = 2.7
@@ -157,6 +160,22 @@ function groupCaption(field: FieldSnapshot, fields: FieldSnapshot[]) {
   }
 }
 
+function projectSamples(field: FieldSnapshot, frame: MapFrame, layer: FieldLayerId) {
+  if (layer !== "ph" && layer !== "nitrogen") return []
+  const grid = field.precisionGrid
+  if (!grid || grid.step < 1 || grid.cells.length === 0) return []
+  const colorOf = layer === "ph" ? phColor : nitrogenColor
+  return grid.cells.map((cell) => {
+    const value = layer === "ph" ? cell.ph : cell.n
+    const origin = projectPoint(cell.x, cell.z, frame)
+    const east = projectPoint(cell.x + grid.step, cell.z, frame)
+    const south = projectPoint(cell.x, cell.z + grid.step, frame)
+    const w = Math.max(0.15, Math.abs(east.x - origin.x) * 1.08)
+    const h = Math.max(0.15, Math.abs(south.y - origin.y) * 1.08)
+    return { x: origin.x - w / 2, y: origin.y - h / 2, w, h, color: colorOf(value) }
+  })
+}
+
 function projectFields(
   fields: FieldSnapshot[],
   frame: MapFrame,
@@ -211,6 +230,7 @@ function projectFields(
       iconUrl: field.iconUrl,
       mark: key,
       label: caption.show ? caption.text : "",
+      cells: projectSamples(field, frame, layer),
     }
   })
 }
@@ -942,7 +962,32 @@ function FieldMap({
                 .filter(Boolean)
                 .join(" ")
               return field.polygon ? (
-                <polygon key={field.id} data-field={field.id} className={className} points={field.polygon} fill={field.color} />
+                <g key={field.id}>
+                  {field.cells.length > 0 ? (
+                    <g clipPath={`url(#field-clip-${field.id})`}>
+                      <clipPath id={`field-clip-${field.id}`}>
+                        <polygon points={field.polygon} />
+                      </clipPath>
+                      {field.cells.map((cell, index) => (
+                        <rect
+                          key={`${field.id}-${index}`}
+                          className="field-cell"
+                          x={cell.x}
+                          y={cell.y}
+                          width={cell.w}
+                          height={cell.h}
+                          fill={cell.color}
+                        />
+                      ))}
+                    </g>
+                  ) : null}
+                  <polygon
+                    data-field={field.id}
+                    className={className}
+                    points={field.polygon}
+                    fill={field.cells.length > 0 ? "transparent" : field.color}
+                  />
+                </g>
               ) : (
                 <circle key={field.id} data-field={field.id} className={className} cx={field.x} cy={field.y} r="1.1" fill={field.color} />
               )

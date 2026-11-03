@@ -229,6 +229,11 @@ export interface FieldSnapshot {
   phTarget: number | null
   soil: number | null
   soilName: string | null
+  /** Samples inside the field. Absent until connector 0.1.9.0 has written a snapshot. */
+  precisionGrid?: {
+    step: number
+    cells: Array<{ x: number; z: number; ph: number | null; n: number | null }>
+  } | null
 }
 
 export interface FieldsResponse {

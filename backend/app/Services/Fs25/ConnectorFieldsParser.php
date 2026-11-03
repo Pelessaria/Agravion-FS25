@@ -82,6 +82,7 @@ final class ConnectorFieldsParser
                 'phTarget' => $row['phTarget'] ?? null,
                 'soil' => $row['soil'] ?? null,
                 'soilName' => $row['soilName'] ?? null,
+                'precisionGrid' => $row['precisionGrid'] ?? null,
             ];
         }
 
@@ -175,6 +176,7 @@ final class ConnectorFieldsParser
                 'phTarget' => self::floatAttr($blob, 'phTarget'),
                 'soil' => self::intAttr($blob, 'soil'),
                 'soilName' => self::attr($blob, 'soilName'),
+                'precisionGrid' => self::precisionGrid(self::attr($blob, 'pf')),
             ];
         }
 
@@ -212,6 +214,42 @@ final class ConnectorFieldsParser
         }
 
         return self::attr($m[1], $name);
+    }
+
+    /**
+     * @return array{step: float, cells: list<array{x: float, z: float, ph: float|null, n: float|null}>}|null
+     */
+    private static function precisionGrid(?string $raw): ?array
+    {
+        if ($raw === null || ! str_contains($raw, '|')) {
+            return null;
+        }
+        [$stepText, $body] = explode('|', $raw, 2);
+        $step = (float) $stepText;
+        if ($step < 1 || $body === '') {
+            return null;
+        }
+        $cells = [];
+        foreach (explode(';', $body) as $piece) {
+            $bits = explode(',', $piece);
+            if (count($bits) < 4 || ! is_numeric($bits[0]) || ! is_numeric($bits[1])) {
+                continue;
+            }
+            $cells[] = [
+                'x' => (float) $bits[0],
+                'z' => (float) $bits[1],
+                'ph' => $bits[2] === '' || ! is_numeric($bits[2]) ? null : (float) $bits[2],
+                'n' => $bits[3] === '' || ! is_numeric($bits[3]) ? null : (float) $bits[3],
+            ];
+            if (count($cells) >= 64) {
+                break;
+            }
+        }
+        if ($cells === []) {
+            return null;
+        }
+
+        return ['step' => $step, 'cells' => $cells];
     }
 
     /**

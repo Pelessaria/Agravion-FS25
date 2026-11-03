@@ -743,6 +743,73 @@ local function pointInside(points, x, z)
     return inside
 end
 
+local function precisionGrid(precisionFarming, farmlandId, points)
+    if precisionFarming == nil or type(points) ~= "table" or #points < 3 then
+        return nil
+    end
+    local soilMap = precisionFarming.soilMap
+    local nitrogenMap = precisionFarming.nitrogenMap
+    local phMap = precisionFarming.pHMap
+    if soilMap == nil or nitrogenMap == nil or phMap == nil then
+        return nil
+    end
+    local minX, maxX, minZ, maxZ = 1e12, -1e12, 1e12, -1e12
+    local index = 1
+    while index <= #points do
+        local point = points[index]
+        if point.x < minX then minX = point.x end
+        if point.x > maxX then maxX = point.x end
+        if point.z < minZ then minZ = point.z end
+        if point.z > maxZ then maxZ = point.z end
+        index = index + 1
+    end
+    local span = math.max(maxX - minX, maxZ - minZ)
+    if span < 1 then
+        return nil
+    end
+    local step = math.max(12, span / 7)
+    local parts = {}
+    local count = 0
+    local z = minZ + step * 0.5
+    while z < maxZ and count < 64 do
+        local x = minX + step * 0.5
+        while x < maxX and count < 64 do
+            if pointInside(points, x, z) then
+                local onField = true
+                if farmlandId ~= nil then
+                    local farmland = resolveFarmland(x, z)
+                    if farmland == nil or num(farmland.id) ~= farmlandId then
+                        onField = false
+                    end
+                end
+                if onField then
+                    local soilType = num(safeMethod(soilMap, "getTypeIndexAtWorldPos", x, z))
+                    if soilType ~= nil and soilType > 0 then
+                        local nitrogen = decodeNitrogen(safeMethod(nitrogenMap, "getLevelAtWorldPos", x, z))
+                        local phValue = decodePh(safeMethod(phMap, "getLevelAtWorldPos", x, z))
+                        local phText = ""
+                        if phValue ~= nil and phValue > 0 then
+                            phText = string.format("%.2f", phValue)
+                        end
+                        local nitrogenText = ""
+                        if nitrogen ~= nil and nitrogen >= 0 then
+                            nitrogenText = string.format("%.0f", nitrogen)
+                        end
+                        count = count + 1
+                        parts[count] = string.format("%.0f,%.0f,%s,%s", x, z, phText, nitrogenText)
+                    end
+                end
+            end
+            x = x + step
+        end
+        z = z + step
+    end
+    if count == 0 then
+        return nil
+    end
+    return string.format("%.0f|%s", step, table.concat(parts, ";"))
+end
+
 local function tallyValue(bag, key, value)
     if value == nil then
         return
@@ -1039,10 +1106,11 @@ local function collectState(connector, field, id)
         record.owned = "0"
     end
 
+    local polygon = collectPolygon(field)
     if fieldState ~= nil or field ~= nil then
         local fruitTypeIndex = fieldState ~= nil and num(fieldState.fruitTypeIndex) or nil
         local growth = fieldState ~= nil and num(fieldState.growthState) or nil
-        local liveIndex, liveGrowth, live = sampleFruit(collectPolygon(field))
+        local liveIndex, liveGrowth, live = sampleFruit(polygon)
         if liveIndex ~= nil then
             fruitTypeIndex = liveIndex
             if liveGrowth ~= nil then
@@ -1092,6 +1160,7 @@ local function collectState(connector, field, id)
         record.phTarget = round(precision.phTarget, 2)
         record.soil = precision.soil
         record.soilName = precision.soilName
+        record.pf = precisionGrid(getPrecisionFarming(), farmlandId, polygon)
     end
     return record
 end
@@ -1421,7 +1490,7 @@ end
 
 local function stateLine(connector, row)
     return string.format(
-        "<field%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s />",
+        "<field%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s />",
         attr(connector, "id", row.id),
         attr(connector, "farmId", row.farmId),
         attr(connector, "farmlandId", row.farmlandId),
@@ -1452,7 +1521,8 @@ local function stateLine(connector, row)
         attr(connector, "ph", row.ph),
         attr(connector, "phTarget", row.phTarget),
         attr(connector, "soil", row.soil),
-        attr(connector, "soilName", row.soilName)
+        attr(connector, "soilName", row.soilName),
+        attr(connector, "pf", row.pf)
     )
 end
 

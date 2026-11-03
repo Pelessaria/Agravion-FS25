@@ -18,7 +18,7 @@ class ConnectorFieldsParserTest extends TestCase
 
         $state = <<<'XML'
         <fieldsState schema="1" precisionFarming="1" writtenAtUtc="2026-11-02T18:01:00Z">
-          <field id="1" farmId="1" farmlandId="9" owned="1" fruit="WHEAT" fruitTitle="Weizen &amp; Korn" fruitIcon="wheat" growth="4" growthMax="8" harvestMin="6" harvestMax="8" harvestMonths="7,8,9" crop="growing" ground="7" weed="1" weedFactor="0.2" stones="0" spray="1" sprayType="1" lime="2" roller="0" plow="1" stubble="0" water="0" scanned="1" n="40" nTarget="80" ph="6.25" phTarget="6.75" soil="3" />
+          <field id="1" farmId="1" farmlandId="9" owned="1" fruit="WHEAT" fruitTitle="Weizen &amp; Korn" fruitIcon="wheat" growth="4" growthMax="8" harvestMin="6" harvestMax="8" harvestMonths="7,8,9" crop="growing" ground="7" weed="1" weedFactor="0.2" stones="0" spray="1" sprayType="1" lime="2" roller="0" plow="1" stubble="0" water="0" scanned="1" n="40" nTarget="80" ph="6.25" phTarget="6.75" soil="3" pf="16|-12,40,6.10,30;4,40,7.40,160" />
           <field id="3" owned="0" crop="noCrop" />
         </fieldsState>
         XML;
@@ -37,6 +37,10 @@ class ConnectorFieldsParserTest extends TestCase
         $this->assertNull($merged['fields'][2]['harvestMonths']);
         $this->assertSame(40.0, $merged['fields'][0]['nitrogen']);
         $this->assertSame(6.75, $merged['fields'][0]['phTarget']);
+        $this->assertSame(16.0, $merged['fields'][0]['precisionGrid']['step']);
+        $this->assertSame(6.1, $merged['fields'][0]['precisionGrid']['cells'][0]['ph']);
+        $this->assertSame(160.0, $merged['fields'][0]['precisionGrid']['cells'][1]['n']);
+        $this->assertNull($merged['fields'][1]['precisionGrid']);
         $this->assertTrue($merged['fields'][0]['owned']);
         $this->assertTrue($merged['fields'][0]['scanned']);
         $this->assertCount(4, $merged['fields'][0]['points']);

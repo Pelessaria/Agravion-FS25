@@ -77,11 +77,58 @@ export function layersFor(precisionFarming: boolean | null): FieldLayerId[] {
   return [...shared, "spray", "lime"]
 }
 
+function ramp(value: number, stops: Array<[number, string]>): string {
+  if (value <= stops[0][0]) return stops[0][1]
+  const last = stops[stops.length - 1]
+  if (value >= last[0]) return last[1]
+  for (let index = 1; index < stops.length; index += 1) {
+    const [high, color] = stops[index]
+    const [low, previous] = stops[index - 1]
+    if (value <= high) {
+      const span = high - low
+      const ratio = span <= 0 ? 1 : (value - low) / span
+      return mix(previous, color, ratio)
+    }
+  }
+  return last[1]
+}
+
+const PH_STOPS: Array<[number, string]> = [
+  [4.5, "#e23b32"],
+  [5.0, "#ef7a28"],
+  [5.5, "#f0c83a"],
+  [6.0, "#c6d43c"],
+  [6.5, "#6fbe45"],
+  [7.0, "#2f9a78"],
+  [7.5, "#2f86c8"],
+  [8.0, "#244f9a"],
+]
+
+const NITROGEN_STOPS: Array<[number, string]> = [
+  [0, "#d23a32"],
+  [40, "#e07828"],
+  [80, "#e6c23a"],
+  [120, "#9ec23a"],
+  [160, "#3d9a48"],
+  [200, "#1f6a34"],
+  [220, "#1a2420"],
+]
+
+export function phColor(value: number | null): string {
+  if (value == null || value <= 0) return "#141414"
+  return ramp(value, PH_STOPS)
+}
+
+export function nitrogenColor(value: number | null): string {
+  if (value == null || value < 0) return "#141414"
+  return ramp(value, NITROGEN_STOPS)
+}
+
 export function paintColor(field: FieldSnapshot, layer: FieldLayerId): string {
   if (layer === "off" || layer === "fruit") return cropColor(field)
   if (layer === "soil") return field.soil != null ? (SOIL_COLOR[field.soil] ?? NEUTRAL) : NEUTRAL
-  if (layer === "nitrogen") return scaleToTarget(field.nitrogen, field.nitrogenTarget, "#b64040", "#e0b44a", "#3d9a4a")
-  if (layer === "ph") return distanceColor(field.ph, field.phTarget, 1)
+  if (layer === "nitrogen") return nitrogenColor(field.nitrogen)
+  if (layer === "ph") return phColor(field.ph)
   if (layer === "growth") {
     if (field.growth == null || field.growthMax == null || field.growthMax <= 0) return NEUTRAL
     return mix("#6b4a32", "#e0b44a", field.growth / field.growthMax)
@@ -99,12 +146,17 @@ export function legendStops(layer: FieldLayerId, t: TFunction): { color: string;
   if (layer === "soil") {
     return [1, 2, 3, 4].map((id) => ({ color: SOIL_COLOR[id], label: t(`fields.soilType.${id}`) }))
   }
-  if (layer === "nitrogen" || layer === "ph") {
-    return [
-      { color: "#b64040", label: t("fields.legendLow") },
-      { color: "#e0b44a", label: t("fields.legendMid") },
-      { color: "#3d9a4a", label: t("fields.legendOk") },
-    ]
+  if (layer === "nitrogen") {
+    return NITROGEN_STOPS.filter((_, index) => index % 2 === 0).map(([value, color]) => ({
+      color,
+      label: `${value} kg/ha`,
+    }))
+  }
+  if (layer === "ph") {
+    return PH_STOPS.filter((_, index) => index % 2 === 0).map(([value, color]) => ({
+      color,
+      label: value.toFixed(2),
+    }))
   }
   if (layer === "growth") {
     return [
@@ -190,26 +242,6 @@ function offTarget(value: number | null, target: number | null) {
 
 function nearTarget(value: number | null, target: number | null) {
   return value != null && target != null && Math.abs(value - target) < 0.25
-}
-
-function scaleToTarget(
-  value: number | null,
-  target: number | null,
-  low: string,
-  mid: string,
-  high: string,
-) {
-  if (value == null || target == null || target <= 0) return NEUTRAL
-  const ratio = value / target
-  if (ratio >= 1) return mix(high, "#1f6b4a", Math.min(1, ratio - 1))
-  return mix(low, mid, Math.max(0, ratio))
-}
-
-function distanceColor(value: number | null, target: number | null, span: number) {
-  if (value == null || target == null) return NEUTRAL
-  const delta = Math.min(1, Math.abs(value - target) / span)
-  if (delta < 0.5) return mix("#3d9a4a", "#e0b44a", delta * 2)
-  return mix("#e0b44a", "#b64040", (delta - 0.5) * 2)
 }
 
 function levelColor(value: number | null, max: number, low: string, mid: string, high: string) {

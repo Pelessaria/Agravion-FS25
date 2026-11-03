@@ -2746,6 +2746,10 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   vector-effect: non-scaling-stroke;
   cursor: pointer;
 }
+.field-cell {
+  stroke: none;
+  pointer-events: none;
+}
 .field-shape.is-other { fill-opacity: 0; stroke: rgba(255, 255, 255, 0.34); }
 .field-shape.is-joined { stroke: none; }
 .field-shape.is-group-hot { fill-opacity: 0.16; }
