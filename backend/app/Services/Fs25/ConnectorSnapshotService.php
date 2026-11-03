@@ -247,6 +247,8 @@ final class ConnectorSnapshotService
         $merged['ok'] = $geometryXml !== '' || $stateXml !== '';
         $merged['error'] = $merged['ok'] ? null : 'missing';
         $merged['pdaMap'] = $this->pdaMapPath($workspace) !== null;
+        $marker = $this->localStateDir($workspace).'/overview.failed';
+        $merged['pdaError'] = (! $merged['pdaMap'] && is_file($marker)) ? trim((string) file_get_contents($marker)) : null;
 
         return $merged;
     }
@@ -1005,7 +1007,7 @@ final class ConnectorSnapshotService
         }
 
         $marker = $dir.'/overview.failed';
-        if (is_file($marker) && time() - (int) filemtime($marker) < 600) {
+        if (is_file($marker) && time() - (int) filemtime($marker) < 30) {
             return;
         }
 
@@ -1023,11 +1025,11 @@ final class ConnectorSnapshotService
             }
         } catch (Throwable $e) {
             Log::warning('AgriVision PDA map: '.$e->getMessage());
-        }
+            File::ensureDirectoryExists($dir);
+            File::put($marker, $e->getMessage());
 
-        File::ensureDirectoryExists($dir);
-        File::put($marker, gmdate('c'));
-    }
+            return;
+        }
 
     public function pdaMapPath(Workspace $workspace): ?string
     {

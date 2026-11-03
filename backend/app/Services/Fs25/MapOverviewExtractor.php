@@ -27,7 +27,14 @@ final class MapOverviewExtractor
         $modsDir = ConnectorDeployService::resolveModsDirectory($client, $access);
         $zipName = $this->chooseZip($client->listNames($modsDir), $mapName);
         if ($zipName === null) {
-            throw new RuntimeException('Keine Map-Zip zu „'.$mapName.'“ in '.$modsDir);
+        $zips = array_values(array_filter(
+            $names,
+            static fn (string $name): bool => str_ends_with(strtolower($name), '.zip'),
+        ));
+        throw new RuntimeException(
+            'Keine Map-Zip zu „'.$mapName.'“ in '.$modsDir
+            .' ('.implode(', ', array_slice($zips, 0, 12)).')'
+        );
         }
 
         $path = trim($modsDir, '/').'/'.$zipName;
