@@ -688,7 +688,7 @@ export const en = {
     unusedTip: "Not in use. No vehicle or building from this mod appears in the savegame.",
     mapDependency: "Map dependency",
     mapDependencyTip: "The map needs this mod. Do not delete it.",
-    savegameKnown: "A weight icon means the mod appears nowhere in the savegame. A gold outline marks mods the map depends on.",
+    savegameKnown: "A red buoy means the mod appears nowhere in the savegame. A gold link icon marks mods the map depends on.",
     savegameUnknown: "Vehicles and buildings in the savegame could not be read, so usage is not marked.",
     update: "Update",
     updateTo: "Update {{version}}",

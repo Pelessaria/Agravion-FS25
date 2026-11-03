@@ -686,7 +686,7 @@ export const de = {
     unusedTip: "Nicht genutzt. Im Savegame kommt kein Fahrzeug und kein Gebäude aus diesem Mod vor.",
     mapDependency: "Abhängigkeit der Karte",
     mapDependencyTip: "Die Karte braucht diesen Mod. Nicht löschen.",
-    savegameKnown: "Ein Gewicht heißt, der Mod kommt im Savegame nirgends vor. Ein goldener Umriss markiert Abhängigkeiten der Karte.",
+    savegameKnown: "Eine rote Boje heißt, der Mod kommt im Savegame nirgends vor. Ein goldenes Link-Symbol markiert Abhängigkeiten der Karte.",
     savegameUnknown: "Fahrzeuge und Gebäude im Savegame konnten nicht gelesen werden. Die Nutzungsprüfung fehlt deshalb.",
     update: "Aktualisieren",
     updateTo: "Update {{version}}",
