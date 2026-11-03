@@ -331,7 +331,7 @@ final class RequiredModsService
                     if ($client->fileExists($helloPath)) {
                         $raw = $client->read($helloPath);
                         $version = null;
-                        if (preg_match('/\bversion="([^"]+)"/i', $raw, $m)) {
+                        if (preg_match('/<agrivisionConnector\b[^>]*\bversion="([^"]+)"/i', $raw, $m)) {
                             $version = trim($m[1]) ?: null;
                         }
                         $hello[$item['id']] = ['present' => true, 'version' => $version];
