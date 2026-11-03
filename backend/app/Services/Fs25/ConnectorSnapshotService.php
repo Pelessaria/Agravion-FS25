@@ -1031,6 +1031,10 @@ final class ConnectorSnapshotService
             return;
         }
 
+        File::ensureDirectoryExists($dir);
+        File::put($marker, 'PDA-Textur wurde nicht gefunden');
+    }
+
     public function pdaMapPath(Workspace $workspace): ?string
     {
         $png = $this->localStateDir($workspace).'/overview.png';
