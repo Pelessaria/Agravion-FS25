@@ -3005,7 +3005,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .mod-version-row {
   display: grid;
   width: 100%;
-  grid-template-columns: 9ch 11ch minmax(12px, 1fr) 13px max-content 32px 32px 32px;
+  grid-template-columns: 9ch 11ch minmax(12px, 1fr) 13px max-content;
   align-items: center;
   justify-content: start;
   column-gap: 6px;
@@ -3037,22 +3037,16 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   width: 32px;
   height: 32px;
 }
-.mod-update-slot { position: relative; display: inline-grid; min-height: 32px; }
-.mod-update-reserve {
-  visibility: hidden;
+.mod-version-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
   min-height: 32px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  font-weight: 600;
-  white-space: nowrap;
-  line-height: 30px;
 }
-.mod-update-slot .btn-tip,
-.mod-update-slot > .btn {
-  position: absolute;
-  inset: 0;
-}
-.mod-update-slot .btn { width: 100%; min-height: 32px; }
+.mod-version-actions .btn { min-height: 32px; }
+.mod-select { width: 36px; text-align: center; }
+.mod-select input { width: 16px; height: 16px; accent-color: var(--accent); }
 .mod-icon-btn {
   width: 32px;
   min-height: 32px;
@@ -3069,9 +3063,28 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .server-mod-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .server-mod-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 .mod-title-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.mod-dependency { display: inline-flex; flex: none; color: var(--accent-2); }
-.mod-dependency .icon { width: 15px; height: 15px; }
-.server-mods tr.is-unused .mod-name strong { color: var(--text-muted); font-weight: 550; }
+.mod-dependency,
+.mod-unused {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+}
+.mod-dependency {
+  color: #9ec5ff;
+  background: color-mix(in srgb, #7aa2ff 24%, transparent);
+  border: 1px solid color-mix(in srgb, #7aa2ff 62%, transparent);
+}
+.mod-unused {
+  color: #f5c518;
+  background: color-mix(in srgb, #f5c518 18%, transparent);
+  border: 1px solid color-mix(in srgb, #f5c518 55%, transparent);
+}
+.mod-dependency .icon,
+.mod-unused .icon { width: 16px; height: 16px; }
 .server-mods .mod-name strong { display: block; }
 .server-mods .mod-title-line strong { display: inline; min-width: 0; }
 .server-mods .mod-file { display: block; color: var(--text-muted); font-size: var(--small); }
@@ -3090,6 +3103,11 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   background: color-mix(in srgb, var(--warning) 14%, transparent);
 }
 .server-log { max-height: 420px; }
+.badge.is-inactive {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 48%, transparent);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
 .badge.is-off, .badge.is-unknown {
   letter-spacing: 0;
   text-transform: none;

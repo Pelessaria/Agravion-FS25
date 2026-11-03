@@ -297,6 +297,25 @@ final class HostFileClient
         }
     }
 
+    public function delete(string $path): void
+    {
+        try {
+            if ($this->ftp) {
+                $this->ftp->delete($path);
+
+                return;
+            }
+
+            $this->sftp()->delete($this->normalizePath($path));
+        } catch (Throwable $e) {
+            throw new RuntimeException(
+                HostConnectionError::format($e, 'Löschen '.$path.' @ '.$this->endpointLabel()),
+                0,
+                $e
+            );
+        }
+    }
+
     public function ensureDirectory(string $path): void
     {
         $path = $this->normalizePath($path);

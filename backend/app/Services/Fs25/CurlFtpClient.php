@@ -96,6 +96,21 @@ final class CurlFtpClient
         return $this->parseListBody($body);
     }
 
+    public function delete(string $path): void
+    {
+        $normalized = $this->normalizePath($path);
+        $parent = dirname(str_replace('\\', '/', $normalized));
+        if ($parent === '.' || $parent === '/') {
+            $parent = '';
+        }
+        $base = basename(str_replace('\\', '/', $normalized));
+        $url = $this->urlForPath($parent, true);
+        $this->exec($url, [
+            CURLOPT_DIRLISTONLY => true,
+            CURLOPT_POSTQUOTE => ['DELE '.$base],
+        ], 'DELETE '.$path);
+    }
+
     public function fileExists(string $path): bool
     {
         // Avoid downloading the whole file: LIST parent and match basename.

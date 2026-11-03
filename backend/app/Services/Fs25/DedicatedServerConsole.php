@@ -318,6 +318,41 @@ final class DedicatedServerConsole
     }
 
     /**
+     * Remove zip files from the mods folder. The game server locks those files
+     * while it is running, so this waits until the web UI reports it stopped.
+     *
+     * @param  list<string>  $names
+     * @return array{ok: true, deleted: int}
+     */
+    public function deleteMods(Workspace $workspace, array $names): array
+    {
+        $files = [];
+        foreach ($names as $name) {
+            $files[] = $this->safeZip((string) $name);
+        }
+        $files = array_values(array_unique($files));
+        if ($files === []) {
+            throw new RuntimeException('Keine Mod ausgewählt.');
+        }
+        $workspace->loadMissing('hostAccess');
+        if ($workspace->hostAccess === null) {
+            throw new RuntimeException('Löschen braucht den Dateizugang der Instanz.');
+        }
+        [$client, $base, $home] = $this->open($workspace);
+        unset($client, $base);
+        if (($home['running'] ?? null) !== false) {
+            throw new RuntimeException('Löschen geht nur, solange der Spielserver aus ist.');
+        }
+        $access = $this->requireAccess($workspace);
+        $filesClient = new HostFileClient($access);
+        foreach ($files as $name) {
+            $filesClient->delete($this->modPath($filesClient, $access, $name));
+        }
+
+        return ['ok' => true, 'deleted' => count($files)];
+    }
+
+    /**
      * Replace one installed zip with the newer ModHub file.
      * This runs only while the game server is stopped, and only when the ModHub page
      * itself links the zip on the Giants download host.

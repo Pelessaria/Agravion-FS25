@@ -134,6 +134,18 @@ class ServerConsoleController extends Controller
         return $this->afterChange($row, $console, fn () => $console->updateMod($row, $data['name']));
     }
 
+    public function deleteMods(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
+    {
+        $row = $this->workspace($workspace);
+        $this->requireAccess($request, $row, $grants, 'write');
+        $data = $request->validate([
+            'names' => ['required', 'array', 'min:1', 'max:100'],
+            'names.*' => ['required', 'string', 'max:180'],
+        ]);
+
+        return $this->afterChange($row, $console, fn () => $console->deleteMods($row, $data['names']));
+    }
+
     public function active(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
     {
         $row = $this->workspace($workspace);

@@ -490,6 +490,13 @@ export async function apiUpdateServerMod(workspaceId: string, name: string): Pro
   })
 }
 
+export async function apiDeleteServerMods(workspaceId: string, names: string[]): Promise<{ ok: boolean; deleted: number }> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/mods/delete`, {
+    method: "POST",
+    body: JSON.stringify({ names }),
+  })
+}
+
 export async function apiServerAccess(workspaceId: string): Promise<{ users: ServerAccessUser[] }> {
   return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/access`)
 }

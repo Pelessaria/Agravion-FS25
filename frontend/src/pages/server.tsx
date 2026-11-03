@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
-import { ChevronDown, ChevronRight, Copy, Download, Link2, Pause, Play, RotateCcw, Square } from "lucide-react"
+import { ChevronDown, ChevronRight, Copy, Download, Link2, Pause, Play, RotateCcw, Square, Trash2, Weight } from "lucide-react"
 import {
+  apiDeleteServerMods,
   apiDownloadServerMod,
   apiSaveServerSettings,
   apiServerAction,
@@ -15,7 +16,7 @@ import {
   type ServerSnapshot,
 } from "../api"
 import modhubIcon from "../assets/modhub-favicon.png"
-import { MissingWorkspace, PermissionBlock } from "../components/ui"
+import { MissingWorkspace, Modal, PermissionBlock } from "../components/ui"
 import { useStore } from "../store"
 import { useWorkspaceRoute } from "../use-workspace"
 
@@ -84,6 +85,8 @@ export function ServerPage() {
   const [sortKey, setSortKey] = useState<ModSort>("name")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [copied, setCopied] = useState(false)
+  const [selected, setSelected] = useState<string[]>([])
+  const [pendingDelete, setPendingDelete] = useState<string[] | null>(null)
 
   useEffect(() => {
     if (!workspace || !allowed || !access || !liveMode) return
@@ -147,6 +150,19 @@ export function ServerPage() {
       return (diff === 0 ? tie : diff) * factor
     })
   }, [modQuery, snapshot.mods, sortDir, sortKey])
+
+  const selectedSet = useMemo(() => new Set(selected), [selected])
+  const visibleSelected = visibleMods.filter((mod) => selectedSet.has(mod.name)).length
+  const allVisibleSelected = visibleMods.length > 0 && visibleSelected === visibleMods.length
+
+  function toggleSelected(name: string) {
+    setSelected((current) => (current.includes(name) ? current.filter((item) => item !== name) : [...current, name]))
+  }
+
+  function toggleVisible(on: boolean) {
+    const visible = new Set(visibleMods.map((mod) => mod.name))
+    setSelected((current) => (on ? [...new Set([...current, ...visible])] : current.filter((name) => !visible.has(name))))
+  }
 
   function toggleSort(next: ModSort) {
     if (sortKey === next) {
@@ -248,6 +264,23 @@ export function ServerPage() {
       await reload()
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : t("server.updateNeedsStop"))
+    } finally {
+      setBusy("")
+    }
+  }
+
+  async function removeMods(names: string[]) {
+    if (!workspace || names.length === 0) return
+    setBusy("delete")
+    try {
+      const result = await apiDeleteServerMods(workspace.id, names)
+      pushToast("ok", t("server.deleteDone", { count: result.deleted }))
+      setSelected((current) => current.filter((name) => !names.includes(name)))
+      setPendingDelete(null)
+      await reload()
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : t("server.deleteNeedsStop"))
+      setPendingDelete(null)
     } finally {
       setBusy("")
     }
@@ -403,6 +436,32 @@ export function ServerPage() {
             onChange={(event) => setModQuery(event.target.value)}
           />
           {canWrite ? (
+            <Tip
+              text={
+                selected.length === 0
+                  ? undefined
+                  : !snapshot.ftpConfigured
+                    ? t("server.deleteNeedsFiles")
+                    : snapshot.running !== false
+                      ? t("server.deleteNeedsStop")
+                      : busy !== ""
+                        ? t("server.busy")
+                        : undefined
+              }
+            >
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={selected.length === 0 || !snapshot.ftpConfigured || snapshot.running !== false || busy !== ""}
+                onClick={() => setPendingDelete(selected)}
+              >
+                <Trash2 className="icon" aria-hidden="true" />
+                {t("server.delete")}
+                {selected.length > 0 ? ` (${selected.length})` : ""}
+              </button>
+            </Tip>
+          ) : null}
+          {canWrite ? (
             <label className="btn btn-secondary">
               {busy === "upload" ? t("server.loading") : t("server.upload")}
               <input
@@ -425,6 +484,19 @@ export function ServerPage() {
             <table>
               <thead>
                 <tr>
+                  {canWrite ? (
+                    <th className="mod-select">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        ref={(input) => {
+                          if (input) input.indeterminate = visibleSelected > 0 && !allVisibleSelected
+                        }}
+                        aria-label={t("server.selectAll")}
+                        onChange={(event) => toggleVisible(event.target.checked)}
+                      />
+                    </th>
+                  ) : null}
                   {(
                     [
                       ["name", t("server.modName")],
@@ -463,11 +535,34 @@ export function ServerPage() {
                   const toggleDisabled = busy === mod.name
                   const toggleLabel = mod.active ? t("server.deactivate") : t("server.activate")
                   const unused = mod.used === false && mod.mapDependency !== true
+                  const deleteDisabled = !snapshot.ftpConfigured || snapshot.running !== false || busy !== ""
+                  const deleteReason = !deleteDisabled
+                    ? t("server.delete")
+                    : !snapshot.ftpConfigured
+                      ? t("server.deleteNeedsFiles")
+                      : snapshot.running !== false
+                        ? t("server.deleteNeedsStop")
+                        : t("server.busy")
                   return (
-                    <tr key={mod.name} className={unused ? "is-unused" : undefined}>
+                    <tr key={mod.name}>
+                      {canWrite ? (
+                        <td className="mod-select">
+                          <input
+                            type="checkbox"
+                            checked={selectedSet.has(mod.name)}
+                            aria-label={t("server.selectMod", { name: mod.title || mod.name })}
+                            onChange={() => toggleSelected(mod.name)}
+                          />
+                        </td>
+                      ) : null}
                       <td className="mod-name">
                         <div className="mod-title-line">
                           <strong>{mod.title || mod.name}</strong>
+                          {unused ? (
+                            <span className="mod-unused" title={t("server.unusedTip")} aria-label={t("server.unused")}>
+                              <Weight className="icon" aria-hidden="true" />
+                            </span>
+                          ) : null}
                           {mod.mapDependency ? (
                             <span className="mod-dependency" title={t("server.mapDependencyTip")} aria-label={t("server.mapDependency")}>
                               <Link2 className="icon" aria-hidden="true" />
@@ -480,10 +575,9 @@ export function ServerPage() {
                       <td>{formatBytes(mod.bytes)}</td>
                       <td>
                         <div className="server-mod-meta">
-                          <span className={mod.active == null ? "badge is-unknown" : mod.active ? "badge" : "badge is-off"}>
+                          <span className={mod.active == null ? "badge is-unknown" : mod.active ? "badge" : "badge is-inactive"}>
                             {mod.active == null ? t("server.unknownActive") : mod.active ? t("server.active") : t("server.inactive")}
                           </span>
-                          {unused ? <span className="badge is-quiet" title={t("server.unusedTip")}>{t("server.unused")}</span> : null}
                         </div>
                       </td>
                       <td className="mod-version">
@@ -492,8 +586,7 @@ export function ServerPage() {
                           <span className="mod-version-next">{mod.updateAvailable && mod.hubVersion ? mod.hubVersion : ""}</span>
                           <span className="mod-version-spacer" />
                           <span className="mod-version-rule" aria-hidden="true" />
-                          <span className="mod-update-slot">
-                            <span className="mod-update-reserve" aria-hidden="true">{t("server.update")}</span>
+                          <span className="mod-version-actions">
                             {mod.updateAvailable ? (
                               <Tip text={updateReason}>
                                 <button
@@ -506,7 +599,6 @@ export function ServerPage() {
                                 </button>
                               </Tip>
                             ) : null}
-                          </span>
                           <span className="mod-icon-slot">
                             {mod.hubUrl ? (
                               <a className="btn btn-secondary mod-icon-btn" href={mod.hubUrl} target="_blank" rel="noreferrer" title={t("server.modHub")} aria-label={t("server.modHub")}>
@@ -542,6 +634,22 @@ export function ServerPage() {
                                 <Download className="icon" aria-hidden="true" />
                               </button>
                             ) : null}
+                          </span>
+                          <span className="mod-icon-slot">
+                            {canWrite ? (
+                              <Tip text={deleteReason}>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary mod-icon-btn"
+                                  disabled={deleteDisabled}
+                                  aria-label={t("server.delete")}
+                                  onClick={() => setPendingDelete([mod.name])}
+                                >
+                                  <Trash2 className="icon" aria-hidden="true" />
+                                </button>
+                              </Tip>
+                            ) : null}
+                          </span>
                           </span>
                         </div>
                       </td>
@@ -635,6 +743,26 @@ export function ServerPage() {
           <p className="muted">{t("server.noLog")}</p>
         )}
       </div>
+      {pendingDelete && pendingDelete.length > 0 ? (
+        <Modal title={t("server.delete")} onClose={() => busy !== "delete" && setPendingDelete(null)}>
+          <p>
+            {pendingDelete.length === 1
+              ? t("server.deleteOne", { name: snapshot.mods.find((mod) => mod.name === pendingDelete[0])?.title || pendingDelete[0] })
+              : t("server.deleteMany", { count: pendingDelete.length })}
+          </p>
+          {pendingDelete.some((name) => snapshot.mods.find((mod) => mod.name === name)?.mapDependency) ? (
+            <p className="hint">{t("server.deleteDependency")}</p>
+          ) : null}
+          <div className="card-actions">
+            <button type="button" className="btn btn-secondary" disabled={busy === "delete"} onClick={() => setPendingDelete(null)}>
+              {t("server.cancel")}
+            </button>
+            <button type="button" className="btn btn-danger" disabled={busy === "delete"} onClick={() => void removeMods(pendingDelete)}>
+              {busy === "delete" ? t("server.loading") : t("server.delete")}
+            </button>
+          </div>
+        </Modal>
+      ) : null}
     </section>
   )
 }
