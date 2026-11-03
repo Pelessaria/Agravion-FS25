@@ -7,6 +7,7 @@ export const APP_MODULES = [
   { id: "finance", labelKey: "modules.finance", path: "m/finance", section: "biz" },
   { id: "trade", labelKey: "modules.trade", path: "m/trade", section: "biz" },
   { id: "farm", labelKey: "modules.farm", path: "m/farm", section: "admin" },
+  { id: "server", labelKey: "modules.server", path: "m/server", section: "admin" },
 ] as const
 
 export type ModuleId = (typeof APP_MODULES)[number]["id"]
@@ -25,7 +26,7 @@ const LEGACY_MODULE_IDS: Record<string, ModuleId> = {
   vehicles: "equipment",
 }
 
-const READY_MODULES = new Set<ModuleId>(["equipment", "fields"])
+const READY_MODULES = new Set<ModuleId>(["equipment", "fields", "server"])
 
 export function moduleIsReady(id: ModuleId) {
   return READY_MODULES.has(id)

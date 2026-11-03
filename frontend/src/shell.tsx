@@ -40,6 +40,7 @@ const MODULE_ICONS: Record<ModuleId, ComponentType<{ className?: string }>> = {
   finance: Wallet,
   trade: Landmark,
   farm: House,
+  server: Server,
 }
 
 function chooseLocale(lng: "de" | "en") {

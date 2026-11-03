@@ -29,6 +29,9 @@ class Workspace extends Model
         'status_note',
         'feed_base_url',
         'feed_code_encrypted',
+        'console_base_url',
+        'console_username',
+        'console_password_encrypted',
     ];
 
     protected function casts(): array
@@ -58,6 +61,27 @@ class Workspace extends Model
         $this->feed_code_encrypted = $code === null || $code === ''
             ? null
             : Crypt::encryptString($code);
+    }
+
+    public function setConsolePassword(?string $password): void
+    {
+        $this->console_password_encrypted = $password === null || $password === ''
+            ? null
+            : Crypt::encryptString($password);
+    }
+
+    public function consolePassword(): ?string
+    {
+        if ($this->console_password_encrypted === null || $this->console_password_encrypted === '') {
+            return null;
+        }
+
+        return Crypt::decryptString($this->console_password_encrypted);
+    }
+
+    public function consoleConfigured(): bool
+    {
+        return filled($this->console_username) && filled($this->console_password_encrypted);
     }
 
     public function feedCode(): ?string

@@ -93,6 +93,12 @@ export interface Workspace {
   hostAccess?: HostAccessInfo | null
   savegames?: WorkspaceSavegame[]
   activeSavegameId?: number | null
+  console?: {
+    configured: boolean
+    username: string
+    baseUrl: string
+    hasPassword: boolean
+  } | null
 }
 
 export type SavegameStatus = "ready" | "no_farms" | "error" | "unknown" | string
@@ -201,6 +207,8 @@ export interface FieldSnapshot {
   growthMax: number | null
   harvestMin: number | null
   harvestMax: number | null
+  /** Calendar months 1–12 from the map's growth periods. Absent until the connector can read them. */
+  harvestMonths?: number[] | null
   crop: string | null
   ground: number | null
   weed: number | null

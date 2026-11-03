@@ -104,7 +104,7 @@ class AuthController extends Controller
             'twoFactorEnabled' => false,
             'globalRole' => $role,
             'active' => true,
-            'memberships' => [],
+            'memberships' => app(\App\Services\Fs25\ModuleGrantService::class)->membershipsFor($user),
             'groupIds' => [],
         ];
     }

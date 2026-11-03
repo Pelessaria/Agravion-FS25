@@ -344,6 +344,131 @@ export async function downloadConnectorPackage(): Promise<void> {
   URL.revokeObjectURL(url)
 }
 
+export interface ServerModRow {
+  name: string
+  bytes: number | null
+  active: boolean | null
+  source: string
+  download: boolean
+}
+
+export interface ServerSettingField {
+  name: string
+  label: string
+  type: "text" | "checkbox" | "select" | string
+  value: string
+  options: { value: string; label: string }[]
+}
+
+export interface ServerSnapshot {
+  webConfigured: boolean
+  ftpConfigured: boolean
+  loggedIn: boolean
+  actions: { id: "start" | "stop" | "restart" | string; label: string }[]
+  mods: ServerModRow[]
+  settings: ServerSettingField[]
+  log: { name: string; text: string; truncated: boolean } | null
+  error: string | null
+}
+
+export interface ServerAccessUser {
+  id: string
+  name: string
+  email: string
+  admin: boolean
+  access: "read" | "write" | null
+}
+
+export async function apiServerSnapshot(workspaceId: string): Promise<ServerSnapshot> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server`)
+}
+
+export async function apiSaveServerLogin(
+  workspaceId: string,
+  body: { baseUrl: string; username: string; password?: string; keepPassword: boolean },
+): Promise<{ ok: boolean; console: NonNullable<import("./types").Workspace["console"]> }> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/login`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  })
+}
+
+export async function apiServerAction(workspaceId: string, action: "start" | "stop" | "restart"): Promise<{ ok: boolean; note?: string }> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/action`, {
+    method: "POST",
+    body: JSON.stringify({ action }),
+  })
+}
+
+export async function apiSaveServerSettings(workspaceId: string, values: Record<string, string | boolean>): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/settings`, {
+    method: "POST",
+    body: JSON.stringify({ values }),
+  })
+}
+
+export async function apiUploadServerMod(workspaceId: string, file: File): Promise<{ ok: boolean; via: string }> {
+  const body = new FormData()
+  body.set("file", file)
+  const method = "POST"
+  await ensureCsrf()
+  const headers = new Headers()
+  headers.set("Accept", "application/json")
+  const xsrf = readCookie("XSRF-TOKEN")
+  if (xsrf) headers.set("X-XSRF-TOKEN", xsrf)
+  const response = await fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/mods`, {
+    method,
+    credentials: "include",
+    headers,
+    body,
+  })
+  const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
+  if (!response.ok) throw new ApiError(response.status, readApiErrorMessage(data, response.status))
+  return data as { ok: boolean; via: string }
+}
+
+export async function apiDownloadServerMod(workspaceId: string, name: string): Promise<void> {
+  const response = await fetch(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/server/mod?name=${encodeURIComponent(name)}`,
+    { credentials: "include", headers: { Accept: "application/zip" } },
+  )
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
+    throw new ApiError(response.status, readApiErrorMessage(data, response.status))
+  }
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = name
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
+export async function apiSetServerModActive(workspaceId: string, name: string, active: boolean): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/mods/active`, {
+    method: "POST",
+    body: JSON.stringify({ name, active }),
+  })
+}
+
+export async function apiServerAccess(workspaceId: string): Promise<{ users: ServerAccessUser[] }> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/access`)
+}
+
+export async function apiSaveServerAccess(
+  workspaceId: string,
+  userId: string,
+  access: "none" | "read" | "write",
+): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/access`, {
+    method: "PUT",
+    body: JSON.stringify({ userId: Number(userId), access }),
+  })
+}
+
 /** Probe whether the Laravel API is reachable (not just Vite demo). */
 export async function apiIsLive(): Promise<boolean> {
   try {

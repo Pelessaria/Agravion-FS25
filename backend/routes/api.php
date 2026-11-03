@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ServerConsoleController;
 use App\Http\Controllers\SystemUpdateController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,15 @@ Route::middleware('auth:web')->group(function () {
     Route::post('/workspaces/{workspace}/host-access/probe', [WorkspaceController::class, 'probeHostAccess']);
     Route::delete('/workspaces/{workspace}/host-access', [WorkspaceController::class, 'deleteHostAccess']);
     Route::post('/workspaces/{workspace}/savegames/select', [WorkspaceController::class, 'selectSavegame']);
+    Route::get('/workspaces/{workspace}/server', [ServerConsoleController::class, 'show']);
+    Route::put('/workspaces/{workspace}/server/login', [ServerConsoleController::class, 'saveLogin']);
+    Route::post('/workspaces/{workspace}/server/action', [ServerConsoleController::class, 'action']);
+    Route::post('/workspaces/{workspace}/server/settings', [ServerConsoleController::class, 'settings']);
+    Route::post('/workspaces/{workspace}/server/mods', [ServerConsoleController::class, 'upload']);
+    Route::get('/workspaces/{workspace}/server/mod', [ServerConsoleController::class, 'download']);
+    Route::post('/workspaces/{workspace}/server/mods/active', [ServerConsoleController::class, 'active']);
+    Route::get('/workspaces/{workspace}/server/access', [ServerConsoleController::class, 'access']);
+    Route::put('/workspaces/{workspace}/server/access', [ServerConsoleController::class, 'saveAccess']);
 
     Route::get('/system/update', [SystemUpdateController::class, 'status']);
     Route::get('/system/schedule', [SystemUpdateController::class, 'schedule']);

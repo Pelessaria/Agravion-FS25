@@ -4,6 +4,7 @@ import { ControlPage } from "./pages/control"
 import { CreatePage } from "./pages/create"
 import { DashboardPage } from "./pages/dashboard"
 import { FieldsPage } from "./pages/fields"
+import { ServerPage } from "./pages/server"
 import { LoginPage } from "./pages/login"
 import { ModulePage } from "./pages/module"
 import { SettingsPage } from "./pages/settings"
@@ -47,6 +48,7 @@ export function App() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="w/:id" element={<WorkspaceHomePage />} />
         <Route path="w/:id/m/fields" element={<FieldsPage />} />
+        <Route path="w/:id/m/server" element={<ServerPage />} />
         <Route path="w/:id/equipment" element={<VehiclesPage />} />
         <Route path="w/:id/equipment/:vehicleId" element={<VehicleDetailPage />} />
         <Route path="w/:id/vehicles" element={<LegacyVehiclesRedirect />} />

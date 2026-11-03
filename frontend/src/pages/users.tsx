@@ -5,6 +5,7 @@ import {
   ChevronRight,
   House,
   Landmark,
+  Server,
   LoaderCircle,
   Map,
   Package,
@@ -27,6 +28,7 @@ const MODULE_ICONS: Record<ModuleId, typeof Map> = {
   finance: Wallet,
   trade: Landmark,
   farm: House,
+  server: Server,
 }
 
 const WORKSPACE_ROLES: WorkspaceRole[] = ["workspace_admin", "manager", "operator", "viewer"]

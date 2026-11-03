@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
 import { LocateFixed, Minus, Plus } from "lucide-react"
 import { apiWorkspaceFields } from "../api"
@@ -10,18 +10,26 @@ import {
   cropKey,
   cropStateLabel,
   effectiveMapSize,
-  formatGrowth,
   formatHa,
+  formatHarvest,
   formatTarget,
-  formatWindow,
   frameFromContentBox,
-  levelLabel,
   measureMapContent,
   namedValue,
   projectPoint,
   terrainFrame,
   type MapFrame,
 } from "../field-format"
+import {
+  EMPTY_FIELD_QUERY,
+  activeQueryCount,
+  layersFor,
+  legendStops,
+  matchesFieldQuery,
+  paintColor,
+  type FieldLayerId,
+  type FieldQuery,
+} from "../field-layers"
 import { joinedContours } from "../field-outline"
 import { useStore } from "../store"
 import type { FieldSnapshot, FieldsResponse } from "../types"
@@ -149,7 +157,12 @@ function groupCaption(field: FieldSnapshot, fields: FieldSnapshot[]) {
   }
 }
 
-function projectFields(fields: FieldSnapshot[], frame: MapFrame, farmId: number | null): DrawnField[] {
+function projectFields(
+  fields: FieldSnapshot[],
+  frame: MapFrame,
+  farmId: number | null,
+  layer: FieldLayerId,
+): DrawnField[] {
   return fields.map((field) => {
     const caption = groupCaption(field, fields)
     const center =
@@ -187,7 +200,7 @@ function projectFields(fields: FieldSnapshot[], frame: MapFrame, farmId: number 
     }
     return {
       id: field.id,
-      color: cropColor(field),
+      color: layer === "off" ? cropColor(field) : paintColor(field, layer),
       polygon: projected.length >= 3 ? projected.map((point) => `${point.x},${point.y}`).join(" ") : null,
       x: label?.x ?? 50,
       y: label?.y ?? 50,
@@ -218,6 +231,8 @@ export function FieldsPage() {
   const [query, setQuery] = useState("")
   const [focusToken, setFocusToken] = useState(0)
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const [layer, setLayer] = useState<FieldLayerId>("off")
+  const [fieldQuery, setFieldQuery] = useState<FieldQuery>(EMPTY_FIELD_QUERY)
 
   useEffect(() => {
     if (!workspace || !allowed || !access || !liveMode) return
@@ -277,18 +292,23 @@ export function FieldsPage() {
     if (contentBox) return frameFromContentBox(mapSize, contentBox)
     return terrainFrame(mapSize)
   }, [contentBox, mapSize, reported])
+  const precisionFarming = source?.precisionFarming ?? null
+  const availableLayers = layersFor(precisionFarming)
+  const activeLayer = availableLayers.includes(layer) ? layer : "off"
   const drawn = useMemo(
-    () => projectFields(fields, frame, farm?.gameFarmId ?? null),
-    [farm?.gameFarmId, fields, frame],
+    () => projectFields(fields, frame, farm?.gameFarmId ?? null, activeLayer),
+    [activeLayer, farm?.gameFarmId, fields, frame],
   )
   const visible = useMemo(
     () =>
       drawn.filter((field) => {
         if (onlyMine && farm && !field.mine) return false
         if (!showUnowned && field.owned === false) return false
+        const sourceField = fields.find((item) => item.id === field.id)
+        if (sourceField && !matchesFieldQuery(sourceField, fieldQuery, precisionFarming)) return false
         return true
       }),
-    [drawn, farm, onlyMine, showUnowned],
+    [drawn, farm, fieldQuery, fields, onlyMine, precisionFarming, showUnowned],
   )
   const outlines = useMemo(() => {
     const shown = new Set(visible.map((field) => field.id))
@@ -336,7 +356,21 @@ export function FieldsPage() {
     if (!match) return
     if (onlyMine && farm && match.farmId !== farm.gameFarmId) setOnlyMine(false)
     if (!showUnowned && match.owned === false) setShowUnowned(true)
+    setFieldQuery(EMPTY_FIELD_QUERY)
     choose(nextId, true)
+  }
+
+  const fruitOptions = [...new Map(
+    fields
+      .filter((field) => field.fruitName)
+      .map((field) => [field.fruitName as string, field.fruitTitle || field.fruitName || ""]),
+  ).entries()].sort((a, b) => a[1].localeCompare(b[1], i18n.language))
+  const filterCount = activeQueryCount(fieldQuery, precisionFarming)
+  const legend = legendStops(activeLayer, t)
+  const cropFilters = ["harvestReady", "growing", "planted", "cut", "withered", "noCrop"]
+
+  function patchQuery(patch: Partial<FieldQuery>) {
+    setFieldQuery((current) => ({ ...current, ...patch }))
   }
 
   if (!workspace) return <MissingWorkspace />
@@ -430,10 +464,158 @@ export function FieldsPage() {
               >
                 {t("fields.showUnowned")}
               </button>
+              <label className="field fields-layer">
+                <span className="sr-only">{t("fields.layer")}</span>
+                <select value={activeLayer} onChange={(event) => setLayer(event.target.value as FieldLayerId)}>
+                  {availableLayers.map((id) => (
+                    <option key={id} value={id}>
+                      {t(`fields.layerName.${id}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
+            <div className="fields-filters">
+              <span className="fields-filter-count">
+                {t("fields.shown", {
+                  shown: visible.length.toLocaleString(i18n.language),
+                  total: drawn.length.toLocaleString(i18n.language),
+                })}
+              </span>
+              <button
+                type="button"
+                className={fieldQuery.crop === "harvestReady" ? "btn" : "btn btn-secondary"}
+                aria-pressed={fieldQuery.crop === "harvestReady"}
+                onClick={() => patchQuery({ crop: fieldQuery.crop === "harvestReady" ? "" : "harvestReady" })}
+              >
+                {t("fields.crop.harvestReady")}
+              </button>
+              <button
+                type="button"
+                className={fieldQuery.joined ? "btn" : "btn btn-secondary"}
+                aria-pressed={fieldQuery.joined}
+                onClick={() => patchQuery({ joined: !fieldQuery.joined })}
+              >
+                {t("fields.filterJoined")}
+              </button>
+              <button
+                type="button"
+                className={fieldQuery.weeds ? "btn" : "btn btn-secondary"}
+                aria-pressed={fieldQuery.weeds}
+                onClick={() => patchQuery({ weeds: !fieldQuery.weeds })}
+              >
+                {t("fields.filterWeeds")}
+              </button>
+              <button
+                type="button"
+                className={fieldQuery.stones ? "btn" : "btn btn-secondary"}
+                aria-pressed={fieldQuery.stones}
+                onClick={() => patchQuery({ stones: !fieldQuery.stones })}
+              >
+                {t("fields.filterStones")}
+              </button>
+              {precisionFarming === true ? (
+                <>
+                  <button
+                    type="button"
+                    className={fieldQuery.nitrogen === "low" ? "btn" : "btn btn-secondary"}
+                    aria-pressed={fieldQuery.nitrogen === "low"}
+                    onClick={() => patchQuery({ nitrogen: fieldQuery.nitrogen === "low" ? "" : "low" })}
+                  >
+                    {t("fields.filterNitrogenLow")}
+                  </button>
+                  <button
+                    type="button"
+                    className={fieldQuery.ph === "off" ? "btn" : "btn btn-secondary"}
+                    aria-pressed={fieldQuery.ph === "off"}
+                    onClick={() => patchQuery({ ph: fieldQuery.ph === "off" ? "" : "off" })}
+                  >
+                    {t("fields.filterPhOff")}
+                  </button>
+                  <button
+                    type="button"
+                    className={fieldQuery.scan === "no" ? "btn" : "btn btn-secondary"}
+                    aria-pressed={fieldQuery.scan === "no"}
+                    onClick={() => patchQuery({ scan: fieldQuery.scan === "no" ? "" : "no" })}
+                  >
+                    {t("fields.filterUnscanned")}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={fieldQuery.spray === "open" ? "btn" : "btn btn-secondary"}
+                    aria-pressed={fieldQuery.spray === "open"}
+                    onClick={() => patchQuery({ spray: fieldQuery.spray === "open" ? "" : "open" })}
+                  >
+                    {t("fields.filterSprayOpen")}
+                  </button>
+                  <button
+                    type="button"
+                    className={fieldQuery.lime === "open" ? "btn" : "btn btn-secondary"}
+                    aria-pressed={fieldQuery.lime === "open"}
+                    onClick={() => patchQuery({ lime: fieldQuery.lime === "open" ? "" : "open" })}
+                  >
+                    {t("fields.filterLimeOpen")}
+                  </button>
+                </>
+              )}
+              <label className="field">
+                <span className="sr-only">{t("fields.filterFruit")}</span>
+                <select value={fieldQuery.fruit} onChange={(event) => patchQuery({ fruit: event.target.value })}>
+                  <option value="">{t("fields.filterFruit")}</option>
+                  {fruitOptions.map(([name, title]) => (
+                    <option key={name} value={name}>
+                      {title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="sr-only">{t("fields.filterCrop")}</span>
+                <select value={fieldQuery.crop} onChange={(event) => patchQuery({ crop: event.target.value })}>
+                  <option value="">{t("fields.filterCrop")}</option>
+                  {cropFilters.map((crop) => (
+                    <option key={crop} value={crop}>
+                      {t(`fields.crop.${crop}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {precisionFarming === true ? (
+                <label className="field">
+                  <span className="sr-only">{t("fields.filterSoil")}</span>
+                  <select value={fieldQuery.soil} onChange={(event) => patchQuery({ soil: event.target.value })}>
+                    <option value="">{t("fields.filterSoil")}</option>
+                    {[1, 2, 3, 4].map((soil) => (
+                      <option key={soil} value={String(soil)}>
+                        {t(`fields.soilType.${soil}`)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {filterCount > 0 ? (
+                <button type="button" className="btn btn-secondary" onClick={() => setFieldQuery(EMPTY_FIELD_QUERY)}>
+                  {t("fields.filterReset")}
+                </button>
+              ) : null}
+            </div>
+            {legend.length > 0 ? (
+              <div className="layer-legend" aria-label={t("fields.legend")}>
+                {legend.map((stop) => (
+                  <span key={stop.label}>
+                    <i style={{ background: stop.color }} />
+                    {stop.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <FieldMap
               fields={visible}
               outlines={outlines}
+              painted={activeLayer !== "off"}
               mapUrl={
                 source?.pdaMap
                   ? `/api/workspaces/${workspace.id}/pda-map`
@@ -537,6 +719,7 @@ function visibleLabels(
 function FieldMap({
   fields,
   outlines,
+  painted,
   mapUrl,
   live,
   selectedId,
@@ -547,6 +730,7 @@ function FieldMap({
 }: {
   fields: DrawnField[]
   outlines: { key: string; ids: number[]; polygon: string }[]
+  painted: boolean
   mapUrl: string | null
   live: boolean
   selectedId: number | null
@@ -749,6 +933,7 @@ function FieldMap({
             {fields.map((field) => {
               const className = [
                 "field-shape",
+                painted ? "is-painted" : "",
                 field.group ? "is-joined" : "",
                 inActiveGroup(field, hoverId, selectedId) ? "is-group-hot" : "",
                 field.id === selectedId ? "is-selected" : "",
@@ -858,47 +1043,15 @@ function FieldDetail({
   }
 
   const fruit = field.fruitTitle || field.fruitName
-  const rows: { label: string; value: string | null }[] = [
-    { label: t("fields.number"), value: String(field.id) },
-    ...(field.group && field.group.length > 1
-      ? [{ label: t("fields.merged"), value: field.group.join(", ") }]
-      : []),
-    { label: t("fields.fruit"), value: fruit },
-    { label: t("fields.areaHa"), value: formatHa(field.areaHa, i18n.language) },
-    { label: t("fields.farm"), value: farmName },
-    {
-      label: t("fields.ownership"),
-      value: field.owned == null ? null : field.owned ? t("fields.ownedYes") : t("fields.ownedNo"),
-    },
-    { label: t("fields.farmland"), value: field.farmlandId == null ? null : String(field.farmlandId) },
-    { label: t("fields.cropState"), value: cropStateLabel(t, field.crop) },
-    { label: t("fields.growth"), value: formatGrowth(field) },
-    { label: t("fields.harvestWindow"), value: formatWindow(field.harvestMin, field.harvestMax) },
-    { label: t("fields.ground"), value: namedValue(t, "groundState", field.ground) },
-    { label: t("fields.weed"), value: namedValue(t, "weedState", field.weed) },
-    {
-      label: t("fields.weedFactor"),
-      value:
-        field.weedFactor == null
-          ? null
-          : field.weedFactor.toLocaleString(i18n.language, { maximumFractionDigits: 2 }),
-    },
-    { label: t("fields.stones"), value: namedValue(t, "stoneState", field.stones) },
-    { label: t("fields.spray"), value: levelLabel(t, field.spray) },
-    { label: t("fields.sprayType"), value: levelLabel(t, field.sprayType) },
-    { label: t("fields.lime"), value: levelLabel(t, field.lime) },
-    { label: t("fields.roller"), value: levelLabel(t, field.roller) },
-    { label: t("fields.plow"), value: levelLabel(t, field.plow) },
-    { label: t("fields.stubble"), value: levelLabel(t, field.stubble) },
-    { label: t("fields.water"), value: levelLabel(t, field.water) },
-  ]
-
-  const soil =
+  const harvest = formatHarvest(field, t)
+  const grassFruit = field.fruitName != null && GRASS_FRUIT.has(field.fruitName.toUpperCase())
+  const grassGround = field.ground === 14 || field.ground === 15
+  const soilLabel =
     field.soilName != null
-      ? field.soil != null
-        ? `${field.soilName} · ${field.soil}`
-        : field.soilName
+      ? field.soilName
       : namedValue(t, "soilType", field.soil)
+  const nitrogenText = formatTarget(field.nitrogen, field.nitrogenTarget, i18n.language, 0, "kg/ha")
+  const phText = formatTarget(field.ph, field.phTarget, i18n.language, 2, "pH")
 
   return (
     <aside className="fields-detail">
@@ -916,40 +1069,213 @@ function FieldDetail({
       </header>
       {field.points.length < 3 ? <p className="hint">{t("fields.outlineMissing")}</p> : null}
       <dl className="fields-facts">
-        {rows.map((row) => (
-          <div key={row.label}>
-            <dt>{row.label}</dt>
-            <dd>{row.value ?? t("unavailable")}</dd>
-          </div>
-        ))}
+        <Fact label={t("fields.number")} value={String(field.id)} />
+        {field.group && field.group.length > 1 ? <Fact label={t("fields.merged")} value={field.group.join(", ")} /> : null}
+        <Fact label={t("fields.fruit")} value={fruit} />
+        <Fact label={t("fields.areaHa")} value={formatHa(field.areaHa, i18n.language)} />
+        <Fact label={t("fields.farm")} value={farmName} />
+        <Fact
+          label={t("fields.ownership")}
+          value={field.owned == null ? null : field.owned ? t("fields.ownedYes") : t("fields.ownedNo")}
+        />
+        <Fact label={t("fields.farmland")} value={field.farmlandId == null ? null : String(field.farmlandId)} />
+        <Fact label={t("fields.cropState")} value={cropStateLabel(t, field.crop)} />
+        <div>
+          <dt>{t("fields.growth")}</dt>
+          <dd>
+            <GrowthMeter
+              growth={field.growth}
+              max={field.growthMax}
+              harvestMin={field.harvestMin}
+              harvestMax={field.harvestMax}
+            />
+          </dd>
+        </div>
+        <div>
+          <dt>{t("fields.harvestWindow")}</dt>
+          <dd>
+            {harvest.text ?? t("unavailable")}
+            {harvest.pending ? <span className="fact-note">{t("fields.harvestMonthsPending")}</span> : null}
+          </dd>
+        </div>
+        <div title={t("fields.groundHint")}>
+          <dt>{t("fields.ground")}</dt>
+          <dd>
+            <span className="swatch-row">
+              {field.ground != null ? <i className="swatch" style={{ background: paintColor(field, "ground") }} /> : null}
+              {namedValue(t, "groundState", field.ground) ?? t("unavailable")}
+            </span>
+            {grassGround && !grassFruit ? (
+              <span className="fact-note">
+                {t("fields.groundGrassNote", {
+                  fruit: fruit ?? t("fields.crop.unknown"),
+                  soil: soilLabel ?? t("unavailable"),
+                })}
+              </span>
+            ) : null}
+          </dd>
+        </div>
+        <MeterFact label={t("fields.weed")} value={field.weed} max={3} text={namedValue(t, "weedState", field.weed)} color="#c47a3a" />
+        <MeterFact label={t("fields.stones")} value={field.stones} max={3} text={namedValue(t, "stoneState", field.stones)} color="#9aa3ad" />
+        {precisionFarming === true ? (
+          <>
+            <MutedFact label={t("fields.spray")} reason={t("fields.hiddenBecausePf")} />
+            <MutedFact label={t("fields.lime")} reason={t("fields.hiddenBecausePf")} />
+          </>
+        ) : (
+          <>
+            <MeterFact label={t("fields.spray")} value={field.spray} max={2} text={namedValue(t, "levelOnly", field.spray)} color="#6fbf73" />
+            <MeterFact label={t("fields.lime")} value={field.lime} max={2} text={namedValue(t, "levelOnly", field.lime)} color="#d7d3c4" />
+          </>
+        )}
+        <MeterFact label={t("fields.roller")} value={field.roller} max={1} text={namedValue(t, "levelOnly", field.roller)} color="#7eb0d4" />
+        <MeterFact label={t("fields.plow")} value={field.plow} max={1} text={namedValue(t, "levelOnly", field.plow)} color="#c4a574" />
       </dl>
-      <h3>{t("fields.sectionPrecision")}</h3>
-      {precisionFarming === false ? (
-        <p className="muted">{t("fields.pfOff")}</p>
-      ) : precisionFarming == null ? (
-        <p className="muted">{t("unavailable")}</p>
-      ) : field.scanned === false ? (
-        <p className="muted">{t("fields.scannedNo")}</p>
-      ) : (
-        <dl className="fields-facts">
-          <div>
-            <dt>{t("fields.soil")}</dt>
-            <dd>{soil ?? t("unavailable")}</dd>
-          </div>
-          <div>
-            <dt>{t("fields.nitrogen")}</dt>
-            <dd>{formatTarget(field.nitrogen, field.nitrogenTarget, i18n.language, 0, "kg/ha") ?? t("unavailable")}</dd>
-          </div>
-          <div>
-            <dt>{t("fields.ph")}</dt>
-            <dd>{formatTarget(field.ph, field.phTarget, i18n.language, 2, "pH") ?? t("unavailable")}</dd>
-          </div>
-          <div>
-            <dt>{t("fields.scanned")}</dt>
-            <dd>{field.scanned == null ? t("unavailable") : field.scanned ? t("yes") : t("no")}</dd>
-          </div>
-        </dl>
-      )}
+      {precisionFarming === true ? (
+        <>
+          <h3>{t("fields.sectionPrecision")}</h3>
+          {field.scanned === false ? (
+            <p className="muted">{t("fields.scannedNo")}</p>
+          ) : (
+            <dl className="fields-facts">
+              <div>
+                <dt>{t("fields.soil")}</dt>
+                <dd>
+                  <span className="swatch-row">
+                    {field.soil != null ? <i className="swatch" style={{ background: paintColor(field, "soil") }} /> : null}
+                    {soilLabel ?? t("unavailable")}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt>{t("fields.nitrogen")}</dt>
+                <dd>
+                  <RatioBar
+                    value={field.nitrogen}
+                    target={field.nitrogenTarget}
+                    text={nitrogenText}
+                    color={paintColor(field, "nitrogen")}
+                  />
+                </dd>
+              </div>
+              <div>
+                <dt>{t("fields.ph")}</dt>
+                <dd>
+                  <RatioBar value={field.ph} target={field.phTarget} text={phText} color={paintColor(field, "ph")} />
+                </dd>
+              </div>
+              <Fact label={t("fields.scanned")} value={field.scanned == null ? null : field.scanned ? t("yes") : t("no")} />
+            </dl>
+          )}
+        </>
+      ) : null}
     </aside>
+  )
+}
+
+const GRASS_FRUIT = new Set(["GRASS", "MEADOW", "FIELDGRASS", "GREENRYE", "VETCHRYE"])
+
+function Fact({ label, value }: { label: string; value: string | null }) {
+  const { t } = useTranslation()
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value ?? t("unavailable")}</dd>
+    </div>
+  )
+}
+
+function MutedFact({ label, reason }: { label: string; reason: string }) {
+  const { t } = useTranslation()
+  return (
+    <div className="is-muted" title={reason}>
+      <dt>{label}</dt>
+      <dd>{t("fields.hiddenValue")}</dd>
+    </div>
+  )
+}
+
+function MeterFact({
+  label,
+  value,
+  max,
+  text,
+  color,
+}: {
+  label: string
+  value: number | null
+  max: number
+  text: string | null
+  color: string
+}) {
+  const { t } = useTranslation()
+  const count = Math.max(max, value ?? 0, 1)
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>
+        <span className="meter-line">
+          <span className="pips" style={{ "--meter": color } as CSSProperties}>
+            {Array.from({ length: count }, (_, index) => (
+              <i key={index} className={value != null && index < value ? "is-on" : ""} />
+            ))}
+          </span>
+          <span>{text ?? (value == null ? t("unavailable") : String(value))}</span>
+        </span>
+      </dd>
+    </div>
+  )
+}
+
+function GrowthMeter({
+  growth,
+  max,
+  harvestMin,
+  harvestMax,
+}: {
+  growth: number | null
+  max: number | null
+  harvestMin: number | null
+  harvestMax: number | null
+}) {
+  const { t } = useTranslation()
+  if (growth == null) return t("unavailable")
+  const count = Math.max(max ?? growth, growth, 1)
+  return (
+    <span className="meter-line">
+      <span className="pips" style={{ "--meter": "#e0b44a" } as CSSProperties}>
+        {Array.from({ length: count }, (_, index) => {
+          const stage = index + 1
+          const harvest = harvestMin != null && harvestMax != null && stage >= harvestMin && stage <= harvestMax
+          return <i key={stage} className={[stage <= growth ? "is-on" : "", harvest ? "is-harvest" : ""].filter(Boolean).join(" ")} />
+        })}
+      </span>
+      <span>{max != null && max > 0 ? `${growth} / ${max}` : String(growth)}</span>
+    </span>
+  )
+}
+
+function RatioBar({
+  value,
+  target,
+  text,
+  color,
+}: {
+  value: number | null
+  target: number | null
+  text: string | null
+  color: string
+}) {
+  const { t } = useTranslation()
+  if (text == null) return t("unavailable")
+  const top = Math.max(value ?? 0, target ?? 0, 1)
+  return (
+    <span className="meter-line">
+      <span className="ratio">
+        <span style={{ width: `${((value ?? 0) / top) * 100}%`, background: color }} />
+        {target != null ? <em style={{ left: `${(target / top) * 100}%` }} /> : null}
+      </span>
+      <span>{text}</span>
+    </span>
   )
 }

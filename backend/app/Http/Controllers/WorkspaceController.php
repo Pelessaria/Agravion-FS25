@@ -518,6 +518,12 @@ class WorkspaceController extends Controller
             'hostAccess' => $hostAccess,
             'savegames' => $savegames,
             'activeSavegameId' => collect($savegames)->firstWhere('active')['id'] ?? null,
+            'console' => [
+                'configured' => $w->consoleConfigured(),
+                'username' => (string) ($w->console_username ?? ''),
+                'baseUrl' => (string) ($w->console_base_url ?? ''),
+                'hasPassword' => filled($w->console_password_encrypted),
+            ],
         ];
     }
 

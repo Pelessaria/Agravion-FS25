@@ -197,6 +197,37 @@ export function formatWindow(min: number | null, max: number | null) {
   return String(min ?? max)
 }
 
+export function formatHarvest(field: FieldSnapshot, t: TFunction) {
+  const months = [...new Set((field.harvestMonths ?? []).filter((month) => month >= 1 && month <= 12))].sort(
+    (a, b) => a - b,
+  )
+  if (months.length > 0) {
+    return { text: formatMonthList(months, t), pending: false }
+  }
+  const stages = formatWindow(field.harvestMin, field.harvestMax)
+  if (!stages) return { text: null, pending: false }
+  return { text: t("fields.harvestStage", { range: stages }), pending: true }
+}
+
+function formatMonthList(months: number[], t: TFunction) {
+  const parts: string[] = []
+  let start = months[0]
+  let prev = months[0]
+  for (let index = 1; index <= months.length; index += 1) {
+    const month = months[index]
+    if (month === prev + 1) {
+      prev = month
+      continue
+    }
+    const from = t(`fields.month.${start}`)
+    const to = t(`fields.month.${prev}`)
+    parts.push(start === prev ? from : `${from}–${to}`)
+    start = month
+    prev = month
+  }
+  return parts.join(", ")
+}
+
 export function namedValue(t: TFunction, group: string, value: number | null) {
   if (value == null) return null
   const key = `fields.${group}.${value}`

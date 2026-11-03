@@ -62,6 +62,7 @@ final class ConnectorFieldsParser
                 'growthMax' => $row['growthMax'] ?? null,
                 'harvestMin' => $row['harvestMin'] ?? null,
                 'harvestMax' => $row['harvestMax'] ?? null,
+                'harvestMonths' => $row['harvestMonths'] ?? null,
                 'crop' => $row['crop'] ?? null,
                 'ground' => $row['ground'] ?? null,
                 'weed' => $row['weed'] ?? null,
@@ -154,6 +155,7 @@ final class ConnectorFieldsParser
                 'growthMax' => self::intAttr($blob, 'growthMax'),
                 'harvestMin' => self::intAttr($blob, 'harvestMin'),
                 'harvestMax' => self::intAttr($blob, 'harvestMax'),
+                'harvestMonths' => self::monthList(self::attr($blob, 'harvestMonths')),
                 'crop' => self::attr($blob, 'crop'),
                 'ground' => self::intAttr($blob, 'ground'),
                 'weed' => self::intAttr($blob, 'weed'),
@@ -305,6 +307,33 @@ final class ConnectorFieldsParser
         }
 
         return count($ids) >= 2 ? $ids : null;
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    private static function monthList(?string $raw): ?array
+    {
+        if ($raw === null || trim($raw) === '') {
+            return null;
+        }
+        $months = [];
+        foreach (preg_split('/\s*,\s*/', trim($raw)) ?: [] as $part) {
+            if (! is_numeric($part)) {
+                continue;
+            }
+            $month = (int) $part;
+            if ($month >= 1 && $month <= 12) {
+                $months[$month] = $month;
+            }
+        }
+        if ($months === []) {
+            return null;
+        }
+        $values = array_values($months);
+        sort($values);
+
+        return $values;
     }
 
     private static function intAttr(string $blob, string $key): ?int

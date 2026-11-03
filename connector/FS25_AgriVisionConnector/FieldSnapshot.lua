@@ -743,6 +743,170 @@ local function pointInside(points, x, z)
     return inside
 end
 
+local function tallyValue(bag, key, value)
+    if value == nil then
+        return
+    end
+    local slot = bag[key]
+    if slot == nil then
+        slot = {}
+        bag[key] = slot
+    end
+    local text = tostring(value)
+    slot[text] = (slot[text] or 0) + 1
+end
+
+local function modeNumber(slot)
+    if slot == nil then
+        return nil
+    end
+    local best, bestCount = nil, 0
+    for text, count in pairs(slot) do
+        if count > bestCount then
+            best = text
+            bestCount = count
+        end
+    end
+    return num(best)
+end
+
+local function packExtra(bag)
+    if bag == nil then
+        return nil
+    end
+    return {
+        weed = modeNumber(bag.weed),
+        weedFactor = modeNumber(bag.weedFactor),
+        stones = modeNumber(bag.stones),
+        ground = modeNumber(bag.ground),
+        spray = modeNumber(bag.spray),
+        sprayType = modeNumber(bag.sprayType),
+        lime = modeNumber(bag.lime),
+        roller = modeNumber(bag.roller),
+        plow = modeNumber(bag.plow),
+        stubble = modeNumber(bag.stubble),
+        water = modeNumber(bag.water),
+    }
+end
+
+local function monthsFromPeriodRow(row, minH, maxH)
+    if type(row) ~= "table" or minH == nil or maxH == nil then
+        return nil
+    end
+    local months = {}
+    local month = 1
+    while month <= 12 do
+        local cell = row[month]
+        local state = nil
+        if type(cell) == "number" then
+            state = cell
+        elseif type(cell) == "table" then
+            state = num(cell.growthState or cell.state or cell.startState or cell[1])
+        end
+        if state ~= nil and state >= minH and state <= maxH then
+            months[#months + 1] = tostring(month)
+        end
+        month = month + 1
+    end
+    if #months == 0 then
+        return nil
+    end
+    return table.concat(months, ",")
+end
+
+-- Months come only from a period table the running game already loaded.
+-- Missing or unknown structures stay empty; growth stages are not relabeled as months.
+local function harvestMonths(fruit)
+    if fruit == nil then
+        return nil
+    end
+    local directStart = num(fruit.harvestStartMonth or fruit.minHarvestMonth)
+    local directEnd = num(fruit.harvestEndMonth or fruit.maxHarvestMonth)
+    if directStart ~= nil and directEnd ~= nil and directStart >= 1 and directStart <= 12 and directEnd >= 1 and directEnd <= 12 then
+        local months = {}
+        local month = directStart
+        local guard = 0
+        while guard < 12 do
+            months[#months + 1] = tostring(month)
+            if month == directEnd then
+                break
+            end
+            month = month % 12 + 1
+            guard = guard + 1
+        end
+        return table.concat(months, ",")
+    end
+    local minH = num(fruit.minHarvestingGrowthState)
+    local maxH = num(fruit.maxHarvestingGrowthState)
+    local mission = g_currentMission
+    local gs = mission ~= nil and mission.growthSystem or nil
+    if gs == nil or minH == nil or maxH == nil then
+        return nil
+    end
+    local index = fruit.index
+    local names = {}
+    if fruit.name ~= nil then
+        names[1] = fruit.name
+        names[2] = string.lower(fruit.name)
+        names[3] = string.upper(fruit.name)
+    end
+    local bags = {
+        gs.fruitTypeGrowths,
+        gs.growthData,
+        gs.fruitTypeData,
+        gs.fruitTypeDatas,
+        gs.fruitGrowth,
+        gs.periods,
+    }
+    local i = 1
+    while i <= #bags do
+        local bag = bags[i]
+        if type(bag) == "table" then
+            local row = nil
+            if index ~= nil then
+                row = bag[index]
+            end
+            if type(row) ~= "table" then
+                local n = 1
+                while n <= #names and type(row) ~= "table" do
+                    row = bag[names[n]]
+                    n = n + 1
+                end
+            end
+            if type(row) == "table" then
+                local candidates = { row.periods, row.growthPeriods, row.seasonal, row.months, row }
+                local c = 1
+                while c <= #candidates do
+                    local found = monthsFromPeriodRow(candidates[c], minH, maxH)
+                    if found ~= nil then
+                        return found
+                    end
+                    c = c + 1
+                end
+            end
+        end
+        i = i + 1
+    end
+    local methods = { "getGrowthData", "getFruitTypeGrowthData", "getGrowthDataForFruitType" }
+    local m = 1
+    while m <= #methods do
+        local method = methods[m]
+        if gs[method] ~= nil and index ~= nil then
+            local ok, data = pcall(function()
+                return gs[method](gs, index)
+            end)
+            if ok and type(data) == "table" then
+                local found = monthsFromPeriodRow(data.periods or data.growthPeriods or data.months or data, minH, maxH)
+                if found ~= nil then
+                    return found
+                end
+            end
+        end
+        m = m + 1
+    end
+    return nil
+end
+
 -- getFieldState() is a cache. On a dedicated server it stays on the previous
 -- fruit (grass) after the density map has been sown. FieldState:update reads
 -- the density map at a world position. A grass margin must not hide the crop.
@@ -798,21 +962,22 @@ local function sampleFruit(points)
                         growth[index] = growth[index] or {}
                         growth[index][stage] = (growth[index][stage] or 0) + 1
                     end
-                    if extra[index] == nil then
-                        extra[index] = {
-                            weed = num(state.weedState),
-                            weedFactor = state.weedFactor,
-                            stones = num(state.stoneLevel),
-                            ground = num(state.groundType),
-                            spray = num(state.sprayLevel),
-                            sprayType = num(state.sprayType),
-                            lime = num(state.limeLevel),
-                            roller = num(state.rollerLevel),
-                            plow = num(state.plowLevel),
-                            stubble = num(state.stubbleShredLevel),
-                            water = num(state.waterLevel),
-                        }
+                    local bag = extra[index]
+                    if bag == nil then
+                        bag = {}
+                        extra[index] = bag
                     end
+                    tallyValue(bag, "weed", num(state.weedState))
+                    tallyValue(bag, "weedFactor", state.weedFactor)
+                    tallyValue(bag, "stones", num(state.stoneLevel))
+                    tallyValue(bag, "ground", num(state.groundType))
+                    tallyValue(bag, "spray", num(state.sprayLevel))
+                    tallyValue(bag, "sprayType", num(state.sprayType))
+                    tallyValue(bag, "lime", num(state.limeLevel))
+                    tallyValue(bag, "roller", num(state.rollerLevel))
+                    tallyValue(bag, "plow", num(state.plowLevel))
+                    tallyValue(bag, "stubble", num(state.stubbleShredLevel))
+                    tallyValue(bag, "water", num(state.waterLevel))
                 end
             end
             x = x + step
@@ -850,7 +1015,7 @@ local function sampleFruit(points)
             end
         end
     end
-    return index, stage, extra[index]
+    return index, stage, packExtra(extra[index])
 end
 
 local function collectState(connector, field, id)
@@ -893,6 +1058,7 @@ local function collectState(connector, field, id)
             record.growthMax = num(fruit.numGrowthStates)
             record.harvestMin = num(fruit.minHarvestingGrowthState)
             record.harvestMax = num(fruit.maxHarvestingGrowthState)
+            record.harvestMonths = harvestMonths(fruit)
             record.crop = classifyCrop(fruit, record.growth)
         else
             record.crop = "noCrop"
@@ -1255,7 +1421,7 @@ end
 
 local function stateLine(connector, row)
     return string.format(
-        "<field%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s />",
+        "<field%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s />",
         attr(connector, "id", row.id),
         attr(connector, "farmId", row.farmId),
         attr(connector, "farmlandId", row.farmlandId),
@@ -1267,6 +1433,7 @@ local function stateLine(connector, row)
         attr(connector, "growthMax", row.growthMax),
         attr(connector, "harvestMin", row.harvestMin),
         attr(connector, "harvestMax", row.harvestMax),
+        attr(connector, "harvestMonths", row.harvestMonths),
         attr(connector, "crop", row.crop),
         attr(connector, "ground", row.ground),
         attr(connector, "weed", row.weed),
