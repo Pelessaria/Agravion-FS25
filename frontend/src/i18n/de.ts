@@ -682,6 +682,8 @@ export const de = {
     updateNeedsStop: "Aktualisieren geht nur, solange der Spielserver aus ist.",
     updateDone: "Mod ersetzt.",
     modHub: "ModHub",
+    activate: "Aktivieren",
+    deactivate: "Deaktivieren",
     copyLog: "Log kopieren",
     copied: "Log kopiert",
     downloadLog: "Log herunterladen",

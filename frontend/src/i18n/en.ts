@@ -684,6 +684,8 @@ export const en = {
     updateNeedsStop: "Updating is only possible while the game server is stopped.",
     updateDone: "Mod replaced.",
     modHub: "ModHub",
+    activate: "Activate",
+    deactivate: "Deactivate",
     copyLog: "Copy log",
     copied: "Log copied",
     downloadLog: "Download log",

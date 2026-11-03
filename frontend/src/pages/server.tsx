@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
-import { ChevronDown, ChevronRight, Copy, Download, Play, RotateCcw, Square } from "lucide-react"
+import { ChevronDown, ChevronRight, Copy, Download, Pause, Play, RotateCcw, Square } from "lucide-react"
 import {
   apiDownloadServerMod,
   apiSaveServerSettings,
@@ -460,6 +460,8 @@ export function ServerPage() {
                             ? t("server.updateNeedsStop")
                             : t("server.updateUnknown")
                   const toggleDisabled = busy === mod.name
+                  const toggleLabel = mod.active ? t("server.deactivate") : t("server.activate")
+                  const hasActions = Boolean(mod.hubUrl || mod.updateAvailable || (mod.active != null && canWrite) || mod.download)
                   return (
                     <tr key={mod.name}>
                       <td className="mod-name">
@@ -478,41 +480,55 @@ export function ServerPage() {
                       </td>
                       <td className="mod-version">
                         <div className="mod-version-row">
-                          <span>{mod.version || "—"}</span>
-                          {mod.updateAvailable && mod.hubVersion ? <span className="mod-version-next">{mod.hubVersion}</span> : null}
-                          {mod.hubUrl ? (
-                            <a className="btn btn-secondary" href={mod.hubUrl} target="_blank" rel="noreferrer">
-                              {t("server.modHub")}
-                            </a>
-                          ) : null}
-                          {mod.updateAvailable ? (
-                            <Tip text={updateReason}>
-                              <button
-                                type="button"
-                                className="btn btn-primary"
-                                disabled={updateDisabled}
-                                onClick={() => void updateMod(mod.name)}
-                              >
-                                {busy === `update:${mod.name}` ? t("server.loading") : t("server.update")}
-                              </button>
-                            </Tip>
-                          ) : null}
-                          {mod.active != null && canWrite ? (
-                            <Tip text={toggleDisabled ? t("server.busy") : undefined}>
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                disabled={toggleDisabled}
-                                onClick={() => void toggleMod(mod.name, mod.active !== true)}
-                              >
-                                {mod.active ? t("server.inactive") : t("server.active")}
-                              </button>
-                            </Tip>
-                          ) : null}
-                          {mod.download ? (
-                            <button type="button" className="btn btn-secondary" onClick={() => void apiDownloadServerMod(workspace.id, mod.name).catch((caught) => setError(caught instanceof ApiError ? caught.message : t("server.missingFiles")))}>
-                              {t("server.download")}
-                            </button>
+                          <span className="mod-version-numbers">
+                            <span>{mod.version || "—"}</span>
+                            {mod.updateAvailable && mod.hubVersion ? <span className="mod-version-next">{mod.hubVersion}</span> : null}
+                          </span>
+                          {hasActions ? (
+                            <span className="mod-version-actions">
+                              {mod.hubUrl ? (
+                                <a className="btn btn-secondary mod-icon-btn" href={mod.hubUrl} target="_blank" rel="noreferrer" title={t("server.modHub")} aria-label={t("server.modHub")}>
+                                  <img src="/modhub-favicon.png" alt="" width={18} height={18} />
+                                </a>
+                              ) : null}
+                              {mod.updateAvailable ? (
+                                <Tip text={updateReason}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    disabled={updateDisabled}
+                                    onClick={() => void updateMod(mod.name)}
+                                  >
+                                    {busy === `update:${mod.name}` ? t("server.loading") : t("server.update")}
+                                  </button>
+                                </Tip>
+                              ) : null}
+                              {mod.active != null && canWrite ? (
+                                <Tip text={toggleDisabled ? t("server.busy") : undefined}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary mod-icon-btn"
+                                    disabled={toggleDisabled}
+                                    aria-label={toggleLabel}
+                                    title={toggleDisabled ? undefined : toggleLabel}
+                                    onClick={() => void toggleMod(mod.name, mod.active !== true)}
+                                  >
+                                    {mod.active ? <Pause className="icon" aria-hidden="true" /> : <Play className="icon" aria-hidden="true" />}
+                                  </button>
+                                </Tip>
+                              ) : null}
+                              {mod.download ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary mod-icon-btn"
+                                  aria-label={t("server.download")}
+                                  title={t("server.download")}
+                                  onClick={() => void apiDownloadServerMod(workspace.id, mod.name).catch((caught) => setError(caught instanceof ApiError ? caught.message : t("server.missingFiles")))}
+                                >
+                                  <Download className="icon" aria-hidden="true" />
+                                </button>
+                              ) : null}
+                            </span>
                           ) : null}
                         </div>
                       </td>

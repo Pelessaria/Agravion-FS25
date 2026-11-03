@@ -3007,9 +3007,36 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 8px;
+  gap: 0;
+}
+.mod-version-numbers {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 11rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .mod-version-next { color: var(--warning); font-weight: 650; }
+.mod-version-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+.mod-version-actions .btn { min-height: 32px; }
+.mod-icon-btn {
+  width: 32px;
+  padding: 0;
+}
+.mod-icon-btn img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
 .btn-tip { display: inline-flex; }
 .btn-tip :disabled { pointer-events: none; }
 .server-mods tbody tr { cursor: default; }
