@@ -387,10 +387,28 @@ local function collectGeometry(field, id)
     if cx == nil or cz == nil then
         cx, cz = centroid(points)
     end
+    -- The PDA draws the field number at the name indicator (field.posX/posZ
+    -- after Field:load), which can sit away from the geometric center.
+    local lx, lz = cx, cz
+    if field ~= nil then
+        local okx, px = pcall(function()
+            return field.posX
+        end)
+        local okz, pz = pcall(function()
+            return field.posZ
+        end)
+        px = okx and num(px) or nil
+        pz = okz and num(pz) or nil
+        if px ~= nil and pz ~= nil then
+            lx, lz = px, pz
+        end
+    end
     return {
         id = id,
         cx = round(cx, 1),
         cz = round(cz, 1),
+        lx = round(lx, 1),
+        lz = round(lz, 1),
         areaHa = round(area, 2),
         points = pointString(simplify(points)),
     }
@@ -728,16 +746,120 @@ local function mapFrameAttrs(connector)
     }, "")
 end
 
+local function readString(object, name)
+    if object == nil then
+        return nil
+    end
+    local ok, value = pcall(function()
+        return object[name]
+    end)
+    if not ok or type(value) ~= "string" or value == "" then
+        return nil
+    end
+    return value
+end
+
+-- The running map's PDA texture, resolved the same way the game loads it:
+-- map.xml imageFilename under the mission base directory, then overview.dds.
+local function overviewSource()
+    local mission = g_currentMission
+    if mission == nil or mission.missionInfo == nil then
+        return nil
+    end
+    local info = mission.missionInfo
+    local base = readString(info, "baseDirectory")
+    local fallback = nil
+    if base ~= nil then
+        fallback = base .. "overview.dds"
+    end
+    if base == nil or g_mapManager == nil or info.mapId == nil or g_mapManager.getMapById == nil then
+        return fallback
+    end
+    local ok, entry = pcall(function()
+        return g_mapManager:getMapById(info.mapId)
+    end)
+    if not ok or entry == nil then
+        return fallback
+    end
+    local cfg = readString(entry, "configFilename")
+    if cfg == nil then
+        cfg = readString(entry, "xmlFilename")
+    end
+    if cfg == nil then
+        cfg = readString(entry, "filename")
+    end
+    if cfg == nil then
+        cfg = readString(entry, "mapXMLFilename")
+    end
+    if cfg == nil or loadXMLFile == nil or getXMLString == nil then
+        return fallback
+    end
+    local xmlId = safeCall(loadXMLFile, "AgriVisionMap", base .. cfg)
+    if xmlId == nil or xmlId == 0 then
+        return fallback
+    end
+    local img = safeCall(getXMLString, xmlId, "map#imageFilename")
+    if delete ~= nil then
+        pcall(delete, xmlId)
+    end
+    if type(img) ~= "string" or img == "" or Utils == nil or Utils.getFilename == nil then
+        return fallback
+    end
+    local resolved = safeCall(Utils.getFilename, img, base)
+    if type(resolved) ~= "string" or resolved == "" then
+        return fallback
+    end
+    if fileExists ~= nil then
+        local dds = string.gsub(resolved, "%.[pP][nN][gG]$", ".dds")
+        if dds ~= resolved then
+            local existsOk, exists = pcall(fileExists, dds)
+            if existsOk and exists then
+                return dds
+            end
+        end
+    end
+    return resolved
+end
+
+local function copyOverview(connector)
+    if connector.pdaCopied or connector.copyIconFile == nil or connector.stateDir == nil then
+        return
+    end
+    local now = 0
+    if g_time ~= nil then
+        now = g_time
+    end
+    if connector.pdaNextTry ~= nil and now < connector.pdaNextTry then
+        return
+    end
+    connector.pdaNextTry = now + 60000
+    local src = overviewSource()
+    if src == nil then
+        return
+    end
+    local ext = ".dds"
+    if string.sub(string.lower(src), -4) == ".png" then
+        ext = ".png"
+    end
+    local ok = connector:copyIconFile(src, connector.stateDir .. "overview" .. ext)
+    if ok then
+        connector.pdaCopied = true
+        log("pda overview copied")
+    end
+end
+
 local function writeGeometry(connector, ids, records)
     local lines = {}
     for _, id in ipairs(ids) do
         local row = records[id]
         if row ~= nil then
             lines[#lines + 1] = string.format(
-                "<field%s%s%s%s%s />",
+                "<field%s%s%s%s%s%s%s />",
                 attr(connector, "id", row.id),
                 attr(connector, "cx", row.cx),
                 attr(connector, "cz", row.cz),
+                attr(connector, "lx", row.lx),
+                attr(connector, "lz", row.lz),
                 attr(connector, "areaHa", row.areaHa),
                 attr(connector, "points", row.points)
             )
@@ -870,7 +992,7 @@ local function geometryFingerprint(connector, ids, records)
     for _, id in ipairs(ids) do
         local row = records[id]
         if row ~= nil then
-            parts[#parts + 1] = tostring(row.id) .. ":" .. tostring(row.points or "")
+            parts[#parts + 1] = tostring(row.id) .. ":" .. tostring(row.lx) .. "," .. tostring(row.lz) .. ":" .. tostring(row.points or "")
         end
     end
     return table.concat(parts, "|") .. "#" .. mapFrameAttrs(connector)
@@ -884,6 +1006,7 @@ function FieldSnapshot.writeIfDue(connector)
         pcall(createFolder, connector.fruitsIconsDir)
         connector.fruitDirReady = true
     end
+    copyOverview(connector)
 
     local ids, byId = indexFields()
     if #ids == 0 then

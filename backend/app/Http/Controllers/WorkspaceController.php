@@ -158,6 +158,20 @@ class WorkspaceController extends Controller
         return response()->json($connector->readFields($row));
     }
 
+    public function pdaMap(string $workspace, ConnectorSnapshotService $connector): BinaryFileResponse|Response
+    {
+        $row = $this->findWorkspace($workspace);
+        $path = $connector->pdaMapPath($row);
+        if ($path === null) {
+            return response('', 404);
+        }
+
+        return response()->file($path, [
+            'Content-Type' => 'image/png',
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
+    }
+
     public function fruitIcon(string $workspace, string $fruitKey, ConnectorSnapshotService $connector): BinaryFileResponse|Response
     {
         $row = $this->findWorkspace($workspace);

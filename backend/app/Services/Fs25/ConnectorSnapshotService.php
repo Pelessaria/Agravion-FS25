@@ -182,6 +182,8 @@ final class ConnectorSnapshotService
             }
         }
 
+        $this->pullPdaOverview($client, $workspace, $base);
+
         try {
             $this->pullFruitIcons($client, $workspace, $base);
         } catch (Throwable) {
@@ -218,6 +220,7 @@ final class ConnectorSnapshotService
      *   precisionFarming: bool|null,
      *   geometryAt: string|null,
      *   stateAt: string|null,
+     *   pdaMap: bool,
      *   fields: list<array<string, mixed>>
      * }
      */
@@ -243,6 +246,7 @@ final class ConnectorSnapshotService
 
         $merged['ok'] = $geometryXml !== '' || $stateXml !== '';
         $merged['error'] = $merged['ok'] ? null : 'missing';
+        $merged['pdaMap'] = $this->pdaMapPath($workspace) !== null;
 
         return $merged;
     }
@@ -972,6 +976,64 @@ final class ConnectorSnapshotService
     private function localStateDir(Workspace $workspace): string
     {
         return storage_path('app/connector/'.$workspace->public_id.'/state');
+    }
+
+    /**
+     * The in-game PDA overview, copied once by the connector. Skip the FTP
+     * read once a local file is present; the texture does not change mid-save.
+     */
+    private function pullPdaOverview(HostFileClient $client, Workspace $workspace, string $base): void
+    {
+        $dir = $this->localStateDir($workspace);
+        foreach (['overview.dds', 'overview.png'] as $file) {
+            $local = $dir.'/'.$file;
+            if (is_file($local) && filesize($local) > 64) {
+                continue;
+            }
+            try {
+                $remote = $client->read($base.'/state/'.$file);
+                if ($remote !== '') {
+                    $this->storeLocalIfChanged($local, $remote);
+                }
+            } catch (Throwable) {
+                // Older connectors do not copy the PDA texture.
+            }
+        }
+        $this->ensurePdaPng($workspace);
+    }
+
+    public function pdaMapPath(Workspace $workspace): ?string
+    {
+        $png = $this->localStateDir($workspace).'/overview.png';
+        if (! is_file($png) || filesize($png) < 64) {
+            return null;
+        }
+        $head = file_get_contents($png, false, null, 0, 8);
+
+        return is_string($head) && str_starts_with($head, "\x89PNG") ? $png : null;
+    }
+
+    private function ensurePdaPng(Workspace $workspace): void
+    {
+        $dir = $this->localStateDir($workspace);
+        $png = $dir.'/overview.png';
+        $dds = $dir.'/overview.dds';
+        if (is_file($png) && (! is_file($dds) || filemtime($png) >= filemtime($dds))) {
+            return;
+        }
+        if (! is_file($dds)) {
+            return;
+        }
+        $bytes = file_get_contents($dds);
+        if (! is_string($bytes) || $bytes === '') {
+            return;
+        }
+        $converted = DdsToPng::convert($bytes);
+        if ($converted === null || ! str_starts_with($converted, "\x89PNG")) {
+            return;
+        }
+        File::ensureDirectoryExists($dir);
+        File::put($png, $converted);
     }
 
     private function localVehiclesPath(Workspace $workspace): string

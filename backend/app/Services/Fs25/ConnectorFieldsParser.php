@@ -47,6 +47,8 @@ final class ConnectorFieldsParser
                 'id' => $id,
                 'centerX' => $centerX,
                 'centerZ' => $centerZ,
+                'labelX' => $geo['labelX'] ?? null,
+                'labelZ' => $geo['labelZ'] ?? null,
                 'areaHa' => $row['areaHa'] ?? $geo['areaHa'] ?? null,
                 'points' => is_array($points) ? $points : [],
                 'farmId' => $row['farmId'] ?? null,
@@ -136,6 +138,8 @@ final class ConnectorFieldsParser
             $rows[$id] = [
                 'centerX' => self::floatAttr($blob, 'cx'),
                 'centerZ' => self::floatAttr($blob, 'cz'),
+                'labelX' => self::floatAttr($blob, 'lx'),
+                'labelZ' => self::floatAttr($blob, 'lz'),
                 'areaHa' => self::floatAttr($blob, 'areaHa'),
                 'points' => self::points(self::attr($blob, 'points')),
                 'farmId' => self::positiveInt(self::intAttr($blob, 'farmId')),

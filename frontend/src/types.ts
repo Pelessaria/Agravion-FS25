@@ -182,6 +182,9 @@ export interface FieldSnapshot {
   id: number
   centerX: number | null
   centerZ: number | null
+  /** PDA number position (name indicator). Falls back to the field center. */
+  labelX?: number | null
+  labelZ?: number | null
   areaHa: number | null
   /** World X/Z pairs. Empty when the connector has not sent an outline. */
   points: [number, number][]
@@ -235,6 +238,8 @@ export interface FieldsResponse {
   precisionFarming: boolean | null
   geometryAt: string | null
   stateAt: string | null
+  /** Sharp in-game PDA texture is cached for this workspace. */
+  pdaMap?: boolean
   fields: FieldSnapshot[]
 }
 

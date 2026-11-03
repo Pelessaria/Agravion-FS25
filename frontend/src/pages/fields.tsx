@@ -104,8 +104,12 @@ function projectFields(fields: FieldSnapshot[], frame: MapFrame, farmId: number 
       field.centerX != null && field.centerZ != null
         ? projectPoint(field.centerX, field.centerZ, frame)
         : null
+    const labelPoint =
+      field.labelX != null && field.labelZ != null
+        ? projectPoint(field.labelX, field.labelZ, frame)
+        : center
     const projected = field.points.map(([x, z]) => projectPoint(x, z, frame))
-    const label = center ?? (projected.length > 0 ? projected[0] : null)
+    const label = labelPoint ?? (projected.length > 0 ? projected[0] : null)
     const key = cropKey(field.fruitName)
     let minX = Infinity
     let maxX = -Infinity
@@ -320,9 +324,11 @@ export function FieldsPage() {
             <FieldMap
               fields={visible}
               mapUrl={
-                liveMode && workspace.mapPreviewPath
-                  ? `${workspace.mapPreviewPath}?size=1024&quality=70`
-                  : null
+                source?.pdaMap
+                  ? `/api/workspaces/${workspace.id}/pda-map`
+                  : liveMode && workspace.mapPreviewPath
+                    ? `${workspace.mapPreviewPath}?size=1024&quality=70`
+                    : null
               }
               live={liveMode}
               selectedId={selectedId}
@@ -575,6 +581,10 @@ function FieldMap({
               }}
               onLoad={(event) => {
                 const image = event.currentTarget
+                if (image.src.includes("/pda-map")) {
+                  onContentBox(null)
+                  return
+                }
                 const canvas = document.createElement("canvas")
                 const sample = Math.min(image.naturalWidth, image.naturalHeight, 512)
                 canvas.width = sample
