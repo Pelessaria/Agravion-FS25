@@ -664,6 +664,7 @@ export const de = {
     mapUnavailable: "Das Kartenbild ist gerade nicht erreichbar. Die Feldumrisse bleiben aus dem letzten Stand.",
     selectHint: "Eine Fläche anklicken, um Frucht, Boden und Precision Farming zu sehen.",
     number: "Feld",
+    merged: "Zusammengelegt",
     numberValue: "Feld {{id}}",
     fruit: "Frucht",
     areaHa: "Fläche",

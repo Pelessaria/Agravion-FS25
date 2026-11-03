@@ -2733,6 +2733,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .field-shape.is-other { fill-opacity: 0; stroke: rgba(255, 255, 255, 0.34); }
 .field-shape.is-selected { stroke: #f3ffd8; stroke-width: 2.2px; fill-opacity: 0.28; }
 .field-shape:hover { fill-opacity: 0.18; stroke: rgba(255, 255, 255, 0.92); }
+.field-bridge { fill: rgba(255, 255, 255, 0.16); fill-opacity: 1; stroke: rgba(255, 255, 255, 0.4); pointer-events: none; }
 .field-label { cursor: pointer; }
 .field-label rect { fill: rgba(8, 12, 10, 0.78); }
 .field-label text { fill: #f7f8f7; font-weight: 700; }

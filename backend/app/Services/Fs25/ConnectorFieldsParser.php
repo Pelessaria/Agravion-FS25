@@ -51,6 +51,7 @@ final class ConnectorFieldsParser
                 'labelZ' => $geo['labelZ'] ?? null,
                 'areaHa' => $row['areaHa'] ?? $geo['areaHa'] ?? null,
                 'points' => is_array($points) ? $points : [],
+                'group' => $geo['group'] ?? null,
                 'farmId' => $row['farmId'] ?? null,
                 'farmlandId' => $row['farmlandId'] ?? null,
                 'owned' => $row['owned'] ?? null,
@@ -142,6 +143,7 @@ final class ConnectorFieldsParser
                 'labelZ' => self::floatAttr($blob, 'lz'),
                 'areaHa' => self::floatAttr($blob, 'areaHa'),
                 'points' => self::points(self::attr($blob, 'points')),
+                'group' => self::idList(self::attr($blob, 'group')),
                 'farmId' => self::positiveInt(self::intAttr($blob, 'farmId')),
                 'farmlandId' => self::positiveInt(self::intAttr($blob, 'farmlandId')),
                 'owned' => self::boolAttr($blob, 'owned'),
@@ -282,6 +284,27 @@ final class ConnectorFieldsParser
         $value = trim(html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    private static function idList(?string $value): ?array
+    {
+        if ($value === null || trim($value) === '') {
+            return null;
+        }
+        $ids = [];
+        foreach (preg_split('/\s+/', trim($value)) ?: [] as $part) {
+            if (preg_match('/^\d+$/', $part) === 1) {
+                $id = (int) $part;
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+            }
+        }
+
+        return count($ids) >= 2 ? $ids : null;
     }
 
     private static function intAttr(string $blob, string $key): ?int

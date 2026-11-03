@@ -20,7 +20,7 @@ FieldSnapshot.STATE_EVERY_MS = 60000
 FieldSnapshot.GEOMETRY_BUDGET = 20
 FieldSnapshot.STATE_BUDGET_PF = 12
 FieldSnapshot.STATE_BUDGET = 48
-FieldSnapshot.MAX_POINTS = 48
+FieldSnapshot.MAX_POINTS = 160
 
 local function log(msg)
     print("AgriVisionConnector: " .. tostring(msg))
@@ -311,19 +311,97 @@ local function fieldAreaHa(field, points)
     return nil
 end
 
+local function segmentDistance(point, ax, az, bx, bz)
+    local dx = bx - ax
+    local dz = bz - az
+    local len2 = dx * dx + dz * dz
+    if len2 < 0.0001 then
+        local ex = point.x - ax
+        local ez = point.z - az
+        return math.sqrt(ex * ex + ez * ez)
+    end
+    local t = ((point.x - ax) * dx + (point.z - az) * dz) / len2
+    if t < 0 then
+        t = 0
+    elseif t > 1 then
+        t = 1
+    end
+    local px = ax + t * dx
+    local pz = az + t * dz
+    local ex = point.x - px
+    local ez = point.z - pz
+    return math.sqrt(ex * ex + ez * ez)
+end
+
+-- Keep corners. Dropping every Nth point of a concave outline draws chords
+-- across the field, which show up as areas the game does not have.
+local function simplifyClosed(points, epsilon)
+    local count = #points
+    if count < 4 then
+        return points
+    end
+    local far = 2
+    local farDist = -1
+    local i = 2
+    while i <= count do
+        local dx = points[i].x - points[1].x
+        local dz = points[i].z - points[1].z
+        local dist = dx * dx + dz * dz
+        if dist > farDist then
+            farDist = dist
+            far = i
+        end
+        i = i + 1
+    end
+    local keep = {}
+    local function mark(first, last)
+        local maxDist = 0
+        local index = first
+        local cursor = first + 1
+        while cursor < last do
+            local dist = segmentDistance(points[cursor], points[first].x, points[first].z, points[last].x, points[last].z)
+            if dist > maxDist then
+                maxDist = dist
+                index = cursor
+            end
+            cursor = cursor + 1
+        end
+        if maxDist > epsilon and index ~= first and index ~= last then
+            mark(first, index)
+            mark(index, last)
+        else
+            keep[first] = true
+            keep[last] = true
+        end
+    end
+    mark(1, far)
+    mark(far, count)
+    keep[1] = true
+    keep[count] = true
+    local out = {}
+    i = 1
+    while i <= count do
+        if keep[i] then
+            out[#out + 1] = points[i]
+        end
+        i = i + 1
+    end
+    return out
+end
+
 local function simplify(points)
     local count = #points
     if count <= FieldSnapshot.MAX_POINTS then
         return points
     end
-    local out = {}
-    local step = (count - 1) / (FieldSnapshot.MAX_POINTS - 1)
-    for i = 0, FieldSnapshot.MAX_POINTS - 1 do
-        local index = math.floor(i * step) + 1
-        if index > count then
-            index = count
+    local epsilon = 1.5
+    local out = points
+    while epsilon < 80 do
+        out = simplifyClosed(points, epsilon)
+        if #out <= FieldSnapshot.MAX_POINTS then
+            return out
         end
-        out[#out + 1] = points[index]
+        epsilon = epsilon * 1.6
     end
     return out
 end
@@ -403,6 +481,7 @@ local function collectGeometry(field, id)
             lx, lz = px, pz
         end
     end
+    local outline = simplify(points)
     return {
         id = id,
         cx = round(cx, 1),
@@ -410,7 +489,8 @@ local function collectGeometry(field, id)
         lx = round(lx, 1),
         lz = round(lz, 1),
         areaHa = round(area, 2),
-        points = pointString(simplify(points)),
+        points = pointString(outline),
+        raw = outline,
     }
 end
 
@@ -452,6 +532,10 @@ end
 local function queueFruitIcon(connector, fruit)
     local key = fruitKey(fruit ~= nil and fruit.name or nil)
     local src = fruitIconSource(fruit)
+    if (src == nil or src == "") and fruit ~= nil and type(fruit.name) == "string" and fruit.name ~= "" then
+        -- Base-game HUD symbols live at this path inside the game data.
+        src = "$dataS/menu/hud/fillTypes/hud_fill_" .. string.lower(fruit.name) .. ".png"
+    end
     if key == nil or src == nil or src == "" or connector.fruitsIconsDir == nil then
         return key
     end
@@ -848,19 +932,167 @@ local function copyOverview(connector)
     end
 end
 
+local function onFieldGround(x, z)
+    if FSDensityMapUtil == nil or FSDensityMapUtil.getFieldDataAtWorldPosition == nil then
+        return nil
+    end
+    local y = 0
+    if g_terrainNode ~= nil and getTerrainHeightAtWorldPos ~= nil then
+        local height = num(safeCall(getTerrainHeightAtWorldPos, g_terrainNode, x, 0, z))
+        if height ~= nil then
+            y = height
+        end
+    end
+    local ok, isOnField = pcall(function()
+        return FSDensityMapUtil.getFieldDataAtWorldPosition(x, y, z)
+    end)
+    if not ok then
+        return nil
+    end
+    return isOnField == true
+end
+
+local function closestOutlinePoints(a, b)
+    local best = nil
+    local stepA = math.max(1, math.floor(#a / 24))
+    local stepB = math.max(1, math.floor(#b / 24))
+    local i = 1
+    while i <= #a do
+        local j = 1
+        while j <= #b do
+            local dx = a[i].x - b[j].x
+            local dz = a[i].z - b[j].z
+            local dist = dx * dx + dz * dz
+            if best == nil or dist < best.dist then
+                best = { dist = dist, ax = a[i].x, az = a[i].z, bx = b[j].x, bz = b[j].z }
+            end
+            j = j + stepB
+        end
+        i = i + stepA
+    end
+    if best == nil then
+        return nil
+    end
+    best.dist = math.sqrt(best.dist)
+    return best
+end
+
+-- Fields the player has plowed together stay as separate ids. The join is
+-- field ground between the original outlines. Confirmed samples only.
+local function assignGroups(records)
+    local ids = {}
+    for id, row in pairs(records) do
+        if type(row.raw) == "table" and #row.raw >= 3 then
+            ids[#ids + 1] = id
+        end
+    end
+    table.sort(ids)
+    local bounds = {}
+    for _, id in ipairs(ids) do
+        local minX, maxX, minZ, maxZ = 1e12, -1e12, 1e12, -1e12
+        for _, point in ipairs(records[id].raw) do
+            if point.x < minX then minX = point.x end
+            if point.x > maxX then maxX = point.x end
+            if point.z < minZ then minZ = point.z end
+            if point.z > maxZ then maxZ = point.z end
+        end
+        bounds[id] = { minX = minX, maxX = maxX, minZ = minZ, maxZ = maxZ }
+    end
+    local parent = {}
+    local function find(id)
+        local root = parent[id] or id
+        if root ~= id then
+            root = find(root)
+            parent[id] = root
+        else
+            parent[id] = id
+        end
+        return parent[id]
+    end
+    local function unite(a, b)
+        local ra = find(a)
+        local rb = find(b)
+        if ra ~= rb then
+            parent[rb] = ra
+        end
+    end
+    local i = 1
+    while i <= #ids do
+        local j = i + 1
+        while j <= #ids do
+            local a = ids[i]
+            local b = ids[j]
+            local boxA = bounds[a]
+            local boxB = bounds[b]
+            local gapX = 0
+            if boxA.maxX < boxB.minX then
+                gapX = boxB.minX - boxA.maxX
+            elseif boxB.maxX < boxA.minX then
+                gapX = boxA.minX - boxB.maxX
+            end
+            local gapZ = 0
+            if boxA.maxZ < boxB.minZ then
+                gapZ = boxB.minZ - boxA.maxZ
+            elseif boxB.maxZ < boxA.minZ then
+                gapZ = boxA.minZ - boxB.maxZ
+            end
+            if gapX * gapX + gapZ * gapZ <= 40 * 40 then
+                local link = closestOutlinePoints(records[a].raw, records[b].raw)
+                if link ~= nil and link.dist <= 40 then
+                    local joined = true
+                    local t = 0.35
+                    while t <= 0.65 do
+                        local x = link.ax + (link.bx - link.ax) * t
+                        local z = link.az + (link.bz - link.az) * t
+                        if onFieldGround(x, z) ~= true then
+                            joined = false
+                            break
+                        end
+                        t = t + 0.15
+                    end
+                    if joined then
+                        unite(a, b)
+                    end
+                end
+            end
+            j = j + 1
+        end
+        i = i + 1
+    end
+    local members = {}
+    for _, id in ipairs(ids) do
+        local root = find(id)
+        members[root] = members[root] or {}
+        members[root][#members[root] + 1] = id
+    end
+    for _, list in pairs(members) do
+        if #list >= 2 then
+            table.sort(list)
+            local text = table.concat(list, " ")
+            for _, id in ipairs(list) do
+                records[id].group = text
+            end
+        end
+    end
+    for _, row in pairs(records) do
+        row.raw = nil
+    end
+end
+
 local function writeGeometry(connector, ids, records)
     local lines = {}
     for _, id in ipairs(ids) do
         local row = records[id]
         if row ~= nil then
             lines[#lines + 1] = string.format(
-                "<field%s%s%s%s%s%s%s />",
+                "<field%s%s%s%s%s%s%s%s />",
                 attr(connector, "id", row.id),
                 attr(connector, "cx", row.cx),
                 attr(connector, "cz", row.cz),
                 attr(connector, "lx", row.lx),
                 attr(connector, "lz", row.lz),
                 attr(connector, "areaHa", row.areaHa),
+                attr(connector, "group", row.group),
                 attr(connector, "points", row.points)
             )
         end
@@ -945,16 +1177,25 @@ local function copyPendingFruitIcons(connector, budget)
         if copied >= budget then
             break
         end
-        local ext = "dds"
-        if connector.iconExtFromPath ~= nil then
-            ext = connector:iconExtFromPath(src)
+        local candidates = { src }
+        if connector.buildStoreImageCandidates ~= nil then
+            local listed = connector:buildStoreImageCandidates(src)
+            if type(listed) == "table" and #listed > 0 then
+                candidates = listed
+            end
         end
-        local dest = connector.fruitsIconsDir .. key .. "." .. ext
-        local ok = connector:copyIconFile(src, dest)
-        if ok then
-            connector.copiedFruitIcons[key] = "icons/fruits/" .. key .. "." .. ext
-            pending[key] = nil
-            copied = copied + 1
+        for _, candidate in ipairs(candidates) do
+            local ext = "dds"
+            if connector.iconExtFromPath ~= nil then
+                ext = connector:iconExtFromPath(candidate)
+            end
+            local dest = connector.fruitsIconsDir .. key .. "." .. ext
+            if connector:copyIconFile(candidate, dest) then
+                connector.copiedFruitIcons[key] = "icons/fruits/" .. key .. "." .. ext
+                pending[key] = nil
+                copied = copied + 1
+                break
+            end
         end
     end
 end
@@ -992,7 +1233,7 @@ local function geometryFingerprint(connector, ids, records)
     for _, id in ipairs(ids) do
         local row = records[id]
         if row ~= nil then
-            parts[#parts + 1] = tostring(row.id) .. ":" .. tostring(row.lx) .. "," .. tostring(row.lz) .. ":" .. tostring(row.points or "")
+            parts[#parts + 1] = tostring(row.id) .. ":" .. tostring(row.lx) .. "," .. tostring(row.lz) .. ":" .. tostring(row.group or "") .. ":" .. tostring(row.points or "")
         end
     end
     return table.concat(parts, "|") .. "#" .. mapFrameAttrs(connector)
@@ -1034,6 +1275,7 @@ function FieldSnapshot.writeIfDue(connector)
             budget = budget - 1
         end
         if connector.fieldGeoIndex > #ids then
+            assignGroups(connector.fieldGeoRecords)
             local fingerprint = geometryFingerprint(connector, ids, connector.fieldGeoRecords)
             if fingerprint ~= connector.fieldGeometryFingerprint then
                 writeGeometry(connector, ids, connector.fieldGeoRecords)

@@ -98,24 +98,65 @@ function CropMark({ kind }: { kind: string }) {
   return <path d="M8 14 V7 M8 9 C5 8 4 5 6 4 M8 8 C11 7 12 4 10 3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
 }
 
+function groupCaption(field: FieldSnapshot, fields: FieldSnapshot[]) {
+  const group = field.group
+  if (!group || group.length < 2) {
+    return { text: String(field.id), show: true, x: field.labelX ?? field.centerX, z: field.labelZ ?? field.centerZ }
+  }
+  const primary = Math.min(...group)
+  if (field.id !== primary) {
+    return { text: "", show: false, x: null, z: null }
+  }
+  let sx = 0
+  let sz = 0
+  let count = 0
+  for (const id of group) {
+    const member = fields.find((item) => item.id === id)
+    if (member?.centerX != null && member.centerZ != null) {
+      sx += member.centerX
+      sz += member.centerZ
+      count += 1
+    }
+  }
+  return {
+    text: group.join(" · "),
+    show: true,
+    x: count > 0 ? sx / count : field.centerX,
+    z: count > 0 ? sz / count : field.centerZ,
+  }
+}
+
 function projectFields(fields: FieldSnapshot[], frame: MapFrame, farmId: number | null): DrawnField[] {
   return fields.map((field) => {
+    const caption = groupCaption(field, fields)
     const center =
       field.centerX != null && field.centerZ != null
         ? projectPoint(field.centerX, field.centerZ, frame)
         : null
     const labelPoint =
-      field.labelX != null && field.labelZ != null
-        ? projectPoint(field.labelX, field.labelZ, frame)
-        : center
+      caption.x != null && caption.z != null
+        ? projectPoint(caption.x, caption.z, frame)
+        : field.labelX != null && field.labelZ != null
+          ? projectPoint(field.labelX, field.labelZ, frame)
+          : center
     const projected = field.points.map(([x, z]) => projectPoint(x, z, frame))
     const label = labelPoint ?? (projected.length > 0 ? projected[0] : null)
     const key = cropKey(field.fruitName)
+    let boxPoints = projected
+    if (caption.show && field.group && field.group.length > 1) {
+      boxPoints = []
+      for (const id of field.group) {
+        const member = fields.find((item) => item.id === id)
+        if (member) {
+          for (const point of member.points) boxPoints.push(projectPoint(point[0], point[1], frame))
+        }
+      }
+    }
     let minX = Infinity
     let maxX = -Infinity
     let minY = Infinity
     let maxY = -Infinity
-    for (const point of projected) {
+    for (const point of boxPoints) {
       minX = Math.min(minX, point.x)
       maxX = Math.max(maxX, point.x)
       minY = Math.min(minY, point.y)
@@ -131,7 +172,7 @@ function projectFields(fields: FieldSnapshot[], frame: MapFrame, farmId: number 
       mine: farmId == null || field.farmId === farmId,
       iconUrl: field.iconUrl,
       mark: key,
-      label: String(field.id),
+      label: caption.show ? caption.text : "",
     }
   })
 }
@@ -214,6 +255,10 @@ export function FieldsPage() {
     () => projectFields(fields, frame, farm?.gameFarmId ?? null),
     [farm?.gameFarmId, fields, frame],
   )
+  const bridges = useMemo(() => {
+    const source = onlyMine && farm ? fields.filter((field) => field.farmId === farm.gameFarmId) : fields
+    return mergeBridges(source, frame)
+  }, [farm, fields, frame, onlyMine])
   const visible = useMemo(
     () => (onlyMine && farm ? drawn.filter((field) => field.mine) : drawn),
     [drawn, farm, onlyMine],
@@ -323,6 +368,7 @@ export function FieldsPage() {
             </div>
             <FieldMap
               fields={visible}
+              bridges={bridges}
               mapUrl={
                 source?.pdaMap
                   ? `/api/workspaces/${workspace.id}/pda-map`
@@ -376,6 +422,7 @@ function visibleLabels(fields: DrawnField[], zoom: number, sidePx: number, pinne
   const placed: { x: number; y: number; w: number; h: number }[] = []
   const ids = new Set<number>()
   for (const field of ranked) {
+    if (!field.label) continue
     const width = labelWidth(field.label.length) * scale
     const height = LABEL_HEIGHT * scale
     const labelBox = { x: field.x - width / 2, y: field.y - height / 2, w: width, h: height }
@@ -401,8 +448,58 @@ function visibleLabels(fields: DrawnField[], zoom: number, sidePx: number, pinne
   return { scale, ids }
 }
 
+function mergeBridges(fields: FieldSnapshot[], frame: MapFrame): string[] {
+  const byId = new Map(fields.map((field) => [field.id, field]))
+  const bridges: string[] = []
+  for (const field of fields) {
+    const group = field.group
+    if (!group || group.length < 2 || field.id !== Math.min(...group)) continue
+    for (let i = 0; i < group.length; i += 1) {
+      for (let j = i + 1; j < group.length; j += 1) {
+        const a = byId.get(group[i])
+        const b = byId.get(group[j])
+        if (!a || !b || a.points.length < 2 || b.points.length < 2) continue
+        let best = Infinity
+        let pair: [[number, number], [number, number]] | null = null
+        for (const left of a.points) {
+          for (const right of b.points) {
+            const dist = (left[0] - right[0]) ** 2 + (left[1] - right[1]) ** 2
+            if (dist < best) {
+              best = dist
+              pair = [left, right]
+            }
+          }
+        }
+        if (!pair || Math.sqrt(best) > 45) continue
+        const [left, right] = pair
+        const dx = right[0] - left[0]
+        const dz = right[1] - left[1]
+        const len = Math.hypot(dx, dz) || 1
+        const ox = (-dz / len) * 4
+        const oz = (dx / len) * 4
+        const quad: [number, number][] = [
+          [left[0] + ox, left[1] + oz],
+          [left[0] - ox, left[1] - oz],
+          [right[0] - ox, right[1] - oz],
+          [right[0] + ox, right[1] + oz],
+        ]
+        bridges.push(
+          quad
+            .map((point) => {
+              const projected = projectPoint(point[0], point[1], frame)
+              return `${projected.x},${projected.y}`
+            })
+            .join(" "),
+        )
+      }
+    }
+  }
+  return bridges
+}
+
 function FieldMap({
   fields,
+  bridges,
   mapUrl,
   live,
   selectedId,
@@ -412,6 +509,7 @@ function FieldMap({
   onContentBox,
 }: {
   fields: DrawnField[]
+  bridges: string[]
   mapUrl: string | null
   live: boolean
   selectedId: number | null
@@ -608,6 +706,9 @@ function FieldMap({
             <div className="fields-terrain" aria-hidden="true" />
           )}
           <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label={label}>
+            {bridges.map((points, index) => (
+              <polygon key={`bridge-${index}`} className="field-shape field-bridge" points={points} />
+            ))}
             {fields.map((field) => {
               const className = [
                 "field-shape",
@@ -623,7 +724,7 @@ function FieldMap({
               )
             })}
             {fields.map((field) => {
-              if (labels.scale <= 0 || (!labels.ids.has(field.id) && field.id !== hoverId)) return null
+              if (!field.label || labels.scale <= 0 || (!labels.ids.has(field.id) && field.id !== hoverId)) return null
               const digits = field.label.length
               const width = labelWidth(digits)
               const iconX = -width / 2 + 0.28
@@ -703,6 +804,9 @@ function FieldDetail({
   const fruit = field.fruitTitle || field.fruitName
   const rows: { label: string; value: string | null }[] = [
     { label: t("fields.number"), value: String(field.id) },
+    ...(field.group && field.group.length > 1
+      ? [{ label: t("fields.merged"), value: field.group.join(", ") }]
+      : []),
     { label: t("fields.fruit"), value: fruit },
     { label: t("fields.areaHa"), value: formatHa(field.areaHa, i18n.language) },
     { label: t("fields.farm"), value: farmName },

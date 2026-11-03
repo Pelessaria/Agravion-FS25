@@ -666,6 +666,7 @@ export const en = {
     mapUnavailable: "The map image is unreachable right now. Field outlines stay on the last snapshot.",
     selectHint: "Click an area to see crop, ground, and Precision Farming.",
     number: "Field",
+    merged: "Joined",
     numberValue: "Field {{id}}",
     fruit: "Crop",
     areaHa: "Area",
