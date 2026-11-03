@@ -641,7 +641,7 @@ export const en = {
     signedInAs: "Signed in as",
   },
   fields: {
-    lead: "Map of every field outline. The number and crop symbol appear on an area once it is large enough to hold them. A click lists base-game and Precision Farming values.",
+    lead: "Map of every field outline. Numbers and crop symbols appear as you zoom in, and joined fields share a gold outline. A click lists base-game and Precision Farming values.",
     loading: "Loading fields",
     updated: "Field state {{time}}",
     count: "Fields",
@@ -658,6 +658,7 @@ export const en = {
     failedBody: "The last request failed. The view retries on its own.",
     allFarms: "All farms",
     thisFarm: "This farm only",
+    showUnowned: "Unowned fields",
     fieldNumber: "Field number",
     pick: "Show",
     zoomIn: "Zoom in",

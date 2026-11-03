@@ -639,7 +639,7 @@ export const de = {
     signedInAs: "Angemeldet als",
   },
   fields: {
-    lead: "Karte mit allen Feldumrissen. Nummer und Fruchtsymbol stehen in der Fläche, sobald sie hineinpassen. Ein Klick öffnet die Werte aus Basispiel und Precision Farming.",
+    lead: "Karte mit allen Feldumrissen. Nummern und Fruchtsymbole kommen beim Heranzoomen, zusammengelegte Felder teilen sich einen goldenen Umriss. Ein Klick öffnet die Werte aus Basispiel und Precision Farming.",
     loading: "Felder werden geladen",
     updated: "Feldstand {{time}}",
     count: "Felder",
@@ -656,6 +656,7 @@ export const de = {
     failedBody: "Die letzte Abfrage ist fehlgeschlagen. Die Ansicht versucht es von allein erneut.",
     allFarms: "Alle Höfe",
     thisFarm: "Nur dieser Hof",
+    showUnowned: "Fremde Felder",
     fieldNumber: "Feldnummer",
     pick: "Zeigen",
     zoomIn: "Vergrößern",

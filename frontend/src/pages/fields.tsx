@@ -36,12 +36,16 @@ type DrawnField = {
   y: number
   box: { x: number; y: number; w: number; h: number } | null
   mine: boolean
+  owned: boolean | null
+  group: number[] | null
   iconUrl: string | null
   mark: string
   label: string
 }
 
 const LABEL_HEIGHT = 2.7
+const LABELS_FROM_ZOOM = 1.7
+const ICONS_FROM_ZOOM = 2.6
 
 function CropMark({ kind }: { kind: string }) {
   if (kind === "wheat" || kind === "barley" || kind === "oat" || kind === "rice" || kind === "ricelonggrain") {
@@ -170,6 +174,8 @@ function projectFields(fields: FieldSnapshot[], frame: MapFrame, farmId: number 
       y: label?.y ?? 50,
       box: projected.length > 0 ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : null,
       mine: farmId == null || field.farmId === farmId,
+      owned: field.owned,
+      group: field.group && field.group.length > 1 ? field.group : null,
       iconUrl: field.iconUrl,
       mark: key,
       label: caption.show ? caption.text : "",
@@ -189,6 +195,7 @@ export function FieldsPage() {
   const [loading, setLoading] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [onlyMine, setOnlyMine] = useState(false)
+  const [showUnowned, setShowUnowned] = useState(false)
   const [query, setQuery] = useState("")
   const [focusToken, setFocusToken] = useState(0)
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
@@ -256,12 +263,21 @@ export function FieldsPage() {
     [farm?.gameFarmId, fields, frame],
   )
   const bridges = useMemo(() => {
-    const source = onlyMine && farm ? fields.filter((field) => field.farmId === farm.gameFarmId) : fields
+    const source = fields.filter((field) => {
+      if (onlyMine && farm && field.farmId !== farm.gameFarmId) return false
+      if (!showUnowned && field.owned === false) return false
+      return true
+    })
     return mergeBridges(source, frame)
-  }, [farm, fields, frame, onlyMine])
+  }, [farm, fields, frame, onlyMine, showUnowned])
   const visible = useMemo(
-    () => (onlyMine && farm ? drawn.filter((field) => field.mine) : drawn),
-    [drawn, farm, onlyMine],
+    () =>
+      drawn.filter((field) => {
+        if (onlyMine && farm && !field.mine) return false
+        if (!showUnowned && field.owned === false) return false
+        return true
+      }),
+    [drawn, farm, onlyMine, showUnowned],
   )
   const selected = fields.find((field) => field.id === selectedId) ?? null
   const owned = fields.filter((field) => field.owned).length
@@ -279,6 +295,7 @@ export function FieldsPage() {
     const match = fields.find((field) => field.id === nextId)
     if (!match) return
     if (onlyMine && farm && match.farmId !== farm.gameFarmId) setOnlyMine(false)
+    if (!showUnowned && match.owned === false) setShowUnowned(true)
     choose(nextId, true)
   }
 
@@ -365,6 +382,14 @@ export function FieldsPage() {
               >
                 {onlyMine ? t("fields.thisFarm") : t("fields.allFarms")}
               </button>
+              <button
+                type="button"
+                className={showUnowned ? "btn" : "btn btn-secondary"}
+                aria-pressed={showUnowned}
+                onClick={() => setShowUnowned((value) => !value)}
+              >
+                {t("fields.showUnowned")}
+              </button>
             </div>
             <FieldMap
               fields={visible}
@@ -401,18 +426,38 @@ export function FieldsPage() {
   )
 }
 
-function labelWidth(digits: number) {
-  return 2.4 + digits * 1.15 + 0.7
+function labelWidth(chars: number, withIcon: boolean) {
+  return (withIcon ? 2.55 : 0.7) + chars * 1.02 + 0.5
 }
 
-/** Labels stay large enough to read and grow when zooming in, without covering a neighbour. */
+function labelHot(field: DrawnField, hoverId: number | null, selectedId: number | null) {
+  const hot = hoverId ?? selectedId
+  if (hot == null) return false
+  if (field.id === hot) return true
+  return field.group != null && field.label !== "" && field.group.includes(hot)
+}
+
+function inActiveGroup(field: DrawnField, hoverId: number | null, selectedId: number | null) {
+  if (field.group == null) return false
+  if (hoverId != null && field.group.includes(hoverId)) return true
+  return selectedId != null && field.group.includes(selectedId)
+}
+
+/** Quiet at the default view. Numbers appear once the map is enlarged; symbols later still. */
 function labelScreenPx(zoom: number) {
-  return Math.min(48, 30 * Math.sqrt(Math.max(zoom, 1)))
+  return Math.min(18, 11 + 2.5 * Math.max(zoom - 1, 0))
 }
 
-function visibleLabels(fields: DrawnField[], zoom: number, sidePx: number, pinnedId: number | null) {
+function visibleLabels(
+  fields: DrawnField[],
+  zoom: number,
+  sidePx: number,
+  pinnedId: number | null,
+  hoverId: number | null,
+) {
   if (sidePx <= 0) return { scale: 0, ids: new Set<number>() }
   const scale = (labelScreenPx(zoom) / (sidePx * Math.max(zoom, 1))) * 100 / LABEL_HEIGHT
+  const withIcon = zoom >= ICONS_FROM_ZOOM
   const ranked = [...fields].sort((a, b) => {
     if (a.id === pinnedId) return -1
     if (b.id === pinnedId) return 1
@@ -423,16 +468,17 @@ function visibleLabels(fields: DrawnField[], zoom: number, sidePx: number, pinne
   const ids = new Set<number>()
   for (const field of ranked) {
     if (!field.label) continue
-    const width = labelWidth(field.label.length) * scale
+    const forced = labelHot(field, hoverId, pinnedId)
+    if (!forced && zoom < LABELS_FROM_ZOOM) continue
+    const width = labelWidth(field.label.length, withIcon || forced) * scale
     const height = LABEL_HEIGHT * scale
     const labelBox = { x: field.x - width / 2, y: field.y - height / 2, w: width, h: height }
-    const pinned = field.id === pinnedId
-  const fits =
-    field.box != null &&
-    field.box.w * field.box.h >= width * height * 0.42 &&
-    field.box.w >= width * 0.55 &&
-    field.box.h >= height * 0.45
-    if (!pinned && !fits) continue
+    const fits =
+      field.box != null &&
+      field.box.w * field.box.h >= width * height * 0.42 &&
+      field.box.w >= width * 0.55 &&
+      field.box.h >= height * 0.45
+    if (!forced && !fits) continue
     const gap = 0.15 * scale
     const blocked = placed.some(
       (other) =>
@@ -441,7 +487,7 @@ function visibleLabels(fields: DrawnField[], zoom: number, sidePx: number, pinne
         labelBox.y < other.y + other.h + gap &&
         labelBox.y + labelBox.h + gap > other.y,
     )
-    if (blocked && !pinned) continue
+    if (blocked && !forced) continue
     placed.push(labelBox)
     ids.add(field.id)
   }
@@ -470,13 +516,13 @@ function mergeBridges(fields: FieldSnapshot[], frame: MapFrame): string[] {
             }
           }
         }
-        if (!pair || Math.sqrt(best) > 45) continue
+        if (!pair || Math.sqrt(best) > 55) continue
         const [left, right] = pair
         const dx = right[0] - left[0]
         const dz = right[1] - left[1]
         const len = Math.hypot(dx, dz) || 1
-        const ox = (-dz / len) * 4
-        const oz = (dx / len) * 4
+        const ox = (-dz / len) * 14
+        const oz = (dx / len) * 14
         const quad: [number, number][] = [
           [left[0] + ox, left[1] + oz],
           [left[0] - ox, left[1] - oz],
@@ -530,7 +576,10 @@ function FieldMap({
   const [hoverId, setHoverId] = useState<number | null>(null)
   const fieldsRef = useRef(fields)
   const selectedRef = useRef(selectedId)
-  const labels = useMemo(() => visibleLabels(fields, zoom, sidePx, selectedId), [fields, selectedId, sidePx, zoom])
+  const labels = useMemo(
+    () => visibleLabels(fields, zoom, sidePx, selectedId, hoverId),
+    [fields, hoverId, selectedId, sidePx, zoom],
+  )
 
   function apply() {
     const el = stageRef.current
@@ -712,6 +761,8 @@ function FieldMap({
             {fields.map((field) => {
               const className = [
                 "field-shape",
+                field.group ? "is-joined" : "",
+                inActiveGroup(field, hoverId, selectedId) ? "is-group-hot" : "",
                 field.id === selectedId ? "is-selected" : "",
                 field.mine ? "" : "is-other",
               ]
@@ -724,10 +775,13 @@ function FieldMap({
               )
             })}
             {fields.map((field) => {
-              if (!field.label || labels.scale <= 0 || (!labels.ids.has(field.id) && field.id !== hoverId)) return null
+              const hot = labelHot(field, hoverId, selectedId)
+              if (!field.label || labels.scale <= 0 || (!labels.ids.has(field.id) && !hot)) return null
+              const withIcon = zoom >= ICONS_FROM_ZOOM || hot
               const digits = field.label.length
-              const width = labelWidth(digits)
+              const width = labelWidth(digits, withIcon)
               const iconX = -width / 2 + 0.28
+              const textX = withIcon ? iconX + 2.35 + (digits * 1.02) / 2 : 0
               return (
                 <g
                   key={`label-${field.id}`}
@@ -736,14 +790,15 @@ function FieldMap({
                   transform={`translate(${field.x} ${field.y}) scale(${labels.scale})`}
                 >
                   <rect x={-width / 2} y={-1.35} width={width} height={LABEL_HEIGHT} rx="0.45" />
-                  {field.iconUrl ? (
+                  {withIcon && field.iconUrl ? (
                     <image href={field.iconUrl} x={iconX} y={-1.05} width="2.1" height="2.1" />
-                  ) : (
+                  ) : null}
+                  {withIcon && !field.iconUrl ? (
                     <g transform={`translate(${iconX} -1.05) scale(0.131)`} style={{ color: field.color }}>
                       <CropMark kind={field.mark} />
                     </g>
-                  )}
-                  <text x={iconX + 2.45 + (digits * 1.15) / 2} y="0.55" textAnchor="middle" fontSize="1.9">
+                  ) : null}
+                  <text x={textX} y="0.55" textAnchor="middle" fontSize="1.7">
                     {field.label}
                   </text>
                 </g>
