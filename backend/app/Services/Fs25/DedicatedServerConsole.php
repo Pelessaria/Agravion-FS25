@@ -54,6 +54,7 @@ final class DedicatedServerConsole
                 $pages = $this->withPages($client, $base, $home, ['logs.html', 'settings.html']);
                 $result['loggedIn'] = true;
                 $result['running'] = $home['running'];
+                $result['statusAt'] = microtime(true);
                 $result['actions'] = $this->publicActions($pages);
                 $result['mods'] = $this->mergeMods($result['mods'], $pages);
                 $result['settings'] = $this->publicSettings($pages);
@@ -104,11 +105,9 @@ final class DedicatedServerConsole
         $result['at'] = now()->toIso8601String();
         $result['pending'] = false;
         $path = $this->cachePath($workspace);
-        $dir = dirname($path);
-        if (! is_dir($dir) && ! mkdir($dir, 0775, true) && ! is_dir($dir)) {
-            return $result;
-        }
-        file_put_contents($path, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $this->mutateCache($path, function (?array $existing) use ($result): array {
+            return $this->preferNewerStatus($existing, $result);
+        });
 
         return $result;
     }
@@ -127,6 +126,7 @@ final class DedicatedServerConsole
             $restart = $this->findAction($pages, 'restart');
             if ($restart !== null) {
                 $this->submit($client, $base, $restart);
+                $this->rememberRunning($workspace, $client, $base, true);
 
                 return ['ok' => true];
             }
@@ -140,9 +140,12 @@ final class DedicatedServerConsole
             $pages = $this->withPages($client, $base, $home, []);
             $start = $this->findAction($pages, 'start');
             if ($start === null) {
+                $this->rememberRunning($workspace, $client, $base, false);
+
                 return ['ok' => true, 'note' => 'stopped'];
             }
             $this->submit($client, $base, $start);
+            $this->rememberRunning($workspace, $client, $base, true);
 
             return ['ok' => true];
         }
@@ -151,6 +154,7 @@ final class DedicatedServerConsole
             throw new RuntimeException('Diese Schaltfläche ist auf der Serveroberfläche gerade nicht vorhanden.');
         }
         $this->submit($client, $base, $action);
+        $this->rememberRunning($workspace, $client, $base, $actionId === 'start');
 
         return ['ok' => true];
     }
@@ -237,16 +241,24 @@ final class DedicatedServerConsole
     {
         $name = $this->safeZip($filename);
         $workspace->loadMissing('hostAccess');
+        if ($workspace->hostAccess !== null) {
+            return $this->downloadViaFiles($workspace, $name);
+        }
         if ($workspace->consoleConfigured()) {
-            try {
-                $fromWeb = $this->downloadViaWeb($workspace, $name);
-                if ($fromWeb !== null) {
-                    return ['name' => $name, 'bytes' => $fromWeb];
-                }
-            } catch (Throwable) {
-                // Fall back to the file access.
+            $fromWeb = $this->downloadViaWeb($workspace, $name);
+            if ($fromWeb !== null) {
+                return ['name' => $name, 'bytes' => $fromWeb];
             }
         }
+
+        throw new RuntimeException('Die Mod liegt nicht zum Herunterladen bereit.');
+    }
+
+    /**
+     * @return array{name: string, bytes: string}
+     */
+    private function downloadViaFiles(Workspace $workspace, string $name): array
+    {
         $access = $this->requireAccess($workspace);
         $client = new HostFileClient($access);
         $path = $this->modPath($client, $access, $name);
@@ -1469,14 +1481,20 @@ final class DedicatedServerConsole
     {
         [$client, $base, $home] = $this->open($workspace);
         foreach ($this->withPages($client, $base, $home, ['mods.html']) as $page) {
+            $hrefs = [];
             foreach ($page['modRows'] as $row) {
-                if (strcasecmp($row['name'], $name) !== 0 || $row['download'] === null) {
-                    continue;
+                if (strcasecmp((string) $row['name'], $name) === 0 && is_string($row['download']) && $row['download'] !== '') {
+                    $hrefs[] = $row['download'];
                 }
-                $url = $this->absolute($base, $page['pageUrl'], $row['download']);
-                if ($url === null) {
-                    continue;
+            }
+            foreach ($page['links'] as $link) {
+                $href = (string) ($link['href'] ?? '');
+                if (preg_match('/(?:^|\\/)'.preg_quote($name, '/').'$/i', $href) === 1) {
+                    $hrefs[] = $href;
                 }
+            }
+            foreach (array_unique($hrefs) as $href) {
+                $url = $this->absolute($base, (string) $page['pageUrl'], $href);
                 $response = $client->get($url);
                 if ($response->status() >= 400) {
                     continue;
@@ -1485,7 +1503,7 @@ final class DedicatedServerConsole
                 if (strlen($body) > self::MAX_BYTES) {
                     throw new RuntimeException('Die Datei ist größer als 80 MB.');
                 }
-                if ($body !== '') {
+                if ($body !== '' && ! str_starts_with(ltrim($body), '<')) {
                     return $body;
                 }
             }
@@ -1592,6 +1610,137 @@ final class DedicatedServerConsole
     private function cachePath(Workspace $workspace): string
     {
         return storage_path('app/connector/'.$workspace->public_id.'/state/server_console.json');
+    }
+
+    /**
+     * The game process does not flip the status lamp in the same moment as the button.
+     * Re-read the home page until it matches, then store that lamp without a full mod scan.
+     */
+    private function rememberRunning(Workspace $workspace, PendingRequest $client, string $base, bool $wantRunning): void
+    {
+        $homeUrl = $base.'/index.html?lang=en';
+        $last = null;
+        for ($attempt = 0; $attempt < 18; $attempt++) {
+            if ($attempt > 0) {
+                sleep(1);
+            }
+            try {
+                $response = $client->get($homeUrl);
+            } catch (Throwable) {
+                continue;
+            }
+            if ($response->status() !== 200) {
+                continue;
+            }
+            $page = DedicatedServerPage::parse((string) $response->body(), $homeUrl);
+            if ($page['loginForm'] || ! is_bool($page['running'])) {
+                continue;
+            }
+            $page['pageUrl'] = $homeUrl;
+            $last = [
+                'running' => $page['running'],
+                'actions' => $this->publicActions([$page]),
+                'statusAt' => microtime(true),
+            ];
+            if ($page['running'] === $wantRunning) {
+                break;
+            }
+        }
+        if ($last === null) {
+            return;
+        }
+        $this->patchRunning($workspace, $last);
+    }
+
+    /**
+     * @param  array{running: bool, actions: list<array{id: string, label: string}>, statusAt: float}  $status
+     */
+    private function patchRunning(Workspace $workspace, array $status): void
+    {
+        $path = $this->cachePath($workspace);
+        $this->mutateCache($path, function (?array $data) use ($workspace, $status): array {
+            if ($data !== null && is_numeric($data['statusAt'] ?? null) && (float) $data['statusAt'] > $status['statusAt']) {
+                return $data;
+            }
+            if ($data === null) {
+                $workspace->loadMissing('hostAccess');
+                $data = $this->blank($workspace, false);
+            }
+            $data['running'] = $status['running'];
+            $data['actions'] = $status['actions'];
+            $data['loggedIn'] = true;
+            $data['webConfigured'] = true;
+            $data['statusAt'] = $status['statusAt'];
+            $data['at'] = now()->toIso8601String();
+            $data['pending'] = false;
+
+            return $data;
+        });
+    }
+
+    /**
+     * A snapshot that opened the page before a newer start/stop must not put the old lamp back.
+     *
+     * @param  array<string, mixed>|null  $existing
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function preferNewerStatus(?array $existing, array $result): array
+    {
+        if ($existing === null || ! is_numeric($existing['statusAt'] ?? null)) {
+            return $result;
+        }
+        $existingAt = (float) $existing['statusAt'];
+        $freshAt = $result['statusAt'] ?? null;
+        if (! is_numeric($freshAt) || $existingAt > (float) $freshAt) {
+            $result['running'] = $existing['running'] ?? $result['running'];
+            $result['actions'] = $existing['actions'] ?? $result['actions'];
+            $result['statusAt'] = $existingAt;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  callable(?array<string, mixed>): array<string, mixed>  $change
+     */
+    private function mutateCache(string $path, callable $change): void
+    {
+        $dir = dirname($path);
+        if (! is_dir($dir) && ! mkdir($dir, 0775, true) && ! is_dir($dir)) {
+            return;
+        }
+        $handle = fopen($path, 'c+');
+        if ($handle === false) {
+            return;
+        }
+        try {
+            if (! flock($handle, LOCK_EX)) {
+                return;
+            }
+            $raw = stream_get_contents($handle);
+            $existing = null;
+            if (is_string($raw) && $raw !== '') {
+                try {
+                    $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+                    $existing = is_array($decoded) ? $decoded : null;
+                } catch (Throwable) {
+                    $existing = null;
+                }
+            }
+            $next = $change($existing);
+            $encoded = json_encode($next, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($encoded === false) {
+                return;
+            }
+            rewind($handle);
+            ftruncate($handle, 0);
+            fwrite($handle, $encoded);
+            fflush($handle);
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
     }
 
     private function absolute(string $base, string $pageUrl, string $href): string

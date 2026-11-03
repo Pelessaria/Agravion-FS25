@@ -83,7 +83,7 @@ class ServerConsoleController extends Controller
             'action' => ['required', 'in:start,stop,restart'],
         ]);
 
-        return $this->afterChange($row, $console, fn () => $console->run($row, $data['action']));
+        return $this->attempt(fn () => $console->run($row, $data['action']));
     }
 
     public function settings(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
@@ -120,6 +120,7 @@ class ServerConsoleController extends Controller
     {
         $row = $this->workspace($workspace);
         $this->requireServer($request, $row, $grants, 'mods');
+        $request->session()->save();
         $name = (string) $request->query('name', '');
         try {
             $file = $console->download($row, $name);

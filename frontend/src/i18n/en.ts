@@ -703,6 +703,7 @@ export const en = {
     mods: "Mods",
     upload: "Upload mod",
     download: "Download",
+    downloadBusy: "Download in progress",
     delete: "Delete",
     deleteOne: "Delete {{name}}?",
     deleteMany: "Delete {{count}} mods?",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { ChevronDown, ChevronRight, Copy, Download, Link2, Pause, Play, RotateCcw, Search, Square, Trash2 } from "lucide-react"
@@ -91,6 +91,15 @@ export function ServerPage() {
   const [copied, setCopied] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
   const [pendingDelete, setPendingDelete] = useState<string[] | null>(null)
+  const [downloading, setDownloading] = useState("")
+  const alive = useRef(true)
+
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!workspace || !allowed || !access || !liveMode) return
@@ -210,13 +219,36 @@ export function ServerPage() {
   async function run(action: "start" | "stop" | "restart") {
     if (!workspace) return
     setBusy(action)
+    setError("")
+    const wantRunning = action !== "stop"
     try {
       await apiServerAction(workspace.id, action)
-      await reload()
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const next = await apiServerSnapshot(workspace.id)
+        if (!alive.current) return
+        setSnapshot(next)
+        setSettings(next.settings)
+        setError(next.error ?? "")
+        if (next.running === wantRunning) break
+        await new Promise((resolve) => window.setTimeout(resolve, 3000))
+      }
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : t("server.actionMissing"))
+      if (alive.current) setError(caught instanceof ApiError ? caught.message : t("server.actionMissing"))
     } finally {
-      setBusy("")
+      if (alive.current) setBusy("")
+    }
+  }
+
+  async function downloadMod(name: string) {
+    if (!workspace) return
+    setDownloading(name)
+    setError("")
+    try {
+      await apiDownloadServerMod(workspace.id, name)
+    } catch (caught) {
+      if (alive.current) setError(caught instanceof ApiError ? caught.message : t("server.missingFiles"))
+    } finally {
+      if (alive.current) setDownloading("")
     }
   }
 
@@ -635,8 +667,9 @@ export function ServerPage() {
                                 type="button"
                                 className="btn btn-secondary mod-icon-btn"
                                 aria-label={t("server.download")}
-                                title={t("server.download")}
-                                onClick={() => void apiDownloadServerMod(workspace.id, mod.name).catch((caught) => setError(caught instanceof ApiError ? caught.message : t("server.missingFiles")))}
+                                title={downloading === mod.name ? t("server.downloadBusy") : t("server.download")}
+                                disabled={downloading === mod.name}
+                                onClick={() => void downloadMod(mod.name)}
                               >
                                 <Download className="icon" aria-hidden="true" />
                               </button>

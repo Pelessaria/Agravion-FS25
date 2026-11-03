@@ -701,6 +701,7 @@ export const de = {
     mods: "Mods",
     upload: "Mod hochladen",
     download: "Herunterladen",
+    downloadBusy: "Download läuft",
     delete: "Löschen",
     deleteOne: "{{name}} wirklich löschen?",
     deleteMany: "{{count}} Mods wirklich löschen?",

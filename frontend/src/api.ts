@@ -456,24 +456,48 @@ export async function apiUploadServerMod(workspaceId: string, file: File): Promi
   return data as { ok: boolean; via: string }
 }
 
-export async function apiDownloadServerMod(workspaceId: string, name: string): Promise<void> {
-  const response = await fetch(
-    `/api/workspaces/${encodeURIComponent(workspaceId)}/server/mod?name=${encodeURIComponent(name)}`,
-    { credentials: "include", headers: { Accept: "application/zip" } },
-  )
-  if (!response.ok) {
-    const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
-    throw new ApiError(response.status, readApiErrorMessage(data, response.status))
-  }
-  const blob = await response.blob()
-  const url = URL.createObjectURL(blob)
+interface SaveHandle {
+  createWritable: () => Promise<WritableStream>
+  remove?: () => Promise<void>
+}
+
+function savePicker(): ((options: { suggestedName: string }) => Promise<SaveHandle>) | null {
+  const picker = (window as Window & { showSaveFilePicker?: (options: { suggestedName: string }) => Promise<SaveHandle> }).showSaveFilePicker
+  return typeof picker === "function" ? picker.bind(window) : null
+}
+
+function startBrowserDownload(url: string, name: string) {
   const anchor = document.createElement("a")
   anchor.href = url
   anchor.download = name
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
-  URL.revokeObjectURL(url)
+}
+
+export async function apiDownloadServerMod(workspaceId: string, name: string): Promise<void> {
+  const url = `/api/workspaces/${encodeURIComponent(workspaceId)}/server/mod?name=${encodeURIComponent(name)}`
+  const picker = savePicker()
+  if (picker) {
+    let handle: SaveHandle
+    try {
+      handle = await picker({ suggestedName: name })
+    } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") return
+      startBrowserDownload(url, name)
+      return
+    }
+    const response = await fetch(url, { credentials: "include", headers: { Accept: "application/zip" } })
+    if (!response.ok || response.body === null) {
+      await handle.remove?.()
+      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
+      throw new ApiError(response.status, readApiErrorMessage(data, response.status))
+    }
+    const writable = await handle.createWritable()
+    await response.body.pipeTo(writable)
+    return
+  }
+  startBrowserDownload(url, name)
 }
 
 export async function apiSetServerModActive(workspaceId: string, name: string, active: boolean): Promise<{ ok: boolean }> {
