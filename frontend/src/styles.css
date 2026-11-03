@@ -2693,6 +2693,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .fields-map-card { display: flex; flex-direction: column; height: 100%; position: relative; }
 .fields-toolbar {
+  position: relative;
+  z-index: 6;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
