@@ -881,9 +881,206 @@ local function monthsFromPeriodRow(row, minH, maxH)
     return table.concat(months, ",")
 end
 
--- Months come only from a period table the running game already loaded.
--- Missing or unknown structures stay empty; growth stages are not relabeled as months.
+-- FS25 names each growth period. MID_WINTER is January.
+local PERIOD_MONTH = {
+    MID_WINTER = 1,
+    LATE_WINTER = 2,
+    EARLY_SPRING = 3,
+    MID_SPRING = 4,
+    LATE_SPRING = 5,
+    EARLY_SUMMER = 6,
+    MID_SUMMER = 7,
+    LATE_SUMMER = 8,
+    EARLY_AUTUMN = 9,
+    MID_AUTUMN = 10,
+    LATE_AUTUMN = 11,
+    EARLY_WINTER = 12,
+}
+
+local harvestMonthCache = {}
+local harvestMonthsFromTables
+
+local function xmlString(xmlId, key)
+    if getXMLString == nil or xmlId == nil then
+        return nil
+    end
+    local ok, value = pcall(getXMLString, xmlId, key)
+    if ok and type(value) == "string" and value ~= "" then
+        return value
+    end
+    return nil
+end
+
+local function xmlBool(xmlId, key)
+    if getXMLBool == nil or xmlId == nil then
+        return false
+    end
+    local ok, value = pcall(getXMLBool, xmlId, key)
+    return ok and value == true
+end
+
+local function openFruitXml(path)
+    if path == nil or path == "" or loadXMLFile == nil then
+        return nil
+    end
+    local ok, xmlId = pcall(loadXMLFile, "AgriVisionFruit", path)
+    if not ok or xmlId == nil or xmlId == 0 then
+        return nil
+    end
+    return xmlId
+end
+
+local function closeFruitXml(xmlId)
+    if xmlId ~= nil and delete ~= nil then
+        pcall(delete, xmlId)
+    end
+end
+
+-- A month counts when the crop is harvest-ready at its start or becomes so during it.
+local function harvestMonthsFromXml(xmlId)
+    local ready = { harvestReady = true }
+    local i = 0
+    while i < 24 do
+        local key = "foliageType.foliageLayer.foliageState(" .. tostring(i) .. ")"
+        local name = xmlString(xmlId, key .. "#name")
+        if name == nil then
+            break
+        end
+        if xmlBool(xmlId, key .. "#isHarvestReady") then
+            ready[name] = true
+        end
+        i = i + 1
+    end
+    local seen = {}
+    local months = {}
+    local p = 0
+    while p < 12 do
+        local key = "foliageType.growth.seasonal.period(" .. tostring(p) .. ")"
+        local period = xmlString(xmlId, key .. "#name")
+        if period == nil then
+            break
+        end
+        local month = PERIOD_MONTH[string.upper(period)]
+        if month ~= nil then
+            local u = 0
+            while u < 8 do
+                local ukey = key .. ".update(" .. tostring(u) .. ")"
+                local startState = xmlString(xmlId, ukey .. "#startState")
+                local endState = xmlString(xmlId, ukey .. "#endState")
+                if startState == nil and endState == nil then
+                    break
+                end
+                if (startState ~= nil and ready[startState] == true) or (endState ~= nil and ready[endState] == true) then
+                    if seen[month] ~= true then
+                        seen[month] = true
+                        months[#months + 1] = month
+                    end
+                end
+                u = u + 1
+            end
+        end
+        p = p + 1
+    end
+    if #months == 0 then
+        return nil
+    end
+    table.sort(months)
+    local out = {}
+    local n = 1
+    while n <= #months do
+        out[n] = tostring(months[n])
+        n = n + 1
+    end
+    return table.concat(out, ",")
+end
+
+local function xmlOn(value, depth)
+    if depth > 2 or type(value) ~= "table" then
+        return nil
+    end
+    local keys = { "xmlFilename", "filename", "configFilename", "foliageFilename", "foliageXmlFilename" }
+    local k = 1
+    while k <= #keys do
+        local item = value[keys[k]]
+        if type(item) == "string" and string.find(item, ".xml", 1, true) ~= nil then
+            return item
+        end
+        k = k + 1
+    end
+    for _, item in pairs(value) do
+        if type(item) == "string" then
+            local lower = string.lower(item)
+            if string.sub(lower, -4) == ".xml" and string.find(lower, "foliage", 1, true) ~= nil then
+                return item
+            end
+        end
+    end
+    local nested = { value.foliageType, value.foliage, value.growth, value.growthData }
+    local n = 1
+    while n <= #nested do
+        local found = xmlOn(nested[n], depth + 1)
+        if found ~= nil then
+            return found
+        end
+        n = n + 1
+    end
+    return nil
+end
+
+local function harvestMonthsFromFruitXml(fruit)
+    local paths = {}
+    local found = xmlOn(fruit, 0)
+    if found ~= nil then
+        paths[#paths + 1] = found
+    end
+    local name = type(fruit.name) == "string" and string.lower(fruit.name) or nil
+    if name ~= nil and name ~= "" then
+        paths[#paths + 1] = "$data/foliage/" .. name .. "/" .. name .. ".xml"
+        paths[#paths + 1] = "$dataS/foliage/" .. name .. "/" .. name .. ".xml"
+    end
+    local i = 1
+    while i <= #paths do
+        local xmlId = openFruitXml(paths[i])
+        if xmlId ~= nil then
+            local months = harvestMonthsFromXml(xmlId)
+            closeFruitXml(xmlId)
+            if months ~= nil then
+                return months
+            end
+        end
+        i = i + 1
+    end
+    return nil
+end
+
+-- Months come from the fruit's foliage calendar. Unknown structures stay empty.
 local function harvestMonths(fruit)
+    if fruit == nil then
+        return nil
+    end
+    local cacheKey = type(fruit.name) == "string" and fruit.name or ""
+    if cacheKey ~= "" and harvestMonthCache[cacheKey] ~= nil then
+        local cached = harvestMonthCache[cacheKey]
+        if cached == false then
+            return nil
+        end
+        return cached
+    end
+    local fromXml = harvestMonthsFromFruitXml(fruit)
+    if fromXml ~= nil then
+        if cacheKey ~= "" then
+            harvestMonthCache[cacheKey] = fromXml
+        end
+        return fromXml
+    end
+    local fromTables = harvestMonthsFromTables(fruit)
+    if cacheKey ~= "" then
+        harvestMonthCache[cacheKey] = fromTables or false
+    end
+    return fromTables
+end
+
+harvestMonthsFromTables = function(fruit)
     if fruit == nil then
         return nil
     end

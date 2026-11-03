@@ -204,9 +204,7 @@ export function formatHarvest(field: FieldSnapshot, t: TFunction) {
   if (months.length > 0) {
     return { text: formatMonthList(months, t), pending: false }
   }
-  const stages = formatWindow(field.harvestMin, field.harvestMax)
-  if (!stages) return { text: null, pending: false }
-  return { text: t("fields.harvestStage", { range: stages }), pending: true }
+  return { text: null, pending: false }
 }
 
 function formatMonthList(months: number[], t: TFunction) {

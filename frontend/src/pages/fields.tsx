@@ -1284,10 +1284,7 @@ function FieldDetail({
         </div>
         <div>
           <dt>{t("fields.harvestWindow")}</dt>
-          <dd>
-            {harvest.text ?? t("unavailable")}
-            {harvest.pending ? <span className="fact-note">{t("fields.harvestMonthsPending")}</span> : null}
-          </dd>
+          <dd>{harvest.text ?? t("unavailable")}</dd>
         </div>
         <div title={t("fields.groundHint")}>
           <dt>{t("fields.ground")}</dt>
@@ -1296,31 +1293,26 @@ function FieldDetail({
               {field.ground != null ? <i className="swatch" style={{ background: paintColor(field, "ground") }} /> : null}
               {namedValue(t, "groundState", field.ground) ?? t("unavailable")}
             </span>
-            {grassGround && !grassFruit ? (
-              <span className="fact-note">
-                {t("fields.groundGrassNote", {
-                  fruit: fruit ?? t("fields.crop.unknown"),
-                  soil: soilLabel ?? t("unavailable"),
-                })}
-              </span>
-            ) : null}
           </dd>
         </div>
+        {grassGround && !grassFruit ? (
+          <div className="fields-note">
+            {t("fields.groundGrassNote", {
+              fruit: fruit ?? t("fields.crop.unknown"),
+              soil: soilLabel ?? t("unavailable"),
+            })}
+          </div>
+        ) : null}
         <MeterFact label={t("fields.weed")} value={field.weed} max={3} text={namedValue(t, "weedState", field.weed)} color="#c47a3a" />
         <MeterFact label={t("fields.stones")} value={field.stones} max={3} text={namedValue(t, "stoneState", field.stones)} color="#9aa3ad" />
-        {precisionFarming === true ? (
-          <>
-            <MutedFact label={t("fields.spray")} reason={t("fields.hiddenBecausePf")} />
-            <MutedFact label={t("fields.lime")} reason={t("fields.hiddenBecausePf")} />
-          </>
-        ) : (
+        {precisionFarming === true ? null : (
           <>
             <MeterFact label={t("fields.spray")} value={field.spray} max={2} text={namedValue(t, "levelOnly", field.spray)} color="#6fbf73" />
             <MeterFact label={t("fields.lime")} value={field.lime} max={2} text={namedValue(t, "levelOnly", field.lime)} color="#d7d3c4" />
           </>
         )}
-        <MeterFact label={t("fields.roller")} value={field.roller} max={1} text={namedValue(t, "levelOnly", field.roller)} color="#7eb0d4" />
-        <MeterFact label={t("fields.plow")} value={field.plow} max={1} text={namedValue(t, "levelOnly", field.plow)} color="#c4a574" />
+        <Fact label={t("fields.rollerNeeded")} value={field.roller == null ? null : field.roller > 0 ? t("no") : t("yes")} />
+        <Fact label={t("fields.plowNeeded")} value={field.plow == null ? null : field.plow > 0 ? t("no") : t("yes")} />
       </dl>
       {precisionFarming === true ? (
         <>
@@ -1359,6 +1351,16 @@ function FieldDetail({
             </dl>
           )}
         </>
+      ) : null}
+      {precisionFarming === true ? (
+        <details className="fields-hidden">
+          <summary>{t("fields.hiddenSection")}</summary>
+          <p>{t("fields.hiddenBecausePf")}</p>
+          <dl className="fields-facts">
+            <MutedFact label={t("fields.spray")} reason={t("fields.hiddenBecausePf")} />
+            <MutedFact label={t("fields.lime")} reason={t("fields.hiddenBecausePf")} />
+          </dl>
+        </details>
       ) : null}
     </aside>
   )
