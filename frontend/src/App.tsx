@@ -7,6 +7,7 @@ import { FieldsPage } from "./pages/fields"
 import { LiveMapPage } from "./pages/live-map"
 import { ServerPage } from "./pages/server"
 import { StoragePage } from "./pages/storage"
+import { WeatherPage } from "./pages/weather"
 import { LoginPage } from "./pages/login"
 import { ModulePage } from "./pages/module"
 import { SettingsPage } from "./pages/settings"
@@ -51,6 +52,7 @@ export function App() {
         <Route path="w/:id" element={<WorkspaceHomePage />} />
         <Route path="w/:id/m/fields" element={<FieldsPage />} />
         <Route path="w/:id/m/map" element={<LiveMapPage />} />
+        <Route path="w/:id/m/weather" element={<WeatherPage />} />
         <Route path="w/:id/m/storage" element={<StoragePage />} />
         <Route path="w/:id/m/server" element={<ServerPage />} />
         <Route path="w/:id/equipment" element={<VehiclesPage />} />

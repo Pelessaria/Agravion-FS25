@@ -5,6 +5,7 @@ import { Minus, Plus } from "lucide-react"
 import {
   apiWorkspaceFields,
   apiWorkspaceLiveMap,
+  apiWorkspaceVehicles,
   type LiveMapResponse,
   type LivePlace,
   type LivePlayer,
@@ -13,20 +14,35 @@ import {
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { projectPoint, effectiveMapSize, frameFromContentBox, measureMapContent, terrainFrame, type MapFrame } from "../field-format"
 import { useStore } from "../store"
-import type { FieldsResponse } from "../types"
+import type { FieldsResponse, Vehicle } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
 
 const PERIOD_TO_MONTH = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2]
 
 type Tab = "vehicles" | "players" | "places"
 type MarkerKind = "vehicle" | "player" | "place" | "pin"
+type MarkerRole = "tractor" | "harvester" | "trailer" | "tool" | "pallet" | "building" | "player" | "pin" | "vehicle"
 type Marker = {
   key: string
   x: number
   y: number
   heading: number | null
   kind: MarkerKind
+  role: MarkerRole
+  farmColor: string | null
   label: string
+}
+
+const ROLES: MarkerRole[] = ["tractor", "harvester", "trailer", "tool", "pallet", "building", "player"]
+
+function markerRole(kind: MarkerKind, category: string | null): MarkerRole {
+  if (kind === "place") return "building"
+  if (kind === "player") return "player"
+  if (kind === "pin") return "pin"
+  if (category === "tractor" || category === "harvester" || category === "trailer" || category === "tool" || category === "pallet") {
+    return category
+  }
+  return "vehicle"
 }
 
 function clockLabel(value: number | null) {
@@ -35,13 +51,6 @@ function clockLabel(value: number | null) {
   if (ms < 0 || ms > 48 * 60 * 60 * 1000) return null
   const minutes = Math.floor(ms / 60000) % (24 * 60)
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
-}
-
-function weatherLabel(raw: string | null) {
-  if (!raw) return null
-  const words = raw.replace(/[_-]+/g, " ").trim()
-  if (!words) return null
-  return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase()
 }
 
 function readPin(params: URLSearchParams) {
@@ -71,6 +80,7 @@ export function LiveMapPage() {
   const farm = workspace ? selectedFarm(workspace.id) : null
   const [payload, setPayload] = useState<LiveMapResponse | null>(null)
   const [fields, setFields] = useState<FieldsResponse | null>(null)
+  const [fleet, setFleet] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(liveMode)
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [ownOnly, setOwnOnly] = useState(true)
@@ -111,17 +121,37 @@ export function LiveMapPage() {
             temperature: null,
             windSpeed: null,
             windDirection: null,
+            year: null,
+            dayInPeriod: null,
+            daysPerPeriod: null,
+            rain: null,
+            clouds: null,
+            humidity: null,
+            fog: null,
+            snow: null,
             vehicles: [],
             players: [],
             places: [],
+            farms: [],
+            hours: [],
+            days: [],
           })
         }
       } finally {
         if (!cancelled && first) setLoading(false)
       }
     }
+    const loadFleet = async () => {
+      try {
+        const next = await apiWorkspaceVehicles(workspace.id)
+        if (!cancelled) setFleet(next.vehicles ?? [])
+      } catch {
+        if (!cancelled) setFleet([])
+      }
+    }
     void loadFields()
     void loadLive(true)
+    void loadFleet()
     const fieldsTimer = window.setInterval(() => void loadFields(), 60_000)
     const liveTimer = window.setInterval(() => void loadLive(false), 20_000)
     return () => {
@@ -177,7 +207,8 @@ export function LiveMapPage() {
 
   const month = payload?.period != null && payload.period >= 1 && payload.period <= 12 ? PERIOD_TO_MONTH[payload.period - 1] : null
   const clock = clockLabel(payload?.dayTime ?? null)
-  const weather = weatherLabel(payload?.weather ?? null)
+  const farmColor = (farmId: number | null) => payload?.farms?.find((item) => item.id === farmId)?.color ?? null
+  const fleetMatch = (id: string) => fleet.find((item) => item.id === `feed-${workspace?.id ?? ""}-${id}` || item.id === id) ?? null
   const selectedVehicle = vehicles.find((vehicle) => `v:${vehicle.id}` === selected) ?? null
   const selectedPlayer = players.find((player) => `p:${player.id}` === selected) ?? null
   const selectedPlace = places.find((place) => `o:${place.id}` === selected) ?? null
@@ -207,6 +238,8 @@ export function LiveMapPage() {
           places={places}
           pin={pin}
           selected={selected}
+          vehicleRole={(vehicle) => markerRole("vehicle", fleetMatch(vehicle.id)?.category ?? null)}
+          placeColor={(farmId) => farmColor(farmId)}
           onSelect={setSelected}
           onContentBox={setContentBox}
         />
@@ -217,13 +250,6 @@ export function LiveMapPage() {
               {payload?.day != null ? ` · ${t("live.day", { day: payload.day })}` : ""}
               {month != null ? ` · ${t(`fields.month.${month}`)}` : ""}
               {payload?.paused ? ` · ${t("live.paused")}` : ""}
-            </span>
-          ) : null}
-          {weather ? (
-            <span className="live-chip">
-              {weather}
-              {payload?.temperature != null ? ` ${payload.temperature.toFixed(1)}°` : ""}
-              {payload?.windSpeed != null ? ` · ${payload.windSpeed.toFixed(1)}` : ""}
             </span>
           ) : null}
           {payload?.writtenAt ? (
@@ -270,8 +296,8 @@ export function LiveMapPage() {
                 {selectedVehicle.ai ? t("live.ai") : null}
                 {selectedVehicle.driver ? ` ${selectedVehicle.driver}` : null}
               </p>
-              {selectedVehicle.id ? (
-                <Link to={`/w/${workspace.id}/equipment/${encodeURIComponent(selectedVehicle.id)}`}>{t("modules.equipment")}</Link>
+              {fleetMatch(selectedVehicle.id) ? (
+                <Link to={`/w/${workspace.id}/equipment/${encodeURIComponent(fleetMatch(selectedVehicle.id)!.id)}`}>{t("modules.equipment")}</Link>
               ) : null}
             </div>
           ) : null}
@@ -286,6 +312,14 @@ export function LiveMapPage() {
               {selectedPlace.type ? <p>{selectedPlace.type}</p> : null}
             </div>
           ) : null}
+          <ul className="live-legend" aria-label={t("live.legend")}>
+            {ROLES.map((role) => (
+              <li key={role}>
+                <i className={`live-dot is-${role}`} />
+                <span>{t(`live.role.${role}`)}</span>
+              </li>
+            ))}
+          </ul>
           <ul className="live-list">
             {rows === 0 ? (
               <li className="live-empty">
@@ -296,7 +330,10 @@ export function LiveMapPage() {
               ? visibleVehicles.map((vehicle) => (
                   <li key={vehicle.id || vehicle.name}>
                     <button type="button" className={selected === `v:${vehicle.id}` ? "is-on" : ""} onClick={() => setSelected(`v:${vehicle.id}`)}>
-                      <i className="live-dot is-vehicle" />
+                      <i
+                        className={`live-dot is-${markerRole("vehicle", fleetMatch(vehicle.id)?.category ?? null)}`}
+                        style={farmColor(vehicle.farmId) ? { boxShadow: `0 0 0 2px ${farmColor(vehicle.farmId)}` } : undefined}
+                      />
                       <span>{vehicle.name || vehicle.id}</span>
                       {vehicle.ai ? <em>{t("live.ai")}</em> : null}
                     </button>
@@ -317,7 +354,10 @@ export function LiveMapPage() {
               ? visiblePlaces.map((place) => (
                   <li key={`${place.id}:${place.x}`}>
                     <button type="button" className={selected === `o:${place.id}` ? "is-on" : ""} onClick={() => setSelected(`o:${place.id}`)}>
-                      <i className="live-dot is-place" />
+                      <i
+                        className="live-dot is-building"
+                        style={farmColor(place.farmId) ? { boxShadow: `0 0 0 2px ${farmColor(place.farmId)}` } : undefined}
+                      />
                       <span>{place.name || place.type || place.id}</span>
                     </button>
                   </li>
@@ -330,6 +370,25 @@ export function LiveMapPage() {
   )
 }
 
+function MarkerGlyph({ role }: { role: MarkerRole }) {
+  if (role === "building") return <polygon points="0,-0.78 0.66,-0.16 0.66,0.62 -0.66,0.62 -0.66,-0.16" />
+  if (role === "player") {
+    return (
+      <g>
+        <circle cy="-0.32" r="0.24" />
+        <path d="M-0.42,0.58 Q0,0.02 0.42,0.58 Z" />
+      </g>
+    )
+  }
+  if (role === "trailer") return <rect x="-0.68" y="-0.3" width="1.36" height="0.6" rx="0.14" />
+  if (role === "tool") return <polygon points="0,-0.66 0.66,0 0,0.66 -0.66,0" />
+  if (role === "harvester") return <polygon points="-0.74,-0.32 0.28,-0.32 0.74,0.08 0.28,0.42 -0.74,0.42" />
+  if (role === "pallet") return <rect x="-0.34" y="-0.34" width="0.68" height="0.68" />
+  if (role === "pin") return <polygon points="0,-0.72 0.16,-0.16 0.72,0 0.16,0.16 0,0.72 -0.16,0.16 -0.72,0 -0.16,-0.16" />
+  if (role === "tractor") return <polygon points="0,0.72 -0.5,-0.48 0.5,-0.48" />
+  return <circle r="0.42" />
+}
+
 function LiveCanvas({
   mapUrl,
   frame,
@@ -339,6 +398,8 @@ function LiveCanvas({
   places,
   pin,
   selected,
+  vehicleRole,
+  placeColor,
   onSelect,
   onContentBox,
 }: {
@@ -350,6 +411,8 @@ function LiveCanvas({
   places: LivePlace[]
   pin: { x: number; z: number; name: string } | null
   selected: string | null
+  vehicleRole: (vehicle: LiveVehicle) => MarkerRole
+  placeColor: (farmId: number | null) => string | null
   onSelect: (id: string) => void
   onContentBox: (box: { x: number; y: number; w: number; h: number } | null) => void
 }) {
@@ -371,7 +434,7 @@ function LiveCanvas({
 
   function zoomAt(next: number, px: number, py: number) {
     const prev = cam.current.k
-    const clamped = Math.min(6, Math.max(1, next))
+    const clamped = Math.min(10, Math.max(1, next))
     if (clamped === 1) {
       cam.current = { x: 0, y: 0, k: 1 }
       apply()
@@ -414,7 +477,7 @@ function LiveCanvas({
       const rect = viewport.getBoundingClientRect()
       const next = cam.current.k * (event.deltaY > 0 ? 1 / 1.12 : 1.12)
       const prev = cam.current.k
-      const clamped = Math.min(6, Math.max(1, next))
+      const clamped = Math.min(10, Math.max(1, next))
       if (clamped === 1) {
         cam.current = { x: 0, y: 0, k: 1 }
       } else {
@@ -443,6 +506,8 @@ function LiveCanvas({
         y: point.y,
         heading: vehicle.heading,
         kind: "vehicle",
+        role: vehicleRole(vehicle),
+        farmColor: placeColor(vehicle.farmId),
         label: vehicle.name || vehicle.id,
       })
     }
@@ -454,6 +519,8 @@ function LiveCanvas({
         y: point.y,
         heading: player.heading,
         kind: "player",
+        role: "player",
+        farmColor: null,
         label: player.name || player.id,
       })
     }
@@ -465,15 +532,62 @@ function LiveCanvas({
         y: point.y,
         heading: null,
         kind: "place",
+        role: "building",
+        farmColor: placeColor(place.farmId),
         label: place.name || place.type || place.id,
       })
     }
     if (pin) {
       const point = projectPoint(pin.x, pin.z, frame)
-      next.push({ key: "pin", x: point.x, y: point.y, heading: null, kind: "pin", label: pin.name })
+      next.push({ key: "pin", x: point.x, y: point.y, heading: null, kind: "pin", role: "pin", farmColor: null, label: pin.name })
     }
     return next
-  }, [frame, pin, places, players, vehicles])
+  }, [frame, pin, placeColor, places, players, vehicleRole, vehicles])
+
+  const draw = useMemo(() => {
+    const threshold = 26
+    const kept = markers.filter((marker) => marker.key === selected || marker.kind === "pin")
+    const pool = markers.filter((marker) => marker.key !== selected && marker.kind !== "pin")
+    const used = new Array(pool.length).fill(false)
+    const singles: Marker[] = [...kept]
+    const clusters: { key: string; x: number; y: number; count: number; color: string | null; role: MarkerRole }[] = []
+    const stageOf = (marker: Marker) => ({
+      x: sheet.left + (marker.x / 100) * sheet.size,
+      y: sheet.top + (marker.y / 100) * sheet.size,
+    })
+    for (let i = 0; i < pool.length; i += 1) {
+      if (used[i]) continue
+      const group = [i]
+      const origin = stageOf(pool[i])
+      for (let j = i + 1; j < pool.length; j += 1) {
+        if (used[j]) continue
+        if (pool[j].role !== pool[i].role || pool[j].farmColor !== pool[i].farmColor) continue
+        const other = stageOf(pool[j])
+        if (Math.hypot(origin.x - other.x, origin.y - other.y) * Math.max(zoom, 1) > threshold) continue
+        used[j] = true
+        group.push(j)
+      }
+      if (group.length === 1) {
+        singles.push(pool[i])
+        continue
+      }
+      let sx = 0
+      let sy = 0
+      for (const index of group) {
+        sx += pool[index].x
+        sy += pool[index].y
+      }
+      clusters.push({
+        key: `c:${pool[group[0]].key}`,
+        x: sx / group.length,
+        y: sy / group.length,
+        count: group.length,
+        color: pool[i].farmColor,
+        role: pool[i].role,
+      })
+    }
+    return { singles, clusters }
+  }, [markers, selected, sheet, zoom])
 
   const focused = useRef<string | null>(null)
   useEffect(() => {
@@ -557,7 +671,16 @@ function LiveCanvas({
             .elementsFromPoint(event.clientX, event.clientY)
             .find((node) => node instanceof Element && node.closest("[data-marker]"))
           const node = hit instanceof Element ? hit.closest("[data-marker]") : null
-          onSelect(node?.getAttribute("data-marker") ?? "")
+          const id = node?.getAttribute("data-marker") ?? ""
+          if (id.startsWith("c:")) {
+            const cluster = draw.clusters.find((item) => item.key === id)
+            if (!cluster) return
+            const px = sheet.left + (cluster.x / 100) * sheet.size
+            const py = sheet.top + (cluster.y / 100) * sheet.size
+            zoomAt(cam.current.k * 1.8, cam.current.x + px * cam.current.k, cam.current.y + py * cam.current.k)
+            return
+          }
+          onSelect(id)
         }}
       >
         <div ref={stageRef} className="fields-stage" style={{ "--map-zoom": zoom } as CSSProperties}>
@@ -588,25 +711,32 @@ function LiveCanvas({
             {shapes.map((points, index) => (
               <polygon key={`shape-${index}`} className="live-field" points={points} />
             ))}
-            {markers.map((marker) => {
+            {draw.clusters.map((cluster) => {
+              const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
+              return (
+                <g key={cluster.key} data-marker={cluster.key} className={`live-cluster is-${cluster.role}`} transform={`translate(${cluster.x} ${cluster.y})`}>
+                  <circle r={toMap(15)} style={cluster.color ? { stroke: cluster.color } : undefined} />
+                  <g transform={`scale(${toMap(12)})`}>
+                    <text textAnchor="middle" y="0.35">
+                      {cluster.count}
+                    </text>
+                  </g>
+                </g>
+              )
+            })}
+            {draw.singles.map((marker) => {
               const on = marker.key === selected
               const rotation = marker.heading == null ? 0 : (-marker.heading * 180) / Math.PI
               const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
-              const mark = toMap(on ? 15 : 10)
+              const mark = toMap(on ? 16 : 13)
               return (
-                <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.kind} is-on` : `live-marker is-${marker.kind}`} transform={`translate(${marker.x} ${marker.y})`}>
+                <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.role} is-on` : `live-marker is-${marker.role}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`rotate(${rotation}) scale(${mark})`}>
-                    {marker.kind === "vehicle" && marker.heading != null ? (
-                      <polygon points="0,0.85 -0.55,-0.6 0.55,-0.6" />
-                    ) : marker.kind === "place" || marker.kind === "pin" ? (
-                      <polygon points="0,-0.7 0.16,-0.16 0.7,0 0.16,0.16 0,0.7 -0.16,0.16 -0.7,0 -0.16,-0.16" />
-                    ) : (
-                      <circle r="0.46" />
-                    )}
-                    <circle className="live-marker-ring" r="0.78" />
+                    <MarkerGlyph role={marker.role} />
+                    <circle className={marker.farmColor ? "live-marker-ring is-farm" : "live-marker-ring"} r="0.96" style={marker.farmColor ? { stroke: marker.farmColor } : undefined} />
                   </g>
                   {on && marker.label ? (
-                    <g className="live-caption" transform={`translate(0 ${-toMap(16)}) scale(${toMap(12)})`}>
+                    <g className="live-caption" transform={`translate(0 ${-toMap(18)}) scale(${toMap(12)})`}>
                       <text textAnchor="middle" y="0">
                         {marker.label}
                       </text>

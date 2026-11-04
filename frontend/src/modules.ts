@@ -1,5 +1,6 @@
 export const APP_MODULES = [
   { id: "map", labelKey: "modules.map", path: "m/map", section: "ops" },
+  { id: "weather", labelKey: "modules.weather", path: "m/weather", section: "ops" },
   { id: "fields", labelKey: "modules.fields", path: "m/fields", section: "ops" },
   { id: "equipment", labelKey: "modules.equipment", path: "equipment", section: "ops" },
   { id: "animals", labelKey: "modules.animals", path: "m/animals", section: "ops" },
@@ -26,7 +27,7 @@ const LEGACY_MODULE_IDS: Record<string, ModuleId> = {
   vehicles: "equipment",
 }
 
-const READY_MODULES = new Set<ModuleId>(["equipment", "fields", "map", "server", "storage"])
+const READY_MODULES = new Set<ModuleId>(["equipment", "fields", "map", "server", "storage", "weather"])
 
 export function moduleIsReady(id: ModuleId) {
   return READY_MODULES.has(id)

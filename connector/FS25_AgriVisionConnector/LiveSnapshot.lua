@@ -259,69 +259,257 @@ local function placeTypeName(hotspot)
     return nil
 end
 
+local function worldXZ(placeable)
+    if placeable == nil or getWorldTranslation == nil then
+        return nil, nil
+    end
+    local node = placeable.rootNode
+    if node == nil and placeable.components ~= nil and placeable.components[1] ~= nil then
+        node = placeable.components[1].node
+    end
+    if node == nil then
+        return nil, nil
+    end
+    local ok, x, _, z = pcall(getWorldTranslation, node)
+    if not ok then
+        return nil, nil
+    end
+    return num(x), num(z)
+end
+
+local function buildingKind(placeable)
+    if placeable == nil then
+        return nil
+    end
+    if placeable.spec_silo ~= nil then
+        return "silo"
+    end
+    if placeable.spec_husbandry ~= nil or placeable.spec_animals ~= nil or placeable.spec_animal ~= nil then
+        return "husbandry"
+    end
+    if placeable.spec_productionPoint ~= nil or placeable.spec_production ~= nil then
+        return "production"
+    end
+    return nil
+end
+
+local function appendPlace(connector, parts, fingerprint, count, id, name, kind, farmId, x, z)
+    parts[#parts + 1] = string.format(
+        "<place%s%s%s%s%s%s />",
+        attr(connector, "id", id),
+        attr(connector, "name", name),
+        attr(connector, "type", kind),
+        attr(connector, "farmId", farmId),
+        attr(connector, "x", round(x, 1)),
+        attr(connector, "z", round(z, 1))
+    )
+    fingerprint[#fingerprint + 1] = string.format("o:%s:%s:%s", tostring(id), tostring(round(x, 0)), tostring(round(z, 0)))
+    return count + 1
+end
+
 local function appendPlaces(connector, parts, fingerprint)
     local mission = g_currentMission
     local placeables = mission ~= nil and mission.placeableSystem ~= nil and mission.placeableSystem.placeables or nil
     local count = 0
+    local seen = {}
     each(placeables, function(placeable)
-        if count >= 120 then
+        if count >= 160 or placeable == nil then
             return
         end
         pcall(function()
-            local spec = placeable ~= nil and placeable.spec_hotspots or nil
-            local hotspots = spec ~= nil and spec.hotspots or nil
-            each(hotspots, function(hotspot)
-                if count >= 120 or hotspot == nil then
-                    return
-                end
-                local x = num(hotspot.worldX)
-                local z = num(hotspot.worldZ)
-                if x == nil or z == nil then
-                    return
-                end
-                local name = hotspot.name
-                if type(name) ~= "string" or name == "" then
-                    name = safeMethod(placeable, "getName")
-                end
-                local id = placeable.uniqueId or safeMethod(placeable, "getUniqueId") or count
-                parts[#parts + 1] = string.format(
-                    "<place%s%s%s%s%s%s />",
-                    attr(connector, "id", id),
-                    attr(connector, "name", name),
-                    attr(connector, "type", placeTypeName(hotspot)),
-                    attr(connector, "farmId", farmIdOf(placeable)),
-                    attr(connector, "x", round(x, 1)),
-                    attr(connector, "z", round(z, 1))
-                )
-                fingerprint[#fingerprint + 1] = string.format("o:%s:%s:%s", tostring(id), tostring(round(x, 0)), tostring(round(z, 0)))
-                count = count + 1
-            end)
+            local spec = placeable.spec_hotspots
+            local lists = {}
+            if spec ~= nil then
+                lists[1] = spec.mapHotspots
+                lists[2] = spec.hotspots
+            end
+            local wrote = false
+            for _, hotspots in ipairs(lists) do
+                each(hotspots, function(hotspot)
+                    if count >= 160 or hotspot == nil or wrote then
+                        return
+                    end
+                    local x = num(hotspot.worldX)
+                    local z = num(hotspot.worldZ)
+                    if x == nil or z == nil then
+                        return
+                    end
+                    local name = hotspot.name
+                    if type(name) ~= "string" or name == "" then
+                        name = safeMethod(placeable, "getName")
+                    end
+                    local id = placeable.uniqueId or safeMethod(placeable, "getUniqueId") or count
+                    local key = tostring(id)
+                    if seen[key] then
+                        return
+                    end
+                    seen[key] = true
+                    count = appendPlace(connector, parts, fingerprint, count, id, name, placeTypeName(hotspot) or buildingKind(placeable), farmIdOf(placeable), x, z)
+                    wrote = true
+                end)
+            end
+            if wrote then
+                return
+            end
+            local kind = buildingKind(placeable)
+            if kind == nil then
+                return
+            end
+            local x, z = worldXZ(placeable)
+            if x == nil or z == nil then
+                return
+            end
+            local id = placeable.uniqueId or safeMethod(placeable, "getUniqueId") or count
+            local key = tostring(id)
+            if seen[key] then
+                return
+            end
+            seen[key] = true
+            local name = safeMethod(placeable, "getName")
+            count = appendPlace(connector, parts, fingerprint, count, id, name, kind, farmIdOf(placeable), x, z)
         end)
     end)
+end
+
+local function hexColor(color)
+    if type(color) ~= "table" then
+        return nil
+    end
+    local r = num(color.r or color[1])
+    local g = num(color.g or color[2])
+    local b = num(color.b or color[3])
+    if r == nil or g == nil or b == nil then
+        return nil
+    end
+    if r > 1 or g > 1 or b > 1 then
+        r = r / 255
+        g = g / 255
+        b = b / 255
+    end
+    local function channel(value)
+        local byte = math.floor(math.max(0, math.min(1, value)) * 255 + 0.5)
+        return string.format("%02X", byte)
+    end
+    return "#" .. channel(r) .. channel(g) .. channel(b)
+end
+
+local function appendFarms(connector, parts)
+    local manager = g_farmManager
+    if manager == nil or manager.getFarms == nil then
+        return
+    end
+    local ok, farms = pcall(manager.getFarms, manager)
+    if not ok or type(farms) ~= "table" then
+        return
+    end
+    each(farms, function(farm)
+        if farm == nil then
+            return
+        end
+        local id = num(farm.farmId)
+        if id == nil or id <= 0 then
+            return
+        end
+        local color = nil
+        if farm.getColor ~= nil then
+            local cok, value = pcall(farm.getColor, farm)
+            if cok then
+                color = hexColor(value)
+            end
+        end
+        local name = farm.name
+        if type(name) ~= "string" or name == "" then
+            name = nil
+        end
+        parts[#parts + 1] = string.format(
+            "<farm%s%s%s />",
+            attr(connector, "id", id),
+            attr(connector, "name", name),
+            attr(connector, "color", color)
+        )
+    end)
+end
+
+local function firstNumber(objects, key, places)
+    for _, object in ipairs(objects) do
+        if type(object) == "table" then
+            local value = round(object[key], places)
+            if value ~= nil then
+                return value
+            end
+        end
+    end
+    return nil
+end
+
+local function forecastRow(forecast, method, index)
+    if forecast == nil or forecast[method] == nil then
+        return nil
+    end
+    local ok, value = pcall(forecast[method], forecast, index)
+    if ok and type(value) == "table" then
+        return value
+    end
+    return nil
 end
 
 local function clockAndWeather()
     local mission = g_currentMission
     local environment = mission ~= nil and mission.environment or nil
     local clock = {}
+    local weather = environment ~= nil and environment.weather or nil
     if environment ~= nil then
-        clock.day = num(environment.day)
-        clock.period = num(environment.period)
+        clock.day = num(environment.day) or num(environment.currentDay)
+        clock.period = num(environment.period) or num(environment.currentPeriod)
         clock.dayTime = num(environment.dayTime)
         clock.timeScale = num(environment.timeScale)
+        clock.year = num(environment.currentYear)
+        clock.dayInPeriod = num(environment.currentDayInPeriod)
+        clock.daysPerPeriod = num(environment.daysPerPeriod)
     end
     if mission ~= nil and mission.paused == true then
         clock.paused = "1"
     end
-    local forecast = nil
-    if environment ~= nil and environment.weather ~= nil and environment.weather.forecast ~= nil then
-        forecast = safeMethod(environment.weather.forecast, "getCurrentWeather")
-    end
+    local forecastObject = weather ~= nil and weather.forecast or nil
+    local forecast = forecastObject ~= nil and safeMethod(forecastObject, "getCurrentWeather") or nil
+    local sources = { forecast, weather }
     if type(forecast) == "table" then
         clock.weather = weatherName(forecast.forecastType)
         clock.temperature = round(forecast.temperature, 1)
         clock.windSpeed = round(forecast.windSpeed, 1)
         clock.windDirection = round(forecast.windDirection, 3)
+    end
+    clock.rain = firstNumber(sources, "rainScale", 3)
+    clock.clouds = firstNumber(sources, "cloudCoverage", 3)
+    clock.humidity = firstNumber(sources, "humidity", 3)
+    clock.fog = firstNumber(sources, "fogScale", 3)
+    clock.snow = firstNumber(sources, "snowHeight", 3)
+    clock.hours = {}
+    clock.days = {}
+    if forecastObject ~= nil then
+        for hour = 0, 11 do
+            local row = forecastRow(forecastObject, "getHourlyForecast", hour)
+            if row ~= nil then
+                clock.hours[#clock.hours + 1] = {
+                    time = num(row.time),
+                    weather = weatherName(row.forecastType),
+                    temperature = round(row.temperature, 1),
+                    windSpeed = round(row.windSpeed, 1),
+                }
+            end
+        end
+        for day = 1, 8 do
+            local row = forecastRow(forecastObject, "getDailyForecast", day)
+            if row ~= nil then
+                clock.days[#clock.days + 1] = {
+                    day = num(row.day),
+                    weather = weatherName(row.forecastType),
+                    high = round(row.highTemperature, 1),
+                    low = round(row.lowTemperature, 1),
+                    windSpeed = round(row.windSpeed, 1),
+                }
+            end
+        end
     end
     return clock
 end
@@ -341,14 +529,36 @@ function LiveSnapshot.writeIfDue(connector)
     appendVehicles(connector, parts, fingerprint)
     appendPlayers(connector, parts, fingerprint)
     appendPlaces(connector, parts, fingerprint)
+    appendFarms(connector, parts)
     local clock = clockAndWeather()
+    for _, row in ipairs(clock.hours) do
+        parts[#parts + 1] = string.format(
+            "<hour%s%s%s%s />",
+            attr(connector, "time", row.time ~= nil and math.floor(row.time) or nil),
+            attr(connector, "type", row.weather),
+            attr(connector, "temperature", row.temperature),
+            attr(connector, "windSpeed", row.windSpeed)
+        )
+    end
+    for _, row in ipairs(clock.days) do
+        parts[#parts + 1] = string.format(
+            "<day%s%s%s%s%s />",
+            attr(connector, "day", row.day),
+            attr(connector, "type", row.weather),
+            attr(connector, "high", row.high),
+            attr(connector, "low", row.low),
+            attr(connector, "windSpeed", row.windSpeed)
+        )
+    end
     local body = table.concat(parts, "")
     local stamp = string.format(
-        "%s|%s|%s|%s|%s",
+        "%s|%s|%s|%s|%s|%s|%s",
         tostring(clock.day),
         tostring(clock.dayTime ~= nil and round(clock.dayTime, -4) or ""),
         tostring(clock.weather),
         tostring(clock.temperature),
+        tostring(clock.rain),
+        tostring(#clock.hours),
         body
     )
     if stamp == connector.liveFingerprint then
@@ -363,12 +573,15 @@ function LiveSnapshot.writeIfDue(connector)
     if g_currentMission ~= nil and g_currentMission.time ~= nil then
         writtenAt = tostring(math.floor(g_currentMission.time))
     end
-    local xml = string.format(
-        '<?xml version="1.0" encoding="utf-8"?><live%s%s%s%s%s%s%s%s%s%s%s>%s</live>',
+    local xml = table.concat({
+        '<?xml version="1.0" encoding="utf-8"?><live',
         attr(connector, "generation", generation),
         attr(connector, "timestamp", writtenAt),
         attr(connector, "day", clock.day),
         attr(connector, "period", clock.period),
+        attr(connector, "year", clock.year),
+        attr(connector, "dayInPeriod", clock.dayInPeriod),
+        attr(connector, "daysPerPeriod", clock.daysPerPeriod),
         attr(connector, "dayTime", clock.dayTime ~= nil and math.floor(clock.dayTime) or nil),
         attr(connector, "timeScale", clock.timeScale),
         attr(connector, "paused", clock.paused),
@@ -376,8 +589,15 @@ function LiveSnapshot.writeIfDue(connector)
         attr(connector, "temperature", clock.temperature),
         attr(connector, "windSpeed", clock.windSpeed),
         attr(connector, "windDirection", clock.windDirection),
-        body
-    )
+        attr(connector, "rain", clock.rain),
+        attr(connector, "clouds", clock.clouds),
+        attr(connector, "humidity", clock.humidity),
+        attr(connector, "fog", clock.fog),
+        attr(connector, "snow", clock.snow),
+        ">",
+        body,
+        "</live>",
+    })
     connector:writeTextFile(connector.stateDir .. "live_map.xml", xml)
     connector.liveFingerprint = stamp
     if not connector.liveLogged then

@@ -3479,6 +3479,47 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .stock-place header { flex-wrap: wrap; }
 .stock-map { margin-left: auto; padding: 6px 10px; white-space: nowrap; }
 .stock-map .icon { width: 15px; height: 15px; }
+.weather-page { display: grid; gap: 16px; align-content: start; }
+.weather-page h2 { margin: 0 0 8px; font-size: 1rem; }
+.weather-now {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.weather-hero { display: grid; align-content: center; gap: 4px; }
+.weather-hero span { color: var(--text-faint); }
+.weather-hero strong { font-size: 3rem; line-height: 1; letter-spacing: -0.04em; }
+.weather-hero p { margin: 0; color: var(--text-muted); }
+.weather-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px 14px;
+  margin: 0;
+}
+.weather-facts div { display: grid; gap: 2px; }
+.weather-facts dt { margin: 0; color: var(--text-faint); font-size: 0.75rem; }
+.weather-facts dd { margin: 0; font-size: 1.15rem; }
+.weather-strip, .weather-days { display: flex; gap: 8px; overflow: auto; padding-bottom: 4px; }
+.weather-card {
+  flex: 0 0 108px;
+  display: grid;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+.weather-card span, .weather-card em, .weather-card small { color: var(--text-faint); font-style: normal; font-size: 0.75rem; }
+.weather-card strong { font-size: 1.35rem; }
+.weather-card strong small { margin-left: 4px; font-size: 0.85rem; color: var(--text-muted); }
+.weather-note { margin: 0; color: var(--text-faint); max-width: 68ch; }
+@media (max-width: 800px) {
+  .weather-now { grid-template-columns: 1fr; }
+}
 .live-page {
   height: calc(100vh - 130px);
   min-height: 560px;
@@ -3591,10 +3632,27 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-list button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .live-list button em { margin-left: auto; font-style: normal; color: var(--text-faint); font-size: 0.75rem; }
 .live-empty { padding: 8px; color: var(--text-faint); }
+.live-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0 2px;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+.live-legend li { display: flex; align-items: center; gap: 5px; }
 .live-dot { width: 8px; height: 8px; border-radius: 99px; flex: 0 0 auto; }
-.live-dot.is-vehicle { background: #e4b84a; }
-.live-dot.is-player { background: #f4f7f4; }
-.live-dot.is-place { background: #7eb6ff; }
+.live-dot.is-tractor, .live-marker.is-tractor { background: #e4b84a; fill: #e4b84a; }
+.live-dot.is-harvester, .live-marker.is-harvester { background: #e07a3d; fill: #e07a3d; }
+.live-dot.is-trailer, .live-marker.is-trailer { background: #7eb6d6; fill: #7eb6d6; }
+.live-dot.is-tool, .live-marker.is-tool { background: #8fbf8a; fill: #8fbf8a; }
+.live-dot.is-pallet, .live-marker.is-pallet { background: #c4b49a; fill: #c4b49a; }
+.live-dot.is-building, .live-marker.is-building { background: #f3efe6; fill: #f3efe6; }
+.live-dot.is-player, .live-marker.is-player { background: #f7f7f7; fill: #f7f7f7; }
+.live-dot.is-vehicle, .live-marker.is-vehicle { background: #d7c27a; fill: #d7c27a; }
+.live-marker.is-pin { fill: #ff8f5a; }
 .live-wait { position: absolute; z-index: 2; left: 16px; bottom: 16px; }
 .live-field {
   fill: rgba(255, 255, 255, 0.03);
@@ -3604,13 +3662,23 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   pointer-events: none;
 }
 .live-marker { cursor: pointer; }
-.live-marker polygon, .live-marker > g > circle:first-of-type { stroke: none; }
-.live-marker.is-vehicle { fill: #e4b84a; }
-.live-marker.is-player { fill: #f4f7f4; }
-.live-marker.is-place { fill: #7eb6ff; }
-.live-marker.is-pin { fill: #ff8f5a; }
-.live-marker-ring { fill: none; stroke: rgba(8, 12, 10, 0.85); stroke-width: 0.18; }
-.live-marker.is-on .live-marker-ring { stroke: #fff; stroke-width: 0.22; }
+.live-marker polygon, .live-marker rect, .live-marker path, .live-marker > g > circle:first-of-type { stroke: none; }
+.live-marker-ring { fill: none; stroke: rgba(8, 12, 10, 0.9); stroke-width: 0.16; }
+.live-marker-ring.is-farm { stroke-width: 0.28; }
+.live-marker.is-on .live-marker-ring { stroke-width: 0.34; }
+.live-cluster { cursor: pointer; }
+.live-cluster circle {
+  fill: #17201c;
+  stroke: rgba(247, 241, 228, 0.85);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+.live-cluster text {
+  fill: #f7f8f7;
+  font-size: 1px;
+  font-weight: 700;
+  pointer-events: none;
+}
 .live-caption text {
   fill: #f7f8f7;
   font-size: 1.15px;

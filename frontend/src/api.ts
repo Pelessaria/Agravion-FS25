@@ -244,6 +244,27 @@ export type LivePlace = {
   z: number
 }
 
+export type LiveFarmColor = {
+  id: number
+  name: string | null
+  color: string | null
+}
+
+export type LiveForecastHour = {
+  time: number | null
+  type: string | null
+  temperature: number | null
+  windSpeed: number | null
+}
+
+export type LiveForecastDay = {
+  day: number | null
+  type: string | null
+  high: number | null
+  low: number | null
+  windSpeed: number | null
+}
+
 export type LiveMapResponse = {
   ok: boolean
   error: string | null
@@ -258,9 +279,20 @@ export type LiveMapResponse = {
   temperature: number | null
   windSpeed: number | null
   windDirection: number | null
+  year: number | null
+  dayInPeriod: number | null
+  daysPerPeriod: number | null
+  rain: number | null
+  clouds: number | null
+  humidity: number | null
+  fog: number | null
+  snow: number | null
   vehicles: LiveVehicle[]
   players: LivePlayer[]
   places: LivePlace[]
+  farms: LiveFarmColor[]
+  hours: LiveForecastHour[]
+  days: LiveForecastDay[]
 }
 
 export async function apiWorkspaceLiveMap(id: string): Promise<LiveMapResponse> {

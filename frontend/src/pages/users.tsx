@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import {
   Check,
   ChevronRight,
+  CloudSun,
   House,
   Landmark,
   Server,
@@ -23,6 +24,7 @@ import { isEmail } from "../validate"
 
 const MODULE_ICONS: Record<ModuleId, typeof Map> = {
   map: Map,
+  weather: CloudSun,
   fields: Sprout,
   equipment: Tractor,
   animals: PawPrint,

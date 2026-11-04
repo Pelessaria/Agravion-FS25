@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   ArrowLeft,
   Bell,
+  CloudSun,
   House,
   Landmark,
   LayoutDashboard,
@@ -33,6 +34,7 @@ import { MANAGEMENT_VERSION } from "./version"
 
 const MODULE_ICONS: Record<ModuleId, ComponentType<{ className?: string }>> = {
   map: Map,
+  weather: CloudSun,
   fields: Sprout,
   equipment: Tractor,
   animals: PawPrint,
