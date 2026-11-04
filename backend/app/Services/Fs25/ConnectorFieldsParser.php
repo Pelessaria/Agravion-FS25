@@ -199,7 +199,7 @@ final class ConnectorFieldsParser
                 continue;
             }
             $points[] = [(float) $bits[0], (float) $bits[1]];
-            if (count($points) >= 64) {
+            if (count($points) >= 160) {
                 break;
             }
         }

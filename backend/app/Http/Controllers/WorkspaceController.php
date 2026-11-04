@@ -159,6 +159,21 @@ class WorkspaceController extends Controller
         return response()->json($connector->readFields($row));
     }
 
+    public function storage(string $workspace, ConnectorSnapshotService $connector): JsonResponse
+    {
+        $row = $this->findWorkspace($workspace);
+        if ($row->lifecycle === 'disabled') {
+            return response()->json([
+                'ok' => false,
+                'error' => 'disabled',
+                'writtenAt' => null,
+                'places' => [],
+            ]);
+        }
+
+        return response()->json($connector->readStorage($row));
+    }
+
     public function pdaMap(string $workspace, ConnectorSnapshotService $connector): BinaryFileResponse|Response
     {
         $row = $this->findWorkspace($workspace);

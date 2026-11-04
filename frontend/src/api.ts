@@ -182,6 +182,38 @@ export async function apiWorkspaceFields(id: string): Promise<FieldsResponse> {
   return apiFetch(`/api/workspaces/${encodeURIComponent(id)}/fields`)
 }
 
+export type StorageFill = {
+  fillType: string | null
+  title: string | null
+  level: number | null
+  capacity: number | null
+  count: number | null
+}
+
+export type StoragePlace = {
+  id: string
+  kind: string | null
+  farmId: number | null
+  name: string | null
+  foreign: boolean
+  level: number | null
+  capacity: number | null
+  used: number | null
+  slots: number | null
+  fills: StorageFill[]
+}
+
+export type StorageResponse = {
+  ok: boolean
+  error: string | null
+  writtenAt: string | null
+  places: StoragePlace[]
+}
+
+export async function apiWorkspaceStorage(id: string): Promise<StorageResponse> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(id)}/storage`)
+}
+
 export async function apiWorkspaceVehicles(
   id: string,
 ): Promise<{

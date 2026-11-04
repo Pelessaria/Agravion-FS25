@@ -173,7 +173,7 @@ final class ConnectorSnapshotService
             $detail = $detail ?? $e->getMessage();
         }
 
-        foreach (['fields_geometry.xml', 'fields_state.xml', 'fruits_manifest.xml'] as $file) {
+        foreach (['fields_geometry.xml', 'fields_state.xml', 'fruits_manifest.xml', 'storage_state.xml'] as $file) {
             try {
                 $remote = $client->read($base.'/state/'.$file);
                 $this->storeLocalIfChanged($this->localStateDir($workspace).'/'.$file, $remote);
@@ -251,6 +251,33 @@ final class ConnectorSnapshotService
         $merged['pdaError'] = (! $merged['pdaMap'] && is_file($marker)) ? trim((string) file_get_contents($marker)) : null;
 
         return $merged;
+    }
+
+    /**
+     * Local storage cache only. Page loads do not open FTP.
+     *
+     * @return array{ok: bool, error: string|null, writtenAt: string|null, places: list<array<string, mixed>>}
+     */
+    public function readStorage(Workspace $workspace): array
+    {
+        $path = $this->localStateDir($workspace).'/storage_state.xml';
+        if (! is_file($path)) {
+            return [
+                'ok' => false,
+                'error' => 'missing',
+                'writtenAt' => null,
+                'places' => [],
+            ];
+        }
+
+        $parsed = ConnectorStorageParser::parse((string) file_get_contents($path));
+
+        return [
+            'ok' => true,
+            'error' => null,
+            'writtenAt' => $parsed['writtenAt'],
+            'places' => $parsed['places'],
+        ];
     }
 
     private function pullFruitIcons(HostFileClient $client, Workspace $workspace, string $base): void

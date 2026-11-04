@@ -2,7 +2,12 @@
   Field geometry + state for the dashboard.
 
   Geometry (polygon outlines) is collected once per field set and written to
-  state/fields_geometry.xml. Crop / ground / Precision Farming state is swept
+  state/fields_geometry.xml. Joined-field groups are measured again whenever
+  field state is written, because plowing between parcels changes the join
+  without moving the outlines. Farmlands hidden from the buy screen and not
+  owned by a player farm are omitted: maps use those for mission and scenery
+  ground, and their polygons are not fields the player can buy.
+  Crop / ground / Precision Farming state is swept
   in small batches and written about once a minute to state/fields_state.xml.
 
   Read patterns for field state and Precision Farming samples follow
@@ -424,25 +429,44 @@ local function centroid(points)
     return sx / #points, sz / #points
 end
 
+-- A farmland with showOnFarmlandsScreen false is not on the buy screen.
+-- Owned land stays, so a farm does not lose a field it already holds.
+local function shownToPlayer(field)
+    local farmland = nil
+    if field ~= nil and type(field.farmland) == "table" then
+        farmland = field.farmland
+    end
+    if farmland == nil or farmland.showOnFarmlandsScreen ~= false then
+        return true
+    end
+    local farmId = num(farmland.farmId)
+    return farmId ~= nil and farmId > 0
+end
+
 local function indexFields()
     local ids = {}
     local byId = {}
+    local hidden = 0
     if g_fieldManager == nil or g_fieldManager.fields == nil then
-        return ids, byId
+        return ids, byId, hidden
     end
     for _, field in pairs(g_fieldManager.fields) do
         if field ~= nil and field.getId ~= nil then
             local id = num(safeMethod(field, "getId"))
             if id ~= nil then
-                ids[#ids + 1] = id
-                byId[id] = field
+                if shownToPlayer(field) then
+                    ids[#ids + 1] = id
+                    byId[id] = field
+                else
+                    hidden = hidden + 1
+                end
             end
         end
     end
     table.sort(ids, function(a, b)
         return a < b
     end)
-    return ids, byId
+    return ids, byId, hidden
 end
 
 local function collectGeometry(field, id)
@@ -1591,34 +1615,161 @@ local function onFieldGround(x, z)
     return isOnField == true
 end
 
-local function closestOutlinePoints(a, b)
-    local best = nil
-    local stepA = math.max(1, math.floor(#a / 24))
-    local stepB = math.max(1, math.floor(#b / 24))
+-- The nearest corners of two parcels often sit in a road. The shared edge
+-- is the place a plow actually joins them, so corridors are measured
+-- edge to edge and only kept when they fall outside both outlines.
+local JOIN_METERS = 48
+
+local function pointInPolygon(points, x, z)
+    local count = #points
+    if count < 3 then
+        return false
+    end
+    local hit = false
+    local j = count
     local i = 1
-    while i <= #a do
-        local j = 1
-        while j <= #b do
-            local dx = a[i].x - b[j].x
-            local dz = a[i].z - b[j].z
-            local dist = dx * dx + dz * dz
-            if best == nil or dist < best.dist then
-                best = { dist = dist, ax = a[i].x, az = a[i].z, bx = b[j].x, bz = b[j].z }
+    while i <= count do
+        local xi = points[i].x
+        local zi = points[i].z
+        local xj = points[j].x
+        local zj = points[j].z
+        if (zi > z) ~= (zj > z) then
+            local denom = zj - zi
+            if denom ~= 0 and x < ((xj - xi) * (z - zi) / denom) + xi then
+                hit = not hit
             end
-            j = j + stepB
         end
-        i = i + stepA
+        j = i
+        i = i + 1
     end
-    if best == nil then
-        return nil
+    return hit
+end
+
+local function pointOnSegment(px, pz, ax, az, bx, bz)
+    local dx = bx - ax
+    local dz = bz - az
+    local len2 = dx * dx + dz * dz
+    local t = 0
+    if len2 > 0.0001 then
+        t = ((px - ax) * dx + (pz - az) * dz) / len2
+        if t < 0 then
+            t = 0
+        elseif t > 1 then
+            t = 1
+        end
     end
-    best.dist = math.sqrt(best.dist)
-    return best
+    return ax + t * dx, az + t * dz
+end
+
+local function corridorOutside(a, b, ax, az, bx, bz)
+    local t = 0.3
+    while t <= 0.7 do
+        local x = ax + (bx - ax) * t
+        local z = az + (bz - az) * t
+        if pointInPolygon(a, x, z) or pointInPolygon(b, x, z) then
+            return false
+        end
+        t = t + 0.2
+    end
+    return true
+end
+
+local function pushCorridors(found, from, onto, maxDist)
+    local fromCount = #from
+    local ontoCount = #onto
+    if fromCount < 2 or ontoCount < 2 then
+        return
+    end
+    local stepFrom = math.max(1, math.floor(fromCount / 24))
+    local stepOnto = math.max(1, math.floor(ontoCount / 32))
+    local max2 = maxDist * maxDist
+    local i = 1
+    while i <= fromCount do
+        local p = from[i]
+        local n = from[(i % fromCount) + 1]
+        local f = 1
+        while f <= 3 do
+            local frac = f / 4
+            local mx = p.x + (n.x - p.x) * frac
+            local mz = p.z + (n.z - p.z) * frac
+            local best = max2 + 1
+            local bx, bz = nil, nil
+            local j = 1
+            while j <= ontoCount do
+                local q = onto[j]
+                local m = onto[(j % ontoCount) + 1]
+                local qx, qz = pointOnSegment(mx, mz, q.x, q.z, m.x, m.z)
+                local dx = mx - qx
+                local dz = mz - qz
+                local dist = dx * dx + dz * dz
+                if dist < best then
+                    best = dist
+                    bx = qx
+                    bz = qz
+                end
+                j = j + stepOnto
+            end
+            if bx ~= nil and best <= max2 and best >= 0.16 then
+                if corridorOutside(from, onto, mx, mz, bx, bz) then
+                    found[#found + 1] = { dist = math.sqrt(best), ax = mx, az = mz, bx = bx, bz = bz }
+                end
+            end
+            f = f + 1
+        end
+        i = i + stepFrom
+    end
+end
+
+local function boundaryCorridors(a, b, maxDist)
+    local found = {}
+    pushCorridors(found, a, b, maxDist)
+    pushCorridors(found, b, a, maxDist)
+    table.sort(found, function(p, q)
+        return p.dist < q.dist
+    end)
+    local kept = {}
+    local k = 1
+    while k <= #found and #kept < 3 do
+        local row = found[k]
+        local distinct = true
+        local c = 1
+        while c <= #kept do
+            local prev = kept[c]
+            local dx = row.ax - prev.ax
+            local dz = row.az - prev.az
+            if dx * dx + dz * dz < 900 then
+                distinct = false
+                break
+            end
+            c = c + 1
+        end
+        if distinct then
+            kept[#kept + 1] = row
+        end
+        k = k + 1
+    end
+    return kept
+end
+
+local function corridorIsField(link)
+    local t = 0.35
+    while t <= 0.65 do
+        local x = link.ax + (link.bx - link.ax) * t
+        local z = link.az + (link.bz - link.az) * t
+        if onFieldGround(x, z) ~= true then
+            return false
+        end
+        t = t + 0.15
+    end
+    return true
 end
 
 -- Fields the player has plowed together stay as separate ids. The join is
 -- field ground between the original outlines. Confirmed samples only.
 local function assignGroups(records)
+    for _, row in pairs(records) do
+        row.group = nil
+    end
     local ids = {}
     for id, row in pairs(records) do
         if type(row.raw) == "table" and #row.raw >= 3 then
@@ -1675,22 +1826,15 @@ local function assignGroups(records)
             elseif boxB.maxZ < boxA.minZ then
                 gapZ = boxA.minZ - boxB.maxZ
             end
-            if gapX * gapX + gapZ * gapZ <= 40 * 40 then
-                local link = closestOutlinePoints(records[a].raw, records[b].raw)
-                if link ~= nil and link.dist <= 40 then
-                    local joined = true
-                    local t = 0.35
-                    while t <= 0.65 do
-                        local x = link.ax + (link.bx - link.ax) * t
-                        local z = link.az + (link.bz - link.az) * t
-                        if onFieldGround(x, z) ~= true then
-                            joined = false
-                            break
-                        end
-                        t = t + 0.15
-                    end
-                    if joined then
+            if gapX * gapX + gapZ * gapZ <= JOIN_METERS * JOIN_METERS then
+                local corridors = boundaryCorridors(records[a].raw, records[b].raw, JOIN_METERS)
+                local c = 1
+                while c <= #corridors do
+                    if corridorIsField(corridors[c]) then
                         unite(a, b)
+                        c = #corridors + 1
+                    else
+                        c = c + 1
                     end
                 end
             end
@@ -1712,9 +1856,6 @@ local function assignGroups(records)
                 records[id].group = text
             end
         end
-    end
-    for _, row in pairs(records) do
-        row.raw = nil
     end
 end
 
@@ -1923,7 +2064,11 @@ function FieldSnapshot.writeIfDue(connector)
     end
     copyOverview(connector)
 
-    local ids, byId = indexFields()
+    local ids, byId, hidden = indexFields()
+    if not connector.hiddenFieldsLogged then
+        connector.hiddenFieldsLogged = true
+        log(string.format("fields listed=%s hiddenFarmland=%s", tostring(#ids), tostring(hidden)))
+    end
     if #ids == 0 then
         return
     end
@@ -1932,6 +2077,7 @@ function FieldSnapshot.writeIfDue(connector)
         connector.fieldGeometryDone = false
         connector.fieldGeoIndex = 1
         connector.fieldGeoRecords = {}
+        connector.fieldGeoCache = nil
         connector.fieldGeometryFingerprint = nil
         connector.fieldStateIndex = nil
         connector.fieldStateRecords = nil
@@ -1961,6 +2107,7 @@ function FieldSnapshot.writeIfDue(connector)
             end
             connector.fieldGeometryDone = true
             connector.fieldGeometryCount = #ids
+            connector.fieldGeoCache = connector.fieldGeoRecords
             connector.fieldGeoRecords = nil
         end
         return
@@ -1995,6 +2142,14 @@ function FieldSnapshot.writeIfDue(connector)
     end
 
     if connector.fieldStateIndex > #stateIds then
+        if connector.fieldGeoCache ~= nil then
+            assignGroups(connector.fieldGeoCache)
+            local fingerprint = geometryFingerprint(connector, stateIds, connector.fieldGeoCache)
+            if fingerprint ~= connector.fieldGeometryFingerprint then
+                writeGeometry(connector, stateIds, connector.fieldGeoCache)
+                connector.fieldGeometryFingerprint = fingerprint
+            end
+        end
         writeState(connector, stateIds, connector.fieldStateRecords)
         copyPendingFruitIcons(connector, 24)
         writeFruitManifest(connector)

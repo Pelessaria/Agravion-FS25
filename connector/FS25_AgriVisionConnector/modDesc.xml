@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
 <modDesc descVersion="114">
     <author>AgriVision</author>
-    <version>0.1.15.0</version>
+    <version>0.1.16.0</version>
     <title>
         <en>AgriVision Connector</en>
         <de>AgriVision Connector</de>
@@ -14,6 +14,7 @@
     <multiplayer supported="true" />
     <extraSourceFiles>
         <sourceFile filename="FieldSnapshot.lua" />
+        <sourceFile filename="StorageSnapshot.lua" />
         <sourceFile filename="AgriVisionConnector.lua" />
     </extraSourceFiles>
 </modDesc>

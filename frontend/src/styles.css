@@ -2740,7 +2740,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .field-shape {
   fill-opacity: 0;
   stroke: rgba(255, 255, 255, 0.58);
-  stroke-width: calc(1.05px / var(--map-zoom, 1));
+  stroke-width: calc(1.4px / var(--map-zoom, 1));
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
   cursor: pointer;
@@ -2752,7 +2752,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .field-shape.is-other { fill-opacity: 0; stroke: rgba(255, 255, 255, 0.34); }
 .field-shape.is-joined { stroke: none; }
 .field-shape.is-group-hot { fill-opacity: 0.16; }
-.field-shape.is-selected { stroke: #f3ffd8; stroke-width: calc(1.8px / var(--map-zoom, 1)); fill-opacity: 0.28; }
+.field-shape.is-selected { stroke: #f3ffd8; stroke-width: calc(2.15px / var(--map-zoom, 1)); fill-opacity: 0.28; }
 .field-shape.is-joined.is-selected { stroke: none; }
 .field-shape:hover { fill-opacity: 0.18; stroke: rgba(255, 255, 255, 0.92); }
 .field-shape.is-joined:hover { stroke: none; }
@@ -2767,13 +2767,13 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .field-outline {
   fill: none;
   stroke: #e4b84a;
-  stroke-width: calc(1.15px / var(--map-zoom, 1));
+  stroke-width: calc(1.55px / var(--map-zoom, 1));
   stroke-linejoin: round;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
-.field-outline.is-hot { stroke: #ffe7a8; stroke-width: calc(1.6px / var(--map-zoom, 1)); }
+.field-outline.is-hot { stroke: #ffe7a8; stroke-width: calc(2.05px / var(--map-zoom, 1)); }
 .field-label { cursor: pointer; }
 .field-label rect { fill: rgba(8, 12, 10, 0.5); }
 .field-label text { fill: #f7f8f7; font-weight: 600; }
@@ -2955,7 +2955,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   fill: transparent;
   fill-opacity: 0;
 }
-.field-shape.is-raster.is-selected { stroke: #f3ffd8; stroke-width: calc(1.8px / var(--map-zoom, 1)); }
+.field-shape.is-raster.is-selected { stroke: #f3ffd8; stroke-width: calc(2.15px / var(--map-zoom, 1)); }
 .field-shape.is-joined,
 .field-shape.is-joined:hover,
 .field-shape.is-joined.is-selected,
@@ -3386,4 +3386,67 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 @media (max-width: 860px) {
   .server-login-grid, .server-settings { grid-template-columns: 1fr; }
   .server-hero { align-items: stretch; }
+}
+
+.stock-page { display: flex; flex-direction: column; gap: 18px; }
+.stock-page .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stock-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+  gap: 16px;
+  align-items: start;
+}
+.stock-columns, .stock-places, .stock-goods { display: grid; gap: 12px; }
+.stock-panel h2 { margin: 0 0 4px; }
+.stock-good, .stock-place li {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+.stock-good { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.stock-good:last-child { border-bottom: 0; }
+.stock-good strong, .stock-place header strong, .stock-place li strong { font-weight: 650; }
+.stock-good p, .stock-place li span { margin: 0; }
+.stock-amount { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.stock-amount strong, .stock-place li strong { font-variant-numeric: tabular-nums; }
+.stock-good img, .stock-place li img, .stock-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #111;
+}
+.stock-mark {
+  display: grid;
+  place-items: center;
+  color: #f4f1e6;
+  font-weight: 650;
+}
+.stock-place {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.stock-place header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.stock-place ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.stock-place li img, .stock-place li .stock-mark { width: 28px; height: 28px; border-radius: 8px; }
+.stock-place li { grid-template-columns: 28px minmax(0, 1fr) auto; }
+.stock-meter { display: grid; gap: 6px; }
+.stock-bar {
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.stock-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #e4b84a;
+}
+@media (max-width: 980px) {
+  .stock-layout, .stock-page .stat-grid { grid-template-columns: 1fr; }
 }

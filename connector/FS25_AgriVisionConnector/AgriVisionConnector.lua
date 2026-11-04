@@ -12,7 +12,7 @@
 
 AgriVisionConnector = {}
 AgriVisionConnector.MOD_NAME = "FS25_AgriVisionConnector"
-AgriVisionConnector.VERSION = "0.1.15.0"
+AgriVisionConnector.VERSION = "0.1.16.0"
 AgriVisionConnector.SCHEMA = "1"
 AgriVisionConnector.TICK_MS = 5000
 AgriVisionConnector.HELLO_EVERY_MS = 60000
@@ -1245,6 +1245,12 @@ function AgriVisionConnector:tick(dt)
             local okFields, errFields = pcall(FieldSnapshot.writeIfDue, self)
             if not okFields then
                 log("fields error: " .. tostring(errFields))
+            end
+        end
+        if StorageSnapshot ~= nil and StorageSnapshot.writeIfDue ~= nil then
+            local okStorage, errStorage = pcall(StorageSnapshot.writeIfDue, self)
+            if not okStorage then
+                log("storage error: " .. tostring(errStorage))
             end
         end
         local hasVehicles = self:missionHasVehicles()
