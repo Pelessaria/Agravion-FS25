@@ -50,83 +50,184 @@ type DrawnField = {
   group: number[] | null
   iconUrl: string | null
   mark: string
+  iconColor: string
   label: string
 }
 
 const LABEL_HEIGHT = 2.7
 const LABELS_FROM_ZOOM = 1.7
 
+function GrainEar({ awns = false }: { awns?: boolean }) {
+  return (
+    <>
+      <path d="M8 15.4 V6.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <ellipse cx="5.2" cy="4.7" rx="1.55" ry="2.15" transform="rotate(-36 5.2 4.7)" fill="currentColor" />
+      <ellipse cx="10.8" cy="4.7" rx="1.55" ry="2.15" transform="rotate(36 10.8 4.7)" fill="currentColor" />
+      <ellipse cx="5" cy="8" rx="1.6" ry="2.2" transform="rotate(-30 5 8)" fill="currentColor" />
+      <ellipse cx="11" cy="8" rx="1.6" ry="2.2" transform="rotate(30 11 8)" fill="currentColor" />
+      <ellipse cx="5.5" cy="11.1" rx="1.45" ry="1.95" transform="rotate(-20 5.5 11.1)" fill="currentColor" />
+      <ellipse cx="10.5" cy="11.1" rx="1.45" ry="1.95" transform="rotate(20 10.5 11.1)" fill="currentColor" />
+      {awns ? (
+        <path
+          d="M5.2 3.2 L3.2 1.2 M10.8 3.2 L12.8 1.2 M4.6 6.4 L2.4 4.6 M11.4 6.4 L13.6 4.6 M5 9.6 L2.8 8.2 M11 9.6 L13.2 8.2"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="0.9"
+          strokeLinecap="round"
+        />
+      ) : null}
+    </>
+  )
+}
+
 function CropMark({ kind }: { kind: string }) {
+  if (kind === "barley" || kind === "summerbarley") return <GrainEar awns />
+  if (kind === "oat") {
+    return (
+      <>
+        <path d="M8 15.2 V5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M8 6.2 C5 6 3.2 4.2 3 2.2 M8 8 C11.2 7.6 13 5.6 13.2 3.4 M8 10 C5.2 10.2 3.6 11.6 3.2 13.4" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+        <ellipse cx="3.1" cy="2" rx="1.15" ry="1.7" transform="rotate(-20 3.1 2)" fill="currentColor" />
+        <ellipse cx="13.1" cy="3.2" rx="1.15" ry="1.7" transform="rotate(18 13.1 3.2)" fill="currentColor" />
+        <ellipse cx="3.3" cy="13.3" rx="1.15" ry="1.65" transform="rotate(16 3.3 13.3)" fill="currentColor" />
+      </>
+    )
+  }
   if (
     kind === "wheat" ||
-    kind === "barley" ||
-    kind === "summerbarley" ||
-    kind === "oat" ||
     kind === "rye" ||
     kind === "spelt" ||
     kind === "triticale" ||
     kind === "rice" ||
     kind === "ricelonggrain"
   ) {
-    return (
-      <path
-        d="M8 15 V3 M8 5 L5.2 3.2 M8 7.2 L10.8 5.4 M8 9.4 L5.2 7.6 M8 11.6 L10.8 9.8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    )
+    return <GrainEar />
   }
-  if (kind === "canola" || kind === "sunflower" || kind === "oilseedradish" || kind === "mustard") {
+  if (kind === "sunflower") {
     return (
       <>
-        <circle cx="8" cy="6" r="3.1" fill="currentColor" />
-        <path d="M8 9 V15" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <circle cx="8" cy="6.3" r="2.15" fill="currentColor" />
+        <circle cx="8" cy="3.15" r="1.15" fill="currentColor" />
+        <circle cx="11.1" cy="4.4" r="1.15" fill="currentColor" />
+        <circle cx="11.6" cy="7.4" r="1.15" fill="currentColor" />
+        <circle cx="9.4" cy="9.5" r="1.15" fill="currentColor" />
+        <circle cx="6.6" cy="9.5" r="1.15" fill="currentColor" />
+        <circle cx="4.4" cy="7.4" r="1.15" fill="currentColor" />
+        <circle cx="4.9" cy="4.4" r="1.15" fill="currentColor" />
+        <path d="M8 9.2 V15.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </>
+    )
+  }
+  if (kind === "canola" || kind === "oilseedradish" || kind === "mustard") {
+    return (
+      <>
+        <circle cx="8" cy="5.6" r="2.5" fill="currentColor" />
+        <circle cx="4.7" cy="7.4" r="1.7" fill="currentColor" />
+        <circle cx="11.3" cy="7.4" r="1.7" fill="currentColor" />
+        <circle cx="6.2" cy="3.3" r="1.45" fill="currentColor" />
+        <circle cx="9.8" cy="3.3" r="1.45" fill="currentColor" />
+        <path d="M8 8.6 V15.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </>
     )
   }
   if (kind === "maize" || kind === "silagemaize" || kind === "corn" || kind === "sorghum") {
-    return <path d="M8 15 V4 M5.5 6.5 H10.5 M5 9 H11 M5.5 11.5 H10.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    return (
+      <>
+        <path d="M8 15.2 V12.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <ellipse cx="8" cy="7.2" rx="2.7" ry="4.6" fill="currentColor" />
+        <path d="M6.2 4.2 H9.8 M5.8 6.4 H10.2 M5.8 8.6 H10.2 M6.2 10.6 H9.8" stroke="#f6f3ea" strokeWidth="0.7" strokeLinecap="round" />
+      </>
+    )
   }
-  if (kind === "grass" || kind === "fieldgrass" || kind === "meadow" || kind === "greenrye" || kind === "vetchrye" || kind === "poplar") {
-    return <path d="M4 14 C5 8 6 6 8 3 C10 6 11 8 12 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+  if (kind === "grass" || kind === "fieldgrass" || kind === "meadow" || kind === "greenrye" || kind === "vetchrye") {
+    return (
+      <path
+        d="M3.2 14.4 C3.6 9 4.4 6 5.2 2.4 C6.2 6.2 6.4 9 6.2 14.4 Z M6.6 14.4 C7 8.2 8 4.2 8.4 1.6 C9.2 4.6 9.6 8.4 9.2 14.4 Z M10 14.4 C10.4 8.6 11.4 5.4 12.6 2.8 C13.2 6 13.4 9.2 12.8 14.4 Z"
+        fill="currentColor"
+      />
+    )
   }
-  if (kind === "potato" || kind === "sugarbeet" || kind === "carrot" || kind === "parsnip" || kind === "beetroot") {
-    return <ellipse cx="8" cy="9" rx="4.2" ry="3.2" fill="currentColor" />
+  if (kind === "poplar") {
+    return (
+      <>
+        <path d="M8 15.2 V8.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <ellipse cx="8" cy="5.6" rx="3.3" ry="4.2" fill="currentColor" />
+      </>
+    )
+  }
+  if (kind === "potato") {
+    return <ellipse cx="8" cy="8.6" rx="4.6" ry="3.5" fill="currentColor" />
+  }
+  if (kind === "sugarbeet") {
+    return (
+      <>
+        <path d="M8 2.4 C6.6 4.2 6.2 5.2 6.6 6.2 C5.2 5.4 4.2 5.6 3.6 6.4 M8 2.2 C9.4 4 9.8 5 9.4 6 C10.8 5.2 11.8 5.4 12.4 6.2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M5.2 6.4 C4.2 9 4.6 12.4 8 14.6 C11.4 12.4 11.8 9 10.8 6.4 C9.6 7.2 6.4 7.2 5.2 6.4 Z" fill="currentColor" />
+      </>
+    )
+  }
+  if (kind === "carrot") {
+    return <path d="M8 2.2 C6.4 4.4 5.6 5.6 6.2 6.4 C4.4 8 4.2 11 8 15 C11.8 11 11.6 8 9.8 6.4 C10.4 5.6 9.6 4.4 8 2.2 Z" fill="currentColor" />
+  }
+  if (kind === "parsnip") {
+    return <path d="M8 1.8 C7.2 4 7.4 5.4 8 6.2 C6.2 8.2 6.4 11.4 8 15.2 C9.6 11.4 9.8 8.2 8 6.2 C8.6 5.4 8.8 4 8 1.8 Z" fill="currentColor" />
+  }
+  if (kind === "beetroot") {
+    return (
+      <>
+        <path d="M8 3.2 V5.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <ellipse cx="8" cy="9.4" rx="4.1" ry="3.6" fill="currentColor" />
+      </>
+    )
   }
   if (kind === "cotton") {
-    return <circle cx="8" cy="8" r="3.4" fill="currentColor" />
+    return (
+      <>
+        <circle cx="6.2" cy="7.2" r="2.5" fill="#f7f7f2" stroke="#5c615c" strokeWidth="0.6" />
+        <circle cx="9.8" cy="7.4" r="2.5" fill="#f7f7f2" stroke="#5c615c" strokeWidth="0.6" />
+        <circle cx="8" cy="10" r="2.3" fill="#f7f7f2" stroke="#5c615c" strokeWidth="0.6" />
+      </>
+    )
   }
   if (kind === "onion") {
     return (
       <>
-        <circle cx="8" cy="9" r="3.2" fill="currentColor" />
-        <path d="M8 6 V3.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M8 3.1 V6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <ellipse cx="8" cy="10" rx="3.6" ry="3.3" fill="currentColor" />
       </>
     )
   }
-  if (kind === "soybean" || kind === "pea" || kind === "fieldbean" || kind === "greenbean" || kind === "spinach") {
+  if (kind === "spinach") {
+    return <path d="M8 14.6 C4 12 2.4 8 4.2 4.2 C6.4 6.4 7.2 8.6 8 14.6 C8.8 8.6 9.6 6.4 11.8 4.2 C13.6 8 12 12 8 14.6 Z" fill="currentColor" />
+  }
+  if (kind === "soybean" || kind === "pea" || kind === "fieldbean" || kind === "greenbean") {
     return (
       <path
-        d="M8 15 V7 M8 9 C4.2 8 3 4.5 6 3.2 M8 10 C12 8.6 13.2 5 10.2 3.6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
+        d="M5.2 3.2 C8.4 3.4 11.2 5.6 12.2 8.8 C10.2 11.6 7 13.6 4.2 13.2 C3.2 9.4 3.4 5.4 5.2 3.2 Z M6.4 6.2 A1 1 0 1 0 6.5 6.2 M8.2 8.2 A1 1 0 1 0 8.3 8.2 M7 10.6 A1 1 0 1 0 7.1 10.6"
+        fill="currentColor"
       />
     )
   }
-  if (kind === "grape" || kind === "olive") {
+  if (kind === "grape") {
     return (
       <>
-        <circle cx="6" cy="8" r="2" fill="currentColor" />
-        <circle cx="10" cy="8" r="2" fill="currentColor" />
-        <circle cx="8" cy="11.2" r="2" fill="currentColor" />
+        <circle cx="6.1" cy="6.4" r="1.7" fill="currentColor" />
+        <circle cx="9.9" cy="6.4" r="1.7" fill="currentColor" />
+        <circle cx="8" cy="8.8" r="1.7" fill="currentColor" />
+        <circle cx="6.3" cy="11.2" r="1.55" fill="currentColor" />
+        <circle cx="9.7" cy="11.2" r="1.55" fill="currentColor" />
       </>
     )
   }
-  return <path d="M8 14 V7 M8 9 C5 8 4 5 6 4 M8 8 C11 7 12 4 10 3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+  if (kind === "olive") {
+    return <ellipse cx="8" cy="8.4" rx="2.5" ry="3.6" fill="currentColor" />
+  }
+  return (
+    <>
+      <path d="M8 15.2 V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M8 9.2 C5 8.4 3.4 6 4.6 3.6 C6.6 5 7.4 6.6 8 9.2 C8.6 6.6 9.4 5 11.4 3.6 C12.6 6 11 8.4 8 9.2 Z" fill="currentColor" />
+    </>
+  )
 }
 
 function groupCaption(field: FieldSnapshot, fields: FieldSnapshot[]) {
@@ -210,6 +311,7 @@ function projectFields(
       group: field.group && field.group.length > 1 ? field.group : null,
       iconUrl: field.iconUrl,
       mark: key,
+      iconColor: cropColor(field),
       label: caption.show ? caption.text : "",
     }
   })
@@ -816,9 +918,9 @@ function inActiveGroup(field: DrawnField, hoverId: number | null, selectedId: nu
   return selectedId != null && field.group.includes(selectedId)
 }
 
-/** Quiet at the default view. Numbers and crop marks appear once the map is enlarged. */
+/** Quiet when the numbers first appear. Zooming in grows the crop picture with them. */
 function labelScreenPx(zoom: number) {
-  return Math.min(18, 11 + 2.5 * Math.max(zoom - 1, 0))
+  return Math.min(36, 15 + 14 * Math.max(zoom - LABELS_FROM_ZOOM, 0))
 }
 
 function visibleLabels(
@@ -1212,8 +1314,8 @@ function FieldMap({
                   ) : null}
                   {withIcon && (!field.iconUrl || brokenIcons.has(field.iconUrl)) ? (
                     <g transform={`translate(${iconX} -1.05)`}>
-                      <rect width="2.1" height="2.1" rx="0.35" fill={field.color} />
-                      <g transform="scale(0.131)" style={{ color: "#172016" }}>
+                      <rect width="2.1" height="2.1" rx="0.4" fill="#f4f1e6" />
+                      <g transform="translate(0.12 0.12) scale(0.116)" style={{ color: field.iconColor }}>
                         <CropMark kind={field.mark} />
                       </g>
                     </g>

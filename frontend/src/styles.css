@@ -2830,9 +2830,9 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.28);
+  background: #f4f1e6;
 }
-.fields-detail-mark svg { width: 26px; height: 26px; }
+.fields-detail-mark svg { width: 30px; height: 30px; }
 .fields-detail-mark img { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); object-fit: contain; }
 .fields-facts { display: grid; gap: 6px; margin: 12px 0 0; }
 .fields-facts div { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 14px; align-items: center; }
