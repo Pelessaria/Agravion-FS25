@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { Minus, Plus } from "lucide-react"
 import {
@@ -10,28 +11,30 @@ import {
   type LiveVehicle,
 } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
-import {
-  effectiveMapSize,
-  frameFromContentBox,
-  measureMapContent,
-  projectPoint,
-  terrainFrame,
-  type MapFrame,
-} from "../field-format"
+import { projectPoint, effectiveMapSize, frameFromContentBox, measureMapContent, terrainFrame, type MapFrame } from "../field-format"
 import { useStore } from "../store"
 import type { FieldsResponse } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
 
 const PERIOD_TO_MONTH = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2]
 
+type Tab = "vehicles" | "players" | "places"
+type MarkerKind = "vehicle" | "player" | "place" | "pin"
+type Marker = {
+  key: string
+  x: number
+  y: number
+  heading: number | null
+  kind: MarkerKind
+  label: string
+}
+
 function clockLabel(value: number | null) {
   if (value == null || !Number.isFinite(value)) return null
   const ms = value > 0 && value <= 1 ? value * 24 * 60 * 60 * 1000 : value
   if (ms < 0 || ms > 48 * 60 * 60 * 1000) return null
   const minutes = Math.floor(ms / 60000) % (24 * 60)
-  const hour = Math.floor(minutes / 60)
-  const minute = minutes % 60
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
 }
 
 function weatherLabel(raw: string | null) {
@@ -41,16 +44,27 @@ function weatherLabel(raw: string | null) {
   return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase()
 }
 
-type Marker = { key: string; x: number; y: number; heading: number | null; kind: "vehicle" | "player" | "place" }
+function readPin(params: URLSearchParams) {
+  const xs = params.get("x")
+  const zs = params.get("z")
+  if (xs == null || zs == null || xs === "" || zs === "") return null
+  const x = Number(xs)
+  const z = Number(zs)
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return null
+  return { x, z, name: params.get("name") || "" }
+}
 
-function placeMarker(x: number, z: number, frame: MapFrame, key: string, heading: number | null, kind: Marker["kind"]): Marker {
-  const point = projectPoint(x, z, frame)
-  return { key, x: point.x, y: point.y, heading, kind }
+function matches(query: string, value: string | null) {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+  return (value ?? "").toLowerCase().includes(needle)
 }
 
 export function LiveMapPage() {
   const { t } = useTranslation()
   const stamp = useTimeLabel()
+  const [params] = useSearchParams()
+  const pin = readPin(params)
   const { liveMode, moduleAccess, selectedFarm } = useStore()
   const { workspace, allowed } = useWorkspaceRoute()
   const access = workspace ? moduleAccess(workspace.id, "map") : null
@@ -60,10 +74,9 @@ export function LiveMapPage() {
   const [loading, setLoading] = useState(liveMode)
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [ownOnly, setOwnOnly] = useState(true)
-  const [showVehicles, setShowVehicles] = useState(true)
-  const [showPlayers, setShowPlayers] = useState(true)
-  const [showPlaces, setShowPlaces] = useState(true)
-  const [selected, setSelected] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>(pin ? "places" : "vehicles")
+  const [query, setQuery] = useState(pin?.name ?? "")
+  const [selected, setSelected] = useState<string | null>(pin ? "pin" : null)
 
   useEffect(() => {
     if (!workspace || !allowed || !access || !liveMode) return
@@ -137,120 +150,180 @@ export function LiveMapPage() {
     return terrainFrame(mapSize)
   }, [contentBox, mapSize, reported])
 
+  const shapes = useMemo(() => {
+    const rows = fields?.fields ?? []
+    const next: string[] = []
+    for (const field of rows) {
+      if (field.points.length < 3) continue
+      next.push(
+        field.points
+          .map(([x, z]) => {
+            const point = projectPoint(x, z, frame)
+            return `${point.x.toFixed(2)},${point.y.toFixed(2)}`
+          })
+          .join(" "),
+      )
+    }
+    return next
+  }, [fields, frame])
+
   const farmId = farm?.gameFarmId ?? null
   const vehicles = (payload?.vehicles ?? []).filter((vehicle) => !ownOnly || farmId == null || vehicle.farmId === farmId)
   const players = payload?.players ?? []
   const places = (payload?.places ?? []).filter((place) => !ownOnly || farmId == null || place.farmId == null || place.farmId === farmId)
+  const visibleVehicles = vehicles.filter((vehicle) => matches(query, vehicle.name))
+  const visiblePlayers = players.filter((player) => matches(query, player.name))
+  const visiblePlaces = places.filter((place) => matches(query, place.name ?? place.type))
 
   const month = payload?.period != null && payload.period >= 1 && payload.period <= 12 ? PERIOD_TO_MONTH[payload.period - 1] : null
   const clock = clockLabel(payload?.dayTime ?? null)
   const weather = weatherLabel(payload?.weather ?? null)
+  const selectedVehicle = vehicles.find((vehicle) => `v:${vehicle.id}` === selected) ?? null
+  const selectedPlayer = players.find((player) => `p:${player.id}` === selected) ?? null
+  const selectedPlace = places.find((place) => `o:${place.id}` === selected) ?? null
 
   if (!workspace) return <MissingWorkspace />
   if (!allowed || !access) return <PermissionBlock />
 
+  const rows =
+    tab === "vehicles" ? visibleVehicles.length : tab === "players" ? visiblePlayers.length : visiblePlaces.length
+
   return (
     <div className="page live-page">
-      <header className="page-head">
-        <div>
-          <h1>{t("modules.map")}</h1>
-          <p className="muted">{t("modules.mapLead")}</p>
-        </div>
-        <p className="muted">{payload?.writtenAt ? t("live.updated", { time: stamp(payload.writtenAt, "") }) : null}</p>
-      </header>
-      {loading && !payload ? <p className="muted">{t("live.loading")}</p> : null}
-      {payload?.error === "failed" && (payload.vehicles.length ?? 0) === 0 ? (
-        <EmptyState title={t("live.failedTitle")} body={t("live.failedBody")} />
-      ) : null}
-      {payload && !payload.ok && payload.error === "missing" ? (
-        <EmptyState title={t("live.missingTitle")} body={t("live.missingBody")} />
-      ) : null}
-      {payload?.source === "vehicles" ? <p className="muted live-note">{t("live.fromVehicles")}</p> : null}
-      <div className="live-meta">
-        {clock ? (
-          <span>
-            {t("live.clock")} {clock}
-            {payload?.day != null ? ` · ${t("live.day", { day: payload.day })}` : ""}
-            {month != null ? ` · ${t(`fields.month.${month}`)}` : ""}
-            {payload?.paused ? ` · ${t("live.paused")}` : ""}
-          </span>
+      <div className="live-stage">
+        {loading && !payload ? <p className="live-wait">{t("live.loading")}</p> : null}
+        {payload?.error === "failed" && payload.vehicles.length === 0 ? (
+          <EmptyState title={t("live.failedTitle")} body={t("live.failedBody")} />
         ) : null}
-        {weather ? (
-          <span>
-            {t("live.weather")} {weather}
-            {payload?.temperature != null ? ` · ${payload.temperature.toFixed(1)} °C` : ""}
-            {payload?.windSpeed != null ? ` · ${t("live.wind", { speed: payload.windSpeed.toFixed(1) })}` : ""}
-          </span>
+        {payload && !payload.ok && payload.error === "missing" ? (
+          <EmptyState title={t("live.missingTitle")} body={t("live.missingBody")} />
         ) : null}
-      </div>
-      <div className="live-layout">
         <LiveCanvas
           mapUrl={fields?.pdaMap && liveMode ? `/api/workspaces/${workspace.id}/pda-map` : null}
           frame={frame}
-          vehicles={showVehicles ? vehicles : []}
-          players={showPlayers ? players : []}
-          places={showPlaces ? places : []}
+          shapes={shapes}
+          vehicles={vehicles}
+          players={players}
+          places={places}
+          pin={pin}
           selected={selected}
           onSelect={setSelected}
           onContentBox={setContentBox}
         />
-        <aside className="live-side">
-          <div className="live-toggles">
-            <button type="button" className={showVehicles ? "chip-check on" : "chip-check"} onClick={() => setShowVehicles((value) => !value)}>
-              {t("live.showVehicles")}
+        <div className="live-hud">
+          {clock ? (
+            <span className="live-chip">
+              {clock}
+              {payload?.day != null ? ` · ${t("live.day", { day: payload.day })}` : ""}
+              {month != null ? ` · ${t(`fields.month.${month}`)}` : ""}
+              {payload?.paused ? ` · ${t("live.paused")}` : ""}
+            </span>
+          ) : null}
+          {weather ? (
+            <span className="live-chip">
+              {weather}
+              {payload?.temperature != null ? ` ${payload.temperature.toFixed(1)}°` : ""}
+              {payload?.windSpeed != null ? ` · ${payload.windSpeed.toFixed(1)}` : ""}
+            </span>
+          ) : null}
+          {payload?.writtenAt ? (
+            <span className="live-chip" title={payload.source === "vehicles" ? t("live.fromVehicles") : undefined}>
+              {t("live.updated", { time: stamp(payload.writtenAt, "") })}
+            </span>
+          ) : null}
+        </div>
+        <aside className="live-dock">
+          <header className="live-dock-head">
+            <h1>{t("modules.map")}</h1>
+            <p>{t("modules.mapLead")}</p>
+          </header>
+          <label className="live-search">
+            <span className="sr-only">{t("live.search")}</span>
+            <input value={query} placeholder={t("live.search")} onChange={(event) => setQuery(event.target.value)} />
+          </label>
+          <div className="live-tabs" role="tablist">
+            <button type="button" className={tab === "vehicles" ? "is-on" : ""} onClick={() => setTab("vehicles")}>
+              {t("live.vehicles")}
+              <em>{vehicles.length}</em>
             </button>
-            <button type="button" className={showPlayers ? "chip-check on" : "chip-check"} onClick={() => setShowPlayers((value) => !value)}>
-              {t("live.showPlayers")}
+            <button type="button" className={tab === "players" ? "is-on" : ""} onClick={() => setTab("players")}>
+              {t("live.players")}
+              <em>{players.length}</em>
             </button>
-            <button type="button" className={showPlaces ? "chip-check on" : "chip-check"} onClick={() => setShowPlaces((value) => !value)}>
-              {t("live.showPlaces")}
-            </button>
-            <button type="button" className={ownOnly ? "chip-check on" : "chip-check"} onClick={() => setOwnOnly((value) => !value)}>
-              {ownOnly ? t("live.ownFarm") : t("live.allFarms")}
+            <button type="button" className={tab === "places" ? "is-on" : ""} onClick={() => setTab("places")}>
+              {t("live.places")}
+              <em>{places.length}</em>
             </button>
           </div>
-          <section>
-            <h2>{t("live.vehicles")}</h2>
-            {vehicles.length === 0 ? <p className="muted">{t("live.emptyVehicles")}</p> : null}
-            <ul className="live-list">
-              {vehicles.map((vehicle) => (
-                <li key={vehicle.id || vehicle.name} className={selected === `v:${vehicle.id}` ? "is-on" : ""}>
-                  <button type="button" onClick={() => setSelected(`v:${vehicle.id}`)}>
-                    <strong>{vehicle.name || vehicle.id}</strong>
-                    {vehicle.ai ? <span>{t("live.ai")}</span> : null}
-                    {vehicle.driver ? <span>{vehicle.driver}</span> : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section>
-            <h2>{t("live.players")}</h2>
-            {players.length === 0 ? <p className="muted">{t("live.emptyPlayers")}</p> : null}
-            <ul className="live-list">
-              {players.map((player) => (
-                <li key={player.id}>
-                  <button type="button" onClick={() => setSelected(`p:${player.id}`)}>
-                    <strong>{player.name || player.id}</strong>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section>
-            <h2>{t("live.places")}</h2>
-            {places.length === 0 ? <p className="muted">{t("live.emptyPlaces")}</p> : null}
-            <ul className="live-list">
-              {places.map((place) => (
-                <li key={`${place.id}:${place.x}`}>
-                  <button type="button" onClick={() => setSelected(`o:${place.id}`)}>
-                    <strong>{place.name || place.type || place.id}</strong>
-                    {place.type ? <span>{place.type}</span> : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <button type="button" className={ownOnly ? "chip-check on live-farm" : "chip-check live-farm"} onClick={() => setOwnOnly((value) => !value)}>
+            {ownOnly ? t("live.ownFarm") : t("live.allFarms")}
+          </button>
+          {selected === "pin" && pin ? (
+            <div className="live-card">
+              <strong>{pin.name || t("stock.places")}</strong>
+            </div>
+          ) : null}
+          {selectedVehicle ? (
+            <div className="live-card">
+              <strong>{selectedVehicle.name || selectedVehicle.id}</strong>
+              <p>
+                {selectedVehicle.ai ? t("live.ai") : null}
+                {selectedVehicle.driver ? ` ${selectedVehicle.driver}` : null}
+              </p>
+              {selectedVehicle.id ? (
+                <Link to={`/w/${workspace.id}/equipment/${encodeURIComponent(selectedVehicle.id)}`}>{t("modules.equipment")}</Link>
+              ) : null}
+            </div>
+          ) : null}
+          {selectedPlayer ? (
+            <div className="live-card">
+              <strong>{selectedPlayer.name || selectedPlayer.id}</strong>
+            </div>
+          ) : null}
+          {selectedPlace ? (
+            <div className="live-card">
+              <strong>{selectedPlace.name || selectedPlace.type || selectedPlace.id}</strong>
+              {selectedPlace.type ? <p>{selectedPlace.type}</p> : null}
+            </div>
+          ) : null}
+          <ul className="live-list">
+            {rows === 0 ? (
+              <li className="live-empty">
+                {tab === "vehicles" ? t("live.emptyVehicles") : tab === "players" ? t("live.emptyPlayers") : t("live.emptyPlaces")}
+              </li>
+            ) : null}
+            {tab === "vehicles"
+              ? visibleVehicles.map((vehicle) => (
+                  <li key={vehicle.id || vehicle.name}>
+                    <button type="button" className={selected === `v:${vehicle.id}` ? "is-on" : ""} onClick={() => setSelected(`v:${vehicle.id}`)}>
+                      <i className="live-dot is-vehicle" />
+                      <span>{vehicle.name || vehicle.id}</span>
+                      {vehicle.ai ? <em>{t("live.ai")}</em> : null}
+                    </button>
+                  </li>
+                ))
+              : null}
+            {tab === "players"
+              ? visiblePlayers.map((player) => (
+                  <li key={player.id}>
+                    <button type="button" className={selected === `p:${player.id}` ? "is-on" : ""} onClick={() => setSelected(`p:${player.id}`)}>
+                      <i className="live-dot is-player" />
+                      <span>{player.name || player.id}</span>
+                    </button>
+                  </li>
+                ))
+              : null}
+            {tab === "places"
+              ? visiblePlaces.map((place) => (
+                  <li key={`${place.id}:${place.x}`}>
+                    <button type="button" className={selected === `o:${place.id}` ? "is-on" : ""} onClick={() => setSelected(`o:${place.id}`)}>
+                      <i className="live-dot is-place" />
+                      <span>{place.name || place.type || place.id}</span>
+                    </button>
+                  </li>
+                ))
+              : null}
+          </ul>
         </aside>
       </div>
     </div>
@@ -260,18 +333,22 @@ export function LiveMapPage() {
 function LiveCanvas({
   mapUrl,
   frame,
+  shapes,
   vehicles,
   players,
   places,
+  pin,
   selected,
   onSelect,
   onContentBox,
 }: {
   mapUrl: string | null
   frame: MapFrame
+  shapes: string[]
   vehicles: LiveVehicle[]
   players: LivePlayer[]
   places: LivePlace[]
+  pin: { x: number; z: number; name: string } | null
   selected: string | null
   onSelect: (id: string) => void
   onContentBox: (box: { x: number; y: number; w: number; h: number } | null) => void
@@ -287,9 +364,8 @@ function LiveCanvas({
   function apply() {
     const el = stageRef.current
     if (!el) return
-    const { x, y, k } = cam.current
-    el.style.transform = `translate(${x}px, ${y}px) scale(${k})`
-    setZoom((prev) => (prev === k ? prev : k))
+    el.style.transform = `translate(${cam.current.x}px, ${cam.current.y}px) scale(${cam.current.k})`
+    setZoom((prev) => (prev === cam.current.k ? prev : cam.current.k))
   }
 
   function zoomAt(next: number, px: number, py: number) {
@@ -313,7 +389,7 @@ function LiveCanvas({
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
       const rect = viewport.getBoundingClientRect()
-      const next = cam.current.k * (event.deltaY > 0 ? 0.9 : 1.12)
+      const next = cam.current.k * (event.deltaY > 0 ? 1 / 1.12 : 1.12)
       const prev = cam.current.k
       const clamped = Math.min(6, Math.max(1, next))
       if (clamped === 1) {
@@ -336,11 +412,45 @@ function LiveCanvas({
 
   const markers = useMemo(() => {
     const next: Marker[] = []
-    for (const vehicle of vehicles) next.push(placeMarker(vehicle.x, vehicle.z, frame, `v:${vehicle.id}`, vehicle.heading, "vehicle"))
-    for (const player of players) next.push(placeMarker(player.x, player.z, frame, `p:${player.id}`, player.heading, "player"))
-    for (const place of places) next.push(placeMarker(place.x, place.z, frame, `o:${place.id}`, null, "place"))
+    for (const vehicle of vehicles) {
+      const point = projectPoint(vehicle.x, vehicle.z, frame)
+      next.push({
+        key: `v:${vehicle.id}`,
+        x: point.x,
+        y: point.y,
+        heading: vehicle.heading,
+        kind: "vehicle",
+        label: vehicle.name || vehicle.id,
+      })
+    }
+    for (const player of players) {
+      const point = projectPoint(player.x, player.z, frame)
+      next.push({
+        key: `p:${player.id}`,
+        x: point.x,
+        y: point.y,
+        heading: player.heading,
+        kind: "player",
+        label: player.name || player.id,
+      })
+    }
+    for (const place of places) {
+      const point = projectPoint(place.x, place.z, frame)
+      next.push({
+        key: `o:${place.id}`,
+        x: point.x,
+        y: point.y,
+        heading: null,
+        kind: "place",
+        label: place.name || place.type || place.id,
+      })
+    }
+    if (pin) {
+      const point = projectPoint(pin.x, pin.z, frame)
+      next.push({ key: "pin", x: point.x, y: point.y, heading: null, kind: "pin", label: pin.name })
+    }
     return next
-  }, [frame, places, players, vehicles])
+  }, [frame, pin, places, players, vehicles])
 
   const focused = useRef<string | null>(null)
   useEffect(() => {
@@ -354,7 +464,7 @@ function LiveCanvas({
     const stage = stageRef.current
     if (!marker || !viewport || !stage) return
     focused.current = selected
-    const k = Math.max(cam.current.k, 4.5)
+    const k = Math.max(cam.current.k, 4.2)
     const px = (marker.x / 100) * viewport.clientWidth
     const py = (marker.y / 100) * viewport.clientHeight
     cam.current = {
@@ -367,10 +477,11 @@ function LiveCanvas({
   }, [markers, selected])
 
   return (
-    <div className="live-map-frame fields-map-frame">
-      <div className="live-zoom">
+    <div className="fields-map-frame live-frame">
+      <div className="fields-zoom">
         <button
           type="button"
+          className="btn btn-secondary"
           aria-label="+"
           onClick={() => {
             const viewport = viewportRef.current
@@ -378,10 +489,11 @@ function LiveCanvas({
             zoomAt(cam.current.k * 1.25, viewport.clientWidth / 2, viewport.clientHeight / 2)
           }}
         >
-          <Plus size={16} />
+          <Plus className="icon" />
         </button>
         <button
           type="button"
+          className="btn btn-secondary"
           aria-label="-"
           onClick={() => {
             const viewport = viewportRef.current
@@ -389,7 +501,7 @@ function LiveCanvas({
             zoomAt(cam.current.k / 1.25, viewport.clientWidth / 2, viewport.clientHeight / 2)
           }}
         >
-          <Minus size={16} />
+          <Minus className="icon" />
         </button>
       </div>
       <div
@@ -441,32 +553,39 @@ function LiveCanvas({
                 const context = canvas.getContext("2d")
                 if (!context) return
                 context.drawImage(image, 0, 0, width, height)
-                const pixels = context.getImageData(0, 0, width, height).data
-                onContentBox(measureMapContent(pixels, width, height))
+                onContentBox(measureMapContent(context.getImageData(0, 0, width, height).data, width, height))
               }}
             />
           ) : (
             <div className="fields-terrain" />
           )}
           <svg viewBox="0 0 100 100">
+            {shapes.map((points, index) => (
+              <polygon key={`shape-${index}`} className="live-field" points={points} />
+            ))}
             {markers.map((marker) => {
               const on = marker.key === selected
               const rotation = marker.heading == null ? 0 : (-marker.heading * 180) / Math.PI
-              const mark = (on ? 1.15 : 0.8) / Math.max(zoom, 1)
+              const mark = (on ? 2.4 : 1.7) / Math.max(zoom, 1)
               return (
-                <g
-                  key={marker.key}
-                  data-marker={marker.key}
-                  className={on ? `live-marker is-${marker.kind} is-on` : `live-marker is-${marker.kind}`}
-                  transform={`translate(${marker.x} ${marker.y}) rotate(${rotation}) scale(${mark})`}
-                >
-                  {marker.kind === "vehicle" && marker.heading != null ? (
-                    <polygon points="0,1.15 -0.72,-0.85 0.72,-0.85" />
-                  ) : marker.kind === "place" ? (
-                    <polygon points="0,-0.85 0.85,0 0,0.85 -0.85,0" />
-                  ) : (
-                    <circle r="0.62" />
-                  )}
+                <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.kind} is-on` : `live-marker is-${marker.kind}`} transform={`translate(${marker.x} ${marker.y})`}>
+                  <g transform={`rotate(${rotation}) scale(${mark})`}>
+                    {marker.kind === "vehicle" && marker.heading != null ? (
+                      <polygon points="0,0.85 -0.55,-0.6 0.55,-0.6" />
+                    ) : marker.kind === "place" || marker.kind === "pin" ? (
+                      <polygon points="0,-0.7 0.16,-0.16 0.7,0 0.16,0.16 0,0.7 -0.16,0.16 -0.7,0 -0.16,-0.16" />
+                    ) : (
+                      <circle r="0.46" />
+                    )}
+                    <circle className="live-marker-ring" r="0.78" />
+                  </g>
+                  {on && marker.label ? (
+                    <g className="live-caption" transform={`translate(0 ${-2.2 / Math.max(zoom, 1)}) scale(${1.2 / Math.max(zoom, 1)})`}>
+                      <text textAnchor="middle" y="0">
+                        {marker.label}
+                      </text>
+                    </g>
+                  ) : null}
                 </g>
               )
             })}

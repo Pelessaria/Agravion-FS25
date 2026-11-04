@@ -10,7 +10,6 @@ export type FieldLayerId =
   | "ph"
   | "yield"
   | "seed"
-  | "tramline"
   | "growth"
   | "ground"
   | "weed"
@@ -95,7 +94,7 @@ export function precisionRasterLayer(layer: FieldLayerId) {
 
 export function layersFor(precisionFarming: boolean | null): FieldLayerId[] {
   const shared: FieldLayerId[] = ["off", "fruit", "growth", "ground", "weed", "stones", "plow", "roller", "stubble"]
-  if (precisionFarming === true) return [...shared, "soil", "nitrogen", "ph", "yield", "seed", "tramline"]
+  if (precisionFarming === true) return [...shared, "soil", "nitrogen", "ph", "yield", "seed"]
   return [...shared, "spray", "lime"]
 }
 
@@ -160,7 +159,7 @@ export function nitrogenColor(value: number | null): string {
 }
 
 export function paintColor(field: FieldSnapshot, layer: FieldLayerId): string {
-  if (layer === "off" || layer === "fruit" || layer === "tramline") return cropColor(field)
+  if (layer === "off" || layer === "fruit") return cropColor(field)
   if (layer === "soil") return field.soil != null ? (SOIL_COLOR[field.soil] ?? NEUTRAL) : NEUTRAL
   if (layer === "nitrogen") return nitrogenColor(field.nitrogen)
   if (layer === "ph") return phColor(field.ph)
@@ -201,9 +200,6 @@ export function legendStops(layer: FieldLayerId, t: TFunction): { color: string;
   }
   if (layer === "seed") {
     return [1, 2, 3].map((id) => ({ color: SEED_COLOR[id], label: t(`fields.seedRate.${id}`) }))
-  }
-  if (layer === "tramline") {
-    return [{ color: "#efe6d4", label: t("fields.tramline") }]
   }
   if (layer === "growth") {
     return [

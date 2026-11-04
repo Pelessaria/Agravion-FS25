@@ -163,6 +163,7 @@ export function FieldsPage() {
   const [focusToken, setFocusToken] = useState(0)
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [layer, setLayer] = useState<FieldLayerId>("off")
+  const [showTramlines, setShowTramlines] = useState(false)
   const [fieldQuery, setFieldQuery] = useState<FieldQuery>(EMPTY_FIELD_QUERY)
 
   useEffect(() => {
@@ -297,7 +298,10 @@ export function FieldsPage() {
       .map((field) => [field.fruitName as string, field.fruitTitle || field.fruitName || ""]),
   ).entries()].sort((a, b) => a[1].localeCompare(b[1], i18n.language))
   const filterCount = activeQueryCount(fieldQuery, precisionFarming)
-  const legend = legendStops(activeLayer, t)
+  const legend = [
+    ...legendStops(activeLayer, t),
+    ...(showTramlines ? [{ color: "#f7f1e4", label: t("fields.layerName.tramline") }] : []),
+  ]
   const cropFilters = ["harvestReady", "growing", "planted", "cut", "withered", "noCrop"]
 
   function patchQuery(patch: Partial<FieldQuery>) {
@@ -389,6 +393,16 @@ export function FieldsPage() {
                 >
                   <ChevronRight className="icon" />
                 </button>
+                {precisionFarming === true ? (
+                  <button
+                    type="button"
+                    className={showTramlines ? "chip-check on" : "chip-check"}
+                    aria-pressed={showTramlines}
+                    onClick={() => setShowTramlines((value) => !value)}
+                  >
+                    {t("fields.layerName.tramline")}
+                  </button>
+                ) : null}
               </div>
               <label className="field fields-search">
                 <span className="sr-only">{t("fields.fieldNumber")}</span>
@@ -570,8 +584,7 @@ export function FieldsPage() {
                     }
                   : null
               }
-              showTracks={activeLayer === "off" || activeLayer === "tramline"}
-              tracksStrong={activeLayer === "tramline"}
+              showTracks={showTramlines}
               mapUrl={
                 source?.pdaMap
                   ? `/api/workspaces/${workspace.id}/pda-map`
@@ -805,7 +818,6 @@ function FieldMap({
   painted,
   raster,
   showTracks,
-  tracksStrong,
   mapUrl,
   live,
   selectedId,
@@ -820,7 +832,6 @@ function FieldMap({
   painted: boolean
   raster: { href: string; x: number; y: number; w: number; h: number } | null
   showTracks: boolean
-  tracksStrong: boolean
   mapUrl: string | null
   live: boolean
   selectedId: number | null
@@ -850,9 +861,6 @@ function FieldMap({
     () => visibleLabels(fields, zoom, sidePx, selectedId, hoverId),
     [fields, hoverId, selectedId, sidePx, zoom],
   )
-  const trackFields = fields.reduce((count, field) => count + (field.tracks.length > 0 ? 1 : 0), 0)
-  const drawAllTracks = showTracks && (tracksStrong || zoom >= 1.45 || trackFields <= 24)
-
   function apply() {
     const el = stageRef.current
     if (!el) return
@@ -1115,16 +1123,14 @@ function FieldMap({
               )
             })}
             {showTracks
-              ? fields.map((field) => {
-                  if (field.tracks.length === 0) return null
-                  const selected =
-                    field.id === selectedId || (selectedId != null && field.group?.includes(selectedId) === true)
-                  if (!drawAllTracks && !selected) return null
-                  const className = tracksStrong || selected ? "field-tram is-on" : "field-tram"
-                  return field.tracks.map((points, index) => (
-                    <polyline key={`tram-${field.id}-${index}`} className={className} points={points} />
-                  ))
-                })
+              ? fields.map((field) =>
+                  field.tracks.map((points, index) => (
+                    <g key={`tram-${field.id}-${index}`} className="field-tramlines">
+                      <polyline className="field-tram is-halo" points={points} />
+                      <polyline className="field-tram is-on" points={points} />
+                    </g>
+                  )),
+                )
               : null}
             {fields.map((field) => {
               const hot = labelHot(field, hoverId, selectedId)

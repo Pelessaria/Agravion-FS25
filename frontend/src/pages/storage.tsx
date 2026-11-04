@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import type { TFunction } from "i18next"
 import { useTranslation } from "react-i18next"
+import { LocateFixed } from "lucide-react"
 import { apiWorkspaceStorage, type StorageFill, type StoragePlace, type StorageResponse } from "../api"
 import { cropIconExact } from "../crop-icons"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
@@ -22,6 +24,8 @@ const DEMO: StorageResponse = {
       capacity: 800000,
       used: null,
       slots: null,
+      x: 180,
+      z: -40,
       fills: [
         { fillType: "WHEAT", title: "Weizen", level: 124000, capacity: 800000, count: null },
         { fillType: "CANOLA", title: "Raps", level: 62000, capacity: 800000, count: null },
@@ -37,6 +41,8 @@ const DEMO: StorageResponse = {
       capacity: null,
       used: 12,
       slots: 40,
+      x: 210,
+      z: 30,
       fills: [{ fillType: "STRAW", title: "Stroh", level: 48000, capacity: null, count: 12 }],
     },
   ],
@@ -238,8 +244,10 @@ export function StoragePage() {
             </section>
 
             <div className="stock-columns">
-              <PlaceList title={t("stock.places")} places={own} language={i18n.language} />
-              {intake.length > 0 ? <PlaceList title={t("stock.intake")} places={intake} language={i18n.language} /> : null}
+              <PlaceList title={t("stock.places")} places={own} language={i18n.language} workspaceId={workspace.id} />
+              {intake.length > 0 ? (
+                <PlaceList title={t("stock.intake")} places={intake} language={i18n.language} workspaceId={workspace.id} />
+              ) : null}
             </div>
           </div>
         </>
@@ -248,7 +256,28 @@ export function StoragePage() {
   )
 }
 
-function PlaceList({ title, places, language }: { title: string; places: StoragePlace[]; language: string }) {
+function mapTarget(workspaceId: string, place: StoragePlace) {
+  const params = new URLSearchParams()
+  if (place.x != null && place.z != null) {
+    params.set("x", String(place.x))
+    params.set("z", String(place.z))
+  }
+  if (place.name) params.set("name", place.name)
+  params.set("bin", place.id)
+  return `/w/${workspaceId}/m/map?${params.toString()}`
+}
+
+function PlaceList({
+  title,
+  places,
+  language,
+  workspaceId,
+}: {
+  title: string
+  places: StoragePlace[]
+  language: string
+  workspaceId: string
+}) {
   const { t } = useTranslation()
   if (places.length === 0) return null
   return (
@@ -263,6 +292,10 @@ function PlaceList({ title, places, language }: { title: string; places: Storage
               <header>
                 <strong>{place.name || kindLabel(t, place.kind)}</strong>
                 <span className="badge">{kindLabel(t, place.kind)}</span>
+                <Link className="btn btn-secondary stock-map" to={mapTarget(workspaceId, place)}>
+                  <LocateFixed className="icon" />
+                  {t("stock.showOnMap")}
+                </Link>
               </header>
               {percent != null ? (
                 <div className="stock-meter">

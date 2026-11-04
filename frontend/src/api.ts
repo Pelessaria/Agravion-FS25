@@ -200,6 +200,8 @@ export type StoragePlace = {
   capacity: number | null
   used: number | null
   slots: number | null
+  x: number | null
+  z: number | null
   fills: StorageFill[]
 }
 

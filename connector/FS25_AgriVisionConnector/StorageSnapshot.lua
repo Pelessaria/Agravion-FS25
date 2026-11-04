@@ -238,6 +238,29 @@ local function objectFillLevel(object)
     return amount
 end
 
+local function placeableXZ(placeable)
+    if placeable == nil or getWorldTranslation == nil then
+        return nil, nil
+    end
+    local node = placeable.rootNode
+    if node == nil and placeable.components ~= nil and placeable.components[1] ~= nil then
+        node = placeable.components[1].node
+    end
+    if node == nil then
+        return nil, nil
+    end
+    local ok, x, _, z = pcall(getWorldTranslation, node)
+    if not ok then
+        return nil, nil
+    end
+    x = num(x)
+    z = num(z)
+    if x == nil or z == nil then
+        return nil, nil
+    end
+    return math.floor(x * 10 + 0.5) / 10, math.floor(z * 10 + 0.5) / 10
+end
+
 local function addSilo(bins, storage, placeable, kind, sourceIndex)
     if storage == nil then
         return
@@ -267,6 +290,7 @@ local function addSilo(bins, storage, placeable, kind, sourceIndex)
     table.sort(fills, function(a, b)
         return tostring(a.title or a.fillType) < tostring(b.title or b.fillType)
     end)
+    local x, z = placeableXZ(placeable)
     bins[#bins + 1] = {
         id = kind .. ":" .. tostring(sourceIndex),
         kind = kind,
@@ -275,6 +299,8 @@ local function addSilo(bins, storage, placeable, kind, sourceIndex)
         foreign = storage.foreignSilo == true,
         level = round(total),
         capacity = round(totalCapacity(storage)),
+        x = x,
+        z = z,
         fills = fills,
     }
 end
@@ -347,6 +373,7 @@ local function addBales(bins, placeable, sourceIndex)
     if used == nil then
         used = bales
     end
+    local x, z = placeableXZ(placeable)
     bins[#bins + 1] = {
         id = "bale:" .. tostring(sourceIndex),
         kind = "baleStorage",
@@ -356,6 +383,8 @@ local function addBales(bins, placeable, sourceIndex)
         level = round(total),
         used = math.max(0, math.floor(used)),
         slots = slots ~= nil and math.floor(slots) or nil,
+        x = x,
+        z = z,
         fills = fills,
     }
 end
@@ -417,7 +446,7 @@ end
 local function binXml(connector, row)
     local lines = {}
     lines[#lines + 1] = string.format(
-        "<bin%s%s%s%s%s%s%s%s%s />",
+        "<bin%s%s%s%s%s%s%s%s%s%s%s />",
         attr(connector, "id", row.id),
         attr(connector, "kind", row.kind),
         attr(connector, "farmId", row.farmId),
@@ -426,7 +455,9 @@ local function binXml(connector, row)
         attr(connector, "level", row.level),
         attr(connector, "capacity", row.capacity),
         attr(connector, "used", row.used),
-        attr(connector, "slots", row.slots)
+        attr(connector, "slots", row.slots),
+        attr(connector, "x", row.x),
+        attr(connector, "z", row.z)
     )
     for _, fill in ipairs(row.fills or {}) do
         lines[#lines + 1] = string.format(
