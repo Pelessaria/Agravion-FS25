@@ -1806,30 +1806,42 @@ local function hudFillIndex(connector)
     if getFiles == nil then
         return index
     end
+    -- Engine signature is getFiles(directory, callbackName, target).
+    -- The callback is target[callbackName](target, filename, isDirectory).
+    local collector = { names = {} }
+    function collector.fileCallbackFunction(a, b)
+        local filename = b
+        local isDirectory = nil
+        if type(a) == "string" then
+            filename = a
+            isDirectory = b
+        end
+        if isDirectory == true or filename == nil then
+            return
+        end
+        collector.names[#collector.names + 1] = tostring(filename)
+    end
     local dirs = { "dataS/menu/hud/fillTypes", "$dataS/menu/hud/fillTypes" }
     local foundDir = nil
-    local foundCount = 0
     local i = 1
     while i <= #dirs do
-        local dir = dirs[i]
-        local ok, listed = pcall(getFiles, dir)
-        if ok and type(listed) == "table" then
-            for _, name in pairs(listed) do
-                if type(name) == "string" then
-                    local base = string.match(string.lower(name), "hud_fill_([%w_]+)%.%w+$")
-                    if base ~= nil and index[base] == nil then
-                        local full = name
-                        if string.find(name, "/", 1, true) == nil then
-                            full = dir .. "/" .. name
-                        end
-                        index[base] = full
-                        foundCount = foundCount + 1
-                        foundDir = dir
+        collector.names = {}
+        local ok = pcall(getFiles, dirs[i], "fileCallbackFunction", collector)
+        if ok and #collector.names > 0 then
+            foundDir = dirs[i]
+            local n = 1
+            while n <= #collector.names do
+                local name = collector.names[n]
+                local base = string.match(string.lower(name), "hud_fill_([%w_]+)%.%w+$")
+                if base ~= nil and index[base] == nil then
+                    local full = name
+                    if string.find(name, "/", 1, true) == nil and string.find(name, "\\", 1, true) == nil then
+                        full = dirs[i] .. "/" .. name
                     end
+                    index[base] = full
                 end
+                n = n + 1
             end
-        end
-        if foundCount > 0 then
             i = #dirs + 1
         else
             i = i + 1
@@ -1837,10 +1849,16 @@ local function hudFillIndex(connector)
     end
     if connector.hudFillDirLogged ~= true then
         connector.hudFillDirLogged = true
+        local count = 0
+        for _ in pairs(index) do
+            count = count + 1
+        end
+        local sample = index.wheat or index.grass or index.canola
         log(string.format(
-            "fruit icon directory entries=%s dir=%s",
-            tostring(foundCount),
-            tostring(foundDir)
+            "fruit icon directory entries=%s dir=%s sample=%s",
+            tostring(count),
+            tostring(foundDir),
+            tostring(sample)
         ))
     end
     return index
@@ -1880,6 +1898,41 @@ local function copyPendingFruitIcons(connector, budget)
         end
         push(listed[key])
         push(src)
+        local function pushTwin(path)
+            if type(path) ~= "string" or path == "" then
+                return
+            end
+            local lower = string.lower(path)
+            local twin = nil
+            if string.find(lower, "%.png$") ~= nil then
+                twin = (string.gsub(path, "[Pp][Nn][Gg]$", "dds"))
+            elseif string.find(lower, "%.dds$") ~= nil then
+                twin = (string.gsub(path, "[Dd][Dd][Ss]$", "png"))
+            end
+            push(twin)
+            local rest = string.match(path, "^%$dataS/(.+)$")
+            if rest == nil then
+                rest = string.match(path, "^dataS/(.+)$")
+            end
+            if rest ~= nil then
+                push("dataS.gar/" .. rest)
+                if twin ~= nil then
+                    local twinRest = string.match(twin, "^%$dataS/(.+)$")
+                    if twinRest == nil then
+                        twinRest = string.match(twin, "^dataS/(.+)$")
+                    end
+                    if twinRest ~= nil then
+                        push("dataS.gar/" .. twinRest)
+                    end
+                end
+            end
+        end
+        local textureKnown = false
+        if connector.textureExists ~= nil and type(src) == "string" and connector:textureExists(src) then
+            textureKnown = true
+        end
+        pushTwin(listed[key])
+        pushTwin(src)
         if connector.buildStoreImageCandidates ~= nil then
             local expanded = connector:buildStoreImageCandidates(src)
             if type(expanded) == "table" then
@@ -1921,7 +1974,14 @@ local function copyPendingFruitIcons(connector, budget)
                 ext = connector:iconExtFromPath(candidate)
             end
             local dest = connector.fruitsIconsDir .. key .. "." .. ext
-            if connector:copyIconFile(candidate, dest) then
+            local trust = textureKnown
+                and type(candidate) == "string"
+                and string.find(string.lower(candidate), "datas/menu/hud/filltypes/", 1, true) ~= nil
+            if connector:copyIconFile(candidate, dest, trust) then
+                if connector.fruitCopyPathLogged ~= true and string.find(tostring(candidate), "dataS", 1, true) ~= nil then
+                    connector.fruitCopyPathLogged = true
+                    log("fruit icon file written key=" .. key .. " from=" .. tostring(candidate))
+                end
                 connector.copiedFruitIcons[key] = "icons/fruits/" .. key .. "." .. ext
                 pending[key] = nil
                 copied = copied + 1

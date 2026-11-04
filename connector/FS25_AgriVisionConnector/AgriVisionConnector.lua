@@ -12,7 +12,7 @@
 
 AgriVisionConnector = {}
 AgriVisionConnector.MOD_NAME = "FS25_AgriVisionConnector"
-AgriVisionConnector.VERSION = "0.1.12.0"
+AgriVisionConnector.VERSION = "0.1.13.0"
 AgriVisionConnector.SCHEMA = "1"
 AgriVisionConnector.TICK_MS = 5000
 AgriVisionConnector.HELLO_EVERY_MS = 60000
@@ -981,29 +981,6 @@ function AgriVisionConnector:textureExists(path)
     return ok and exists == true
 end
 
---- nil: this engine cannot measure the file. false: empty. true: has bytes.
-function AgriVisionConnector:fileHasBytes(path)
-    local size = self:engineFileSize(path)
-    if size ~= nil then
-        return size > 0
-    end
-    if getFileMD5 == nil or path == nil or path == "" then
-        return nil
-    end
-    local ok, hash = pcall(getFileMD5, path)
-    if not ok or type(hash) ~= "string" then
-        return nil
-    end
-    local compact = string.lower(hash):gsub("[^0-9a-f]", "")
-    if compact == "" then
-        return nil
-    end
-    if compact == "d41d8cd98f00b204e9800998ecf8427e" then
-        return false
-    end
-    return true
-end
-
 function AgriVisionConnector:engineFileSize(path)
     if path == nil or path == "" or getFileSize == nil then
         return nil
@@ -1033,7 +1010,7 @@ function AgriVisionConnector:fileLooksPresent(path)
     return true
 end
 
-function AgriVisionConnector:copyIconFile(src, dest)
+function AgriVisionConnector:copyIconFile(src, dest, trustTexture)
     if src == nil or dest == nil or src == "" or dest == "" then
         return false
     end
@@ -1044,22 +1021,17 @@ function AgriVisionConnector:copyIconFile(src, dest)
     if self.copiedStorePaths[dest] then
         return true
     end
-    -- Existing dest: keep a file that has bytes. An empty stub is replaced.
-    -- Without getFileSize an unknown length is kept, so a good store icon is
-    -- not rewritten every minute.
+    -- Existing dest: keep it. This build has no getFileSize, and getFileMD5
+    -- takes a mod name as its second argument, so it must not be used as a
+    -- length check (that call is a script error on every icon).
     if self:engineFileExists(dest) then
-        local have = self:fileHasBytes(dest)
-        if have == false then
-            self:deletePath(dest)
-        else
-            self.copiedStorePaths[dest] = true
-            return true
-        end
+        self.copiedStorePaths[dest] = true
+        return true
     end
     if copyFile == nil then
         return false
     end
-    local srcVisible = self:engineFileExists(src) or self:textureExists(src)
+    local srcVisible = self:engineFileExists(src) or self:textureExists(src) or trustTexture == true
     local ok = pcall(function()
         copyFile(src, dest, true)
     end)
@@ -1067,15 +1039,14 @@ function AgriVisionConnector:copyIconFile(src, dest)
         self:deletePath(dest)
         return false
     end
-    local have = self:fileHasBytes(dest)
-    if have == false then
+    local size = self:engineFileSize(dest)
+    if size ~= nil and size <= 0 then
         self:deletePath(dest)
         return false
     end
-    -- This engine build has no getFileSize. A HUD file inside dataS fails
-    -- fileExists, so a non-empty copy used to be deleted. Keep it when the
-    -- bytes are there, or when the texture loader can see the source.
-    if have == nil and not srcVisible then
+    -- A HUD texture inside dataS fails fileExists. Keep the copy when the
+    -- texture loader can see the source, which is how the game draws the icon.
+    if size == nil and not srcVisible then
         self:deletePath(dest)
         return false
     end
