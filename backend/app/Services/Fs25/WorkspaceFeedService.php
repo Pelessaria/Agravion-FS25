@@ -417,11 +417,11 @@ final class WorkspaceFeedService
         if (self::hayHas($hay, ['harvest', 'mähdresch', 'maehdresch', 'combine', 'häcksl', 'haecksl'])) {
             return 'harvester';
         }
+        if (self::hayHas($hay, ['tractor', 'traktor', 'truck', 'lkw', 'wheelloader', 'radlader', 'telehandler', 'teleskop', 'forklift', 'stapler', 'frontloadervehicle'])) {
+            return 'tractor';
+        }
         if (self::hayHas($hay, ['trailer', 'anhäng', 'anhaeng', 'wagon', 'kipper', 'tipper', 'ladewagen', 'dolly'])) {
             return 'trailer';
-        }
-        if (self::hayHas($hay, ['tractor', 'traktor', 'truck', 'lkw', 'wheelloader', 'radlader', 'telehandler', 'teleskop', 'forklift', 'stapler'])) {
-            return 'tractor';
         }
         if ($fuelCapacity !== null && $fuelCapacity > 1) {
             return 'tractor';
@@ -435,19 +435,45 @@ final class WorkspaceFeedService
      */
     private static function shopBucket(?string $value): ?string
     {
-        $token = strtolower(preg_replace('/[^a-z0-9]+/', '', (string) $value) ?? '');
+        $token = preg_replace('/[^a-z0-9]+/', '', strtolower((string) $value)) ?? '';
         if ($token === '') {
             return null;
         }
+        // The stats feed appends a size letter: TRACTORSM, TRACTORSL, TRACTORSS.
+        if (str_starts_with($token, 'tractors') || str_starts_with($token, 'traktor')) {
+            return 'tractor';
+        }
+        if (self::tokenIs($token, ['trucks', 'truck', 'lkw', 'cars', 'car', 'pkw', 'wheelloaders', 'wheelloader', 'telehandlers', 'telehandler', 'skidsteerloaders', 'skidsteerloader', 'forklifts', 'forklift', 'frontloadervehicles', 'frontloadervehicle'])) {
+            return 'tractor';
+        }
+        if (self::tokenIs($token, ['harvesters', 'harvester', 'forageharvesters', 'forageharvester', 'beetharvesters', 'beetharvester', 'potatoharvesters', 'potatoharvester', 'cottonharvesters', 'cottonharvester', 'sugarcaneharvesters', 'sugarcaneharvester', 'vegetableharvesters', 'vegetableharvester', 'combines', 'combine'])) {
+            return 'harvester';
+        }
+        if (self::tokenIs($token, ['trailers', 'trailer', 'augerwagons', 'augerwagon', 'foragewagons', 'foragewagon', 'loaderwagons', 'loaderwagon', 'lowloaders', 'lowloader', 'dollies', 'dolly', 'tippers', 'tipper'])) {
+            return 'trailer';
+        }
+        if (self::tokenIs($token, ['pallets', 'pallet', 'bigbags', 'bigbag'])) {
+            return 'pallet';
+        }
+        if (self::tokenIs($token, ['cutters', 'cutter', 'cornheaders', 'cornheader', 'headers', 'header', 'weights', 'weight', 'frontloadertools', 'frontloadertool', 'frontloaders', 'frontloader'])) {
+            return 'tool';
+        }
 
-        return match (true) {
-            in_array($token, ['tractors', 'tractor', 'traktoren', 'traktor', 'trucks', 'truck', 'lkw', 'cars', 'car', 'pkw', 'wheelloaders', 'wheelloader', 'telehandlers', 'telehandler', 'skidsteerloaders', 'skidsteerloader', 'forklifts', 'forklift'], true) => 'tractor',
-            in_array($token, ['harvesters', 'harvester', 'forageharvesters', 'forageharvester', 'beetharvesters', 'beetharvester', 'potatoharvesters', 'potatoharvester', 'cottonharvesters', 'cottonharvester', 'sugarcaneharvesters', 'sugarcaneharvester', 'vegetableharvesters', 'vegetableharvester', 'combines', 'combine'], true) => 'harvester',
-            in_array($token, ['trailers', 'trailer', 'augerwagons', 'augerwagon', 'foragewagons', 'foragewagon', 'loaderwagons', 'loaderwagon', 'lowloaders', 'lowloader', 'dollies', 'dolly', 'tippers', 'tipper'], true) => 'trailer',
-            in_array($token, ['pallets', 'pallet', 'bigbags', 'bigbag'], true) => 'pallet',
-            in_array($token, ['cutters', 'cutter', 'cornheaders', 'cornheader', 'headers', 'header', 'weights', 'weight', 'frontloadertools', 'frontloaders', 'frontloader'], true) => 'tool',
-            default => null,
-        };
+        return null;
+    }
+
+    /**
+     * @param  list<string>  $ids
+     */
+    private static function tokenIs(string $token, array $ids): bool
+    {
+        foreach ($ids as $id) {
+            if ($token === $id || str_starts_with($token, $id)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
