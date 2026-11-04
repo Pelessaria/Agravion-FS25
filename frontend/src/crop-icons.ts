@@ -15,11 +15,16 @@ const alias: Record<string, string> = {
   corn: "maize",
   meadow: "grass",
   fieldgrass: "grass",
-  drygrass: "hay",
+  greenrye: "grass",
+  vetchrye: "grass",
+  drygrass: "drygrasswindrow",
+  oilseedradish: "oilradish",
+  sugarbeetroot: "sugarbeet",
 }
 
-/** Poster symbol for a crop when the game did not write a HUD file. */
-export function sheetIcon(kind: string | null | undefined): string | null {
+/** HUD symbol from the icon pack. Mod files still win when the connector copied one. */
+export function cropIcon(kind: string | null | undefined): string | null {
   const key = (kind ?? "").toLowerCase()
-  return icons[alias[key] ?? key] ?? null
+  if (!key) return null
+  return icons[alias[key] ?? key] ?? icons.unknown ?? null
 }

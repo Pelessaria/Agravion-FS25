@@ -12,7 +12,7 @@
 
 AgriVisionConnector = {}
 AgriVisionConnector.MOD_NAME = "FS25_AgriVisionConnector"
-AgriVisionConnector.VERSION = "0.1.14.0"
+AgriVisionConnector.VERSION = "0.1.15.0"
 AgriVisionConnector.SCHEMA = "1"
 AgriVisionConnector.TICK_MS = 5000
 AgriVisionConnector.HELLO_EVERY_MS = 60000
@@ -971,33 +971,6 @@ function AgriVisionConnector:engineFileExists(path)
     return ok and exists == true
 end
 
---- HUD icons live in dataS. fileExists does not see that archive.
---- textureFileExists is the loader the game uses for hudOverlayFilename.
-function AgriVisionConnector:textureExists(path)
-    if path == nil or path == "" or textureFileExists == nil then
-        return false
-    end
-    local ok, exists = pcall(textureFileExists, path)
-    return ok and exists == true
-end
-
---- True when the copied file is an image the game itself can load.
---- nil when this build has no overlay loader. false when the file is empty
---- or not an image. The id is released so the check does not keep the texture.
-function AgriVisionConnector:copiedImageLoads(path)
-    if createImageOverlay == nil or path == nil or path == "" then
-        return nil
-    end
-    local ok, id = pcall(createImageOverlay, path)
-    if not ok or type(id) ~= "number" or id == 0 then
-        return false
-    end
-    if delete ~= nil then
-        pcall(delete, id)
-    end
-    return true
-end
-
 function AgriVisionConnector:engineFileSize(path)
     if path == nil or path == "" or getFileSize == nil then
         return nil
@@ -1027,28 +1000,24 @@ function AgriVisionConnector:fileLooksPresent(path)
     return true
 end
 
-function AgriVisionConnector:copyIconFile(src, dest, trustTexture)
+function AgriVisionConnector:copyIconFile(src, dest)
     if src == nil or dest == nil or src == "" or dest == "" then
         return false
     end
     if self.copiedStorePaths == nil then
         self.copiedStorePaths = {}
     end
-    -- Verified this session.
     if self.copiedStorePaths[dest] then
         return true
     end
-    -- Existing dest: keep it. This build has no getFileSize, and getFileMD5
-    -- takes a mod name as its second argument, so it must not be used as a
-    -- length check (that call is a script error on every icon).
     if self:engineFileExists(dest) then
         self.copiedStorePaths[dest] = true
         return true
     end
-    if copyFile == nil then
+    -- Only real files. dataS textures are visible to the loader and are not copied.
+    if copyFile == nil or not self:engineFileExists(src) then
         return false
     end
-    local srcVisible = self:engineFileExists(src) or self:textureExists(src) or trustTexture == true
     local ok = pcall(function()
         copyFile(src, dest, true)
     end)
@@ -1058,22 +1027,6 @@ function AgriVisionConnector:copyIconFile(src, dest, trustTexture)
     end
     local size = self:engineFileSize(dest)
     if size ~= nil and size <= 0 then
-        self:deletePath(dest)
-        return false
-    end
-    -- A HUD texture inside dataS fails fileExists. copyFile can still leave a
-    -- 0-byte stub, and this build has no getFileSize. An overlay that does not
-    -- load is not an icon, so that stub is removed and the next path is tried.
-    if trustTexture == true and not self:engineFileExists(src) then
-        if self:copiedImageLoads(dest) ~= true then
-            self:deletePath(dest)
-            if self.fruitImageRejectLogged ~= true then
-                self.fruitImageRejectLogged = true
-                print("AgriVisionConnector: fruit icon overlay rejected " .. tostring(dest))
-            end
-            return false
-        end
-    elseif size == nil and not srcVisible then
         self:deletePath(dest)
         return false
     end

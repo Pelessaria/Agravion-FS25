@@ -2832,8 +2832,15 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   border-radius: 12px;
   background: #f4f1e6;
 }
-.fields-detail-mark svg { width: 30px; height: 30px; }
-.fields-detail-mark img { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); object-fit: contain; }
+.fields-detail-mark img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  background: #111;
+}
 .fields-facts { display: grid; gap: 6px; margin: 12px 0 0; }
 .fields-facts div { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 14px; align-items: center; }
 .fields-facts dt { color: var(--text-faint); white-space: nowrap; }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { useTranslation } from "react-i18next"
 import { ChevronLeft, ChevronRight, LocateFixed, Minus, Plus } from "lucide-react"
 import { apiWorkspaceFields } from "../api"
-import { sheetIcon } from "../crop-icons"
+import { cropIcon } from "../crop-icons"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { demoFields } from "../demo-fields"
 import { farmDisplayName } from "../farm-label"
@@ -51,185 +51,11 @@ type DrawnField = {
   group: number[] | null
   iconUrl: string | null
   mark: string
-  iconColor: string
   label: string
 }
 
 const LABEL_HEIGHT = 2.7
 const LABELS_FROM_ZOOM = 1.7
-
-function GrainEar({ awns = false }: { awns?: boolean }) {
-  return (
-    <>
-      <path d="M8 15.4 V6.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <ellipse cx="5.2" cy="4.7" rx="1.55" ry="2.15" transform="rotate(-36 5.2 4.7)" fill="currentColor" />
-      <ellipse cx="10.8" cy="4.7" rx="1.55" ry="2.15" transform="rotate(36 10.8 4.7)" fill="currentColor" />
-      <ellipse cx="5" cy="8" rx="1.6" ry="2.2" transform="rotate(-30 5 8)" fill="currentColor" />
-      <ellipse cx="11" cy="8" rx="1.6" ry="2.2" transform="rotate(30 11 8)" fill="currentColor" />
-      <ellipse cx="5.5" cy="11.1" rx="1.45" ry="1.95" transform="rotate(-20 5.5 11.1)" fill="currentColor" />
-      <ellipse cx="10.5" cy="11.1" rx="1.45" ry="1.95" transform="rotate(20 10.5 11.1)" fill="currentColor" />
-      {awns ? (
-        <path
-          d="M5.2 3.2 L3.2 1.2 M10.8 3.2 L12.8 1.2 M4.6 6.4 L2.4 4.6 M11.4 6.4 L13.6 4.6 M5 9.6 L2.8 8.2 M11 9.6 L13.2 8.2"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="0.9"
-          strokeLinecap="round"
-        />
-      ) : null}
-    </>
-  )
-}
-
-function CropMark({ kind }: { kind: string }) {
-  if (kind === "barley" || kind === "summerbarley") return <GrainEar awns />
-  if (kind === "oat") {
-    return (
-      <>
-        <path d="M8 15.2 V5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M8 6.2 C5 6 3.2 4.2 3 2.2 M8 8 C11.2 7.6 13 5.6 13.2 3.4 M8 10 C5.2 10.2 3.6 11.6 3.2 13.4" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
-        <ellipse cx="3.1" cy="2" rx="1.15" ry="1.7" transform="rotate(-20 3.1 2)" fill="currentColor" />
-        <ellipse cx="13.1" cy="3.2" rx="1.15" ry="1.7" transform="rotate(18 13.1 3.2)" fill="currentColor" />
-        <ellipse cx="3.3" cy="13.3" rx="1.15" ry="1.65" transform="rotate(16 3.3 13.3)" fill="currentColor" />
-      </>
-    )
-  }
-  if (
-    kind === "wheat" ||
-    kind === "rye" ||
-    kind === "spelt" ||
-    kind === "triticale" ||
-    kind === "rice" ||
-    kind === "ricelonggrain"
-  ) {
-    return <GrainEar />
-  }
-  if (kind === "sunflower") {
-    return (
-      <>
-        <circle cx="8" cy="6.3" r="2.15" fill="currentColor" />
-        <circle cx="8" cy="3.15" r="1.15" fill="currentColor" />
-        <circle cx="11.1" cy="4.4" r="1.15" fill="currentColor" />
-        <circle cx="11.6" cy="7.4" r="1.15" fill="currentColor" />
-        <circle cx="9.4" cy="9.5" r="1.15" fill="currentColor" />
-        <circle cx="6.6" cy="9.5" r="1.15" fill="currentColor" />
-        <circle cx="4.4" cy="7.4" r="1.15" fill="currentColor" />
-        <circle cx="4.9" cy="4.4" r="1.15" fill="currentColor" />
-        <path d="M8 9.2 V15.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </>
-    )
-  }
-  if (kind === "canola" || kind === "oilseedradish" || kind === "mustard") {
-    return (
-      <>
-        <circle cx="8" cy="5.6" r="2.5" fill="currentColor" />
-        <circle cx="4.7" cy="7.4" r="1.7" fill="currentColor" />
-        <circle cx="11.3" cy="7.4" r="1.7" fill="currentColor" />
-        <circle cx="6.2" cy="3.3" r="1.45" fill="currentColor" />
-        <circle cx="9.8" cy="3.3" r="1.45" fill="currentColor" />
-        <path d="M8 8.6 V15.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </>
-    )
-  }
-  if (kind === "maize" || kind === "silagemaize" || kind === "corn" || kind === "sorghum") {
-    return (
-      <>
-        <path d="M8 15.2 V12.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <ellipse cx="8" cy="7.2" rx="2.7" ry="4.6" fill="currentColor" />
-        <path d="M6.2 4.2 H9.8 M5.8 6.4 H10.2 M5.8 8.6 H10.2 M6.2 10.6 H9.8" stroke="#f6f3ea" strokeWidth="0.7" strokeLinecap="round" />
-      </>
-    )
-  }
-  if (kind === "grass" || kind === "fieldgrass" || kind === "meadow" || kind === "greenrye" || kind === "vetchrye") {
-    return (
-      <path
-        d="M3.2 14.4 C3.6 9 4.4 6 5.2 2.4 C6.2 6.2 6.4 9 6.2 14.4 Z M6.6 14.4 C7 8.2 8 4.2 8.4 1.6 C9.2 4.6 9.6 8.4 9.2 14.4 Z M10 14.4 C10.4 8.6 11.4 5.4 12.6 2.8 C13.2 6 13.4 9.2 12.8 14.4 Z"
-        fill="currentColor"
-      />
-    )
-  }
-  if (kind === "poplar") {
-    return (
-      <>
-        <path d="M8 15.2 V8.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <ellipse cx="8" cy="5.6" rx="3.3" ry="4.2" fill="currentColor" />
-      </>
-    )
-  }
-  if (kind === "potato") {
-    return <ellipse cx="8" cy="8.6" rx="4.6" ry="3.5" fill="currentColor" />
-  }
-  if (kind === "sugarbeet") {
-    return (
-      <>
-        <path d="M8 2.4 C6.6 4.2 6.2 5.2 6.6 6.2 C5.2 5.4 4.2 5.6 3.6 6.4 M8 2.2 C9.4 4 9.8 5 9.4 6 C10.8 5.2 11.8 5.4 12.4 6.2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-        <path d="M5.2 6.4 C4.2 9 4.6 12.4 8 14.6 C11.4 12.4 11.8 9 10.8 6.4 C9.6 7.2 6.4 7.2 5.2 6.4 Z" fill="currentColor" />
-      </>
-    )
-  }
-  if (kind === "carrot") {
-    return <path d="M8 2.2 C6.4 4.4 5.6 5.6 6.2 6.4 C4.4 8 4.2 11 8 15 C11.8 11 11.6 8 9.8 6.4 C10.4 5.6 9.6 4.4 8 2.2 Z" fill="currentColor" />
-  }
-  if (kind === "parsnip") {
-    return <path d="M8 1.8 C7.2 4 7.4 5.4 8 6.2 C6.2 8.2 6.4 11.4 8 15.2 C9.6 11.4 9.8 8.2 8 6.2 C8.6 5.4 8.8 4 8 1.8 Z" fill="currentColor" />
-  }
-  if (kind === "beetroot") {
-    return (
-      <>
-        <path d="M8 3.2 V5.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-        <ellipse cx="8" cy="9.4" rx="4.1" ry="3.6" fill="currentColor" />
-      </>
-    )
-  }
-  if (kind === "cotton") {
-    return (
-      <>
-        <circle cx="6.2" cy="7.2" r="2.5" fill="#f7f7f2" stroke="#5c615c" strokeWidth="0.6" />
-        <circle cx="9.8" cy="7.4" r="2.5" fill="#f7f7f2" stroke="#5c615c" strokeWidth="0.6" />
-        <circle cx="8" cy="10" r="2.3" fill="#f7f7f2" stroke="#5c615c" strokeWidth="0.6" />
-      </>
-    )
-  }
-  if (kind === "onion") {
-    return (
-      <>
-        <path d="M8 3.1 V6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-        <ellipse cx="8" cy="10" rx="3.6" ry="3.3" fill="currentColor" />
-      </>
-    )
-  }
-  if (kind === "spinach") {
-    return <path d="M8 14.6 C4 12 2.4 8 4.2 4.2 C6.4 6.4 7.2 8.6 8 14.6 C8.8 8.6 9.6 6.4 11.8 4.2 C13.6 8 12 12 8 14.6 Z" fill="currentColor" />
-  }
-  if (kind === "soybean" || kind === "pea" || kind === "fieldbean" || kind === "greenbean") {
-    return (
-      <path
-        d="M5.2 3.2 C8.4 3.4 11.2 5.6 12.2 8.8 C10.2 11.6 7 13.6 4.2 13.2 C3.2 9.4 3.4 5.4 5.2 3.2 Z M6.4 6.2 A1 1 0 1 0 6.5 6.2 M8.2 8.2 A1 1 0 1 0 8.3 8.2 M7 10.6 A1 1 0 1 0 7.1 10.6"
-        fill="currentColor"
-      />
-    )
-  }
-  if (kind === "grape") {
-    return (
-      <>
-        <circle cx="6.1" cy="6.4" r="1.7" fill="currentColor" />
-        <circle cx="9.9" cy="6.4" r="1.7" fill="currentColor" />
-        <circle cx="8" cy="8.8" r="1.7" fill="currentColor" />
-        <circle cx="6.3" cy="11.2" r="1.55" fill="currentColor" />
-        <circle cx="9.7" cy="11.2" r="1.55" fill="currentColor" />
-      </>
-    )
-  }
-  if (kind === "olive") {
-    return <ellipse cx="8" cy="8.4" rx="2.5" ry="3.6" fill="currentColor" />
-  }
-  return (
-    <>
-      <path d="M8 15.2 V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M8 9.2 C5 8.4 3.4 6 4.6 3.6 C6.6 5 7.4 6.6 8 9.2 C8.6 6.6 9.4 5 11.4 3.6 C12.6 6 11 8.4 8 9.2 Z" fill="currentColor" />
-    </>
-  )
-}
 
 function groupCaption(field: FieldSnapshot, fields: FieldSnapshot[]) {
   const group = field.group
@@ -312,7 +138,6 @@ function projectFields(
       group: field.group && field.group.length > 1 ? field.group : null,
       iconUrl: field.iconUrl,
       mark: key,
-      iconColor: cropColor(field),
       label: caption.show ? caption.text : "",
     }
   })
@@ -1281,8 +1106,10 @@ function FieldMap({
             {fields.map((field) => {
               const hot = labelHot(field, hoverId, selectedId)
               if (!field.label || labels.scale <= 0 || (!labels.ids.has(field.id) && !hot)) return null
-              const withIcon = true
-              const sheet = sheetIcon(field.mark)
+              const pack = cropIcon(field.mark)
+              const game = field.iconUrl && !brokenIcons.has(field.iconUrl) ? field.iconUrl : null
+              const icon = game ?? pack
+              const withIcon = icon != null
               const digits = field.label.length
               const width = labelWidth(digits, withIcon)
               const iconX = -width / 2 + 0.28
@@ -1295,16 +1122,16 @@ function FieldMap({
                   transform={`translate(${field.x} ${field.y}) scale(${labels.scale})`}
                 >
                   <rect x={-width / 2} y={-1.35} width={width} height={LABEL_HEIGHT} rx="0.45" />
-                  {withIcon && field.iconUrl && !brokenIcons.has(field.iconUrl) ? (
+                  {icon ? (
                     <image
-                      href={field.iconUrl}
+                      href={icon}
                       x={iconX}
                       y={-1.05}
                       width="2.1"
                       height="2.1"
                       onError={() => {
                         const href = field.iconUrl
-                        if (!href) return
+                        if (!href || href !== icon) return
                         setBrokenIcons((current) => {
                           if (current.has(href)) return current
                           const next = new Set(current)
@@ -1313,20 +1140,6 @@ function FieldMap({
                         })
                       }}
                     />
-                  ) : null}
-                  {withIcon && (!field.iconUrl || brokenIcons.has(field.iconUrl)) && sheet ? (
-                    <g transform={`translate(${iconX} -1.05)`}>
-                      <rect width="2.1" height="2.1" rx="0.4" fill="#f4f1e6" />
-                      <image href={sheet} x="0.15" y="0.15" width="1.8" height="1.8" />
-                    </g>
-                  ) : null}
-                  {withIcon && (!field.iconUrl || brokenIcons.has(field.iconUrl)) && !sheet ? (
-                    <g transform={`translate(${iconX} -1.05)`}>
-                      <rect width="2.1" height="2.1" rx="0.4" fill="#f4f1e6" />
-                      <g transform="translate(0.12 0.12) scale(0.116)" style={{ color: field.iconColor }}>
-                        <CropMark kind={field.mark} />
-                      </g>
-                    </g>
                   ) : null}
                   <text x={textX} y="0.55" textAnchor="middle" fontSize="1.7">
                     {field.label}
@@ -1388,7 +1201,7 @@ function FieldDetail({
   }
 
   const fruit = field.fruitTitle || field.fruitName
-  const sheet = sheetIcon(cropKey(field.fruitName))
+  const pack = cropIcon(cropKey(field.fruitName))
   const harvest = formatHarvest(field, t)
   const grassFruit = field.fruitName != null && GRASS_FRUIT.has(field.fruitName.toUpperCase())
   const grassGround = field.ground === 14 || field.ground === 15
@@ -1402,22 +1215,23 @@ function FieldDetail({
   return (
     <aside className="fields-detail">
       <header className="fields-detail-head">
-        <span className="fields-detail-mark" style={{ color: cropColor(field) }} aria-hidden="true">
-          <svg viewBox="0 0 16 16">
-            <CropMark kind={cropKey(field.fruitName)} />
-          </svg>
-          {field.iconUrl ? (
+        {field.iconUrl || pack ? (
+          <span className="fields-detail-mark" aria-hidden="true">
             <img
-              src={field.iconUrl}
+              src={field.iconUrl ?? pack ?? undefined}
               alt=""
               onError={(event) => {
-                event.currentTarget.style.display = "none"
+                const img = event.currentTarget
+                if (pack && img.dataset.fallback !== "1") {
+                  img.dataset.fallback = "1"
+                  img.src = pack
+                  return
+                }
+                img.style.display = "none"
               }}
             />
-          ) : sheet ? (
-            <img src={sheet} alt="" />
-          ) : null}
-        </span>
+          </span>
+        ) : null}
         <div>
           <h2>{t("fields.numberValue", { id: field.id })}</h2>
           <p>{fruit ?? t("fields.crop.noCrop")}</p>
