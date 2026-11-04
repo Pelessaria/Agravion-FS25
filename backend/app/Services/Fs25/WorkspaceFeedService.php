@@ -403,13 +403,15 @@ final class WorkspaceFeedService
 
     private static function mapVehicleCategory(?string $category, ?string $type, ?string $filename = null, ?string $name = null, ?float $fuelCapacity = null): string
     {
-        $shop = self::shopBucket($category) ?? self::shopBucket($type);
+        $shop = self::shopBucket($category);
+        $objectHay = mb_strtolower(trim(($filename ?? '').' '.($name ?? '')), 'UTF-8');
+        $hay = mb_strtolower(trim(($category ?? '').' '.($type ?? '').' '.$objectHay), 'UTF-8');
+        // A shovel or weight keeps its own name even when the matched shop row says tractor.
+        if (self::hayHas($objectHay, ['fork', 'gabel', 'schaufel', 'shovel', 'frontloader', 'frontlader', 'weight', 'gewicht', 'adapter', 'triangle', 'cutter', 'header', 'pickup', 'orbis', 'plow', 'pflug', 'cultivat', 'grubber', 'mower', 'mäher', 'tedder', 'zetter', 'windrow', 'schwader', 'baler', 'presse', 'sprayer', 'spritze', 'seeder', 'sämaschine', 'planter'])) {
+            return 'tool';
+        }
         if ($shop !== null) {
             return $shop;
-        }
-        $hay = mb_strtolower(trim(($category ?? '').' '.($type ?? '').' '.($filename ?? '').' '.($name ?? '')), 'UTF-8');
-        if (self::hayHas($hay, ['fork', 'gabel', 'schaufel', 'shovel', 'frontloader', 'frontlader', 'weight', 'gewicht', 'adapter', 'triangle', 'cutter', 'header', 'pickup', 'orbis', 'plow', 'pflug', 'cultivat', 'grubber', 'mower', 'mäher', 'tedder', 'zetter', 'windrow', 'schwader', 'baler', 'presse', 'sprayer', 'spritze', 'seeder', 'sämaschine', 'planter'])) {
-            return 'tool';
         }
         if (self::hayHas($hay, ['pallet', '/palette', 'bigbag'])) {
             return 'pallet';
