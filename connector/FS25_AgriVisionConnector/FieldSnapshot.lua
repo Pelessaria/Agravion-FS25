@@ -1797,25 +1797,125 @@ local function writeState(connector, ids, records)
     connector:writeTextFile(connector.stateDir .. "fields_state.xml", body)
 end
 
+local function hudFillIndex(connector)
+    if connector.hudFillIndex ~= nil then
+        return connector.hudFillIndex
+    end
+    local index = {}
+    connector.hudFillIndex = index
+    if getFiles == nil then
+        return index
+    end
+    local dirs = { "dataS/menu/hud/fillTypes", "$dataS/menu/hud/fillTypes" }
+    local foundDir = nil
+    local foundCount = 0
+    local i = 1
+    while i <= #dirs do
+        local dir = dirs[i]
+        local ok, listed = pcall(getFiles, dir)
+        if ok and type(listed) == "table" then
+            for _, name in pairs(listed) do
+                if type(name) == "string" then
+                    local base = string.match(string.lower(name), "hud_fill_([%w_]+)%.%w+$")
+                    if base ~= nil and index[base] == nil then
+                        local full = name
+                        if string.find(name, "/", 1, true) == nil then
+                            full = dir .. "/" .. name
+                        end
+                        index[base] = full
+                        foundCount = foundCount + 1
+                        foundDir = dir
+                    end
+                end
+            end
+        end
+        if foundCount > 0 then
+            i = #dirs + 1
+        else
+            i = i + 1
+        end
+    end
+    if connector.hudFillDirLogged ~= true then
+        connector.hudFillDirLogged = true
+        log(string.format(
+            "fruit icon directory entries=%s dir=%s",
+            tostring(foundCount),
+            tostring(foundDir)
+        ))
+    end
+    return index
+end
+
 local function copyPendingFruitIcons(connector, budget)
     local pending = connector.pendingFruitIcons
     if pending == nil or connector.copyIconFile == nil or connector.fruitsIconsDir == nil then
         return
     end
     connector.copiedFruitIcons = connector.copiedFruitIcons or {}
+    local listed = hudFillIndex(connector)
     local copied = 0
     for key, src in pairs(pending) do
         if copied >= budget then
             break
         end
-        local candidates = { src }
-        if connector.buildStoreImageCandidates ~= nil then
-            local listed = connector:buildStoreImageCandidates(src)
-            if type(listed) == "table" and #listed > 0 then
-                candidates = listed
+        local candidates = {}
+        local function push(path)
+            if path == nil or path == "" then
+                return
+            end
+            local n = #candidates
+            local seen = false
+            local j = 1
+            while j <= n do
+                if candidates[j] == path then
+                    seen = true
+                    j = n + 1
+                else
+                    j = j + 1
+                end
+            end
+            if not seen then
+                candidates[#candidates + 1] = path
             end
         end
-        for _, candidate in ipairs(candidates) do
+        push(listed[key])
+        push(src)
+        if connector.buildStoreImageCandidates ~= nil then
+            local expanded = connector:buildStoreImageCandidates(src)
+            if type(expanded) == "table" then
+                local j = 1
+                while j <= #expanded do
+                    local path = expanded[j]
+                    if connector.textureExists ~= nil and connector:textureExists(path) then
+                        push(path)
+                    elseif connector.engineFileExists ~= nil and connector:engineFileExists(path) then
+                        push(path)
+                    end
+                    j = j + 1
+                end
+            end
+        end
+        if connector.fruitIconProbeLogged ~= true and type(src) == "string" and string.find(src, "dataS", 1, true) ~= nil then
+            connector.fruitIconProbeLogged = true
+            local texture = false
+            local plain = false
+            if connector.textureExists ~= nil then
+                texture = connector:textureExists(src)
+            end
+            if connector.engineFileExists ~= nil then
+                plain = connector:engineFileExists(src)
+            end
+            log(string.format(
+                "fruit icon probe key=%s src=%s texture=%s file=%s",
+                tostring(key),
+                tostring(src),
+                tostring(texture),
+                tostring(plain)
+            ))
+        end
+        local c = 1
+        while c <= #candidates do
+            local candidate = candidates[c]
             local ext = "dds"
             if connector.iconExtFromPath ~= nil then
                 ext = connector:iconExtFromPath(candidate)
@@ -1825,7 +1925,9 @@ local function copyPendingFruitIcons(connector, budget)
                 connector.copiedFruitIcons[key] = "icons/fruits/" .. key .. "." .. ext
                 pending[key] = nil
                 copied = copied + 1
-                break
+                c = #candidates + 1
+            else
+                c = c + 1
             end
         end
     end
