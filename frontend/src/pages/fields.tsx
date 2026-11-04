@@ -393,17 +393,17 @@ export function FieldsPage() {
                 >
                   <ChevronRight className="icon" />
                 </button>
-                {precisionFarming === true ? (
-                  <button
-                    type="button"
-                    className={showTramlines ? "chip-check on" : "chip-check"}
-                    aria-pressed={showTramlines}
-                    onClick={() => setShowTramlines((value) => !value)}
-                  >
-                    {t("fields.layerName.tramline")}
-                  </button>
-                ) : null}
               </div>
+              {precisionFarming === true ? (
+                <button
+                  type="button"
+                  className={showTramlines ? "chip-check on" : "chip-check"}
+                  aria-pressed={showTramlines}
+                  onClick={() => setShowTramlines((value) => !value)}
+                >
+                  {t("fields.layerName.tramline")}
+                </button>
+              ) : null}
               <label className="field fields-search">
                 <span className="sr-only">{t("fields.fieldNumber")}</span>
                 <input
