@@ -1012,6 +1012,9 @@ export const en = {
   },
   toast: {
     dismiss: "Dismiss notice",
+    errorTitle: "Error",
+    copy: "Copy message",
+    copied: "Copied",
   },
   activity: {
     sync: "Demo snapshot accepted",

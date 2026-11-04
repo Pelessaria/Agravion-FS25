@@ -2598,6 +2598,15 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   padding: 20px;
   z-index: 30;
 }
+.modal-back.is-alert { z-index: 80; }
+.toast-error-body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: min(52vh, 420px);
+  overflow: auto;
+  line-height: 1.45;
+}
 .modal {
   width: min(520px, calc(100vw - 32px));
   max-width: 100%;

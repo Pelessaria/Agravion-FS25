@@ -70,28 +70,33 @@ export function Modal({
   title,
   onClose,
   children,
+  alert = false,
 }: {
   title: string
   onClose: () => void
   children: ReactNode
+  alert?: boolean
 }) {
+  const titleId = useId()
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose()
+      if (event.key !== "Escape") return
+      if (alert) event.stopImmediatePropagation()
+      onClose()
     }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [onClose])
+    window.addEventListener("keydown", onKey, alert)
+    return () => window.removeEventListener("keydown", onKey, alert)
+  }, [alert, onClose])
 
   return (
     <div
-      className="modal-back"
+      className={alert ? "modal-back is-alert" : "modal-back"}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <h2 id="modal-title">{title}</h2>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <h2 id={titleId}>{title}</h2>
         {children}
       </div>
     </div>
@@ -101,23 +106,53 @@ export function Modal({
 export function Toasts() {
   const { t } = useTranslation()
   const { toasts, dismissToast } = useStore()
-  if (toasts.length === 0) return null
+  const notices = toasts.filter((toast) => toast.tone === "ok")
+  const error = toasts.find((toast) => toast.tone !== "ok") ?? null
+  const [copiedFor, setCopiedFor] = useState<string | null>(null)
+  const copied = error != null && copiedFor === error.id
+
   return (
-    <div className="toasts" aria-live="polite">
-      {toasts.map((toast) => (
-        <div className={`toast ${toast.tone}`} key={toast.id}>
-          <span>{toast.text}</span>
-          <button
-            type="button"
-            className="btn btn-ghost btn-icon"
-            aria-label={t("toast.dismiss")}
-            onClick={() => dismissToast(toast.id)}
-          >
-            <X className="icon" />
-          </button>
+    <>
+      {notices.length > 0 ? (
+        <div className="toasts" aria-live="polite">
+          {notices.map((toast) => (
+            <div className={`toast ${toast.tone}`} key={toast.id}>
+              <span>{toast.text}</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon"
+                aria-label={t("toast.dismiss")}
+                onClick={() => dismissToast(toast.id)}
+              >
+                <X className="icon" />
+              </button>
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
+      ) : null}
+      {error ? (
+        <Modal alert title={t("toast.errorTitle")} onClose={() => dismissToast(error.id)}>
+          <p className="toast-error-body">{error.text}</p>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                void navigator.clipboard.writeText(error.text).then(
+                  () => setCopiedFor(error.id),
+                  () => setCopiedFor(null),
+                )
+              }}
+            >
+              {copied ? t("toast.copied") : t("toast.copy")}
+            </button>
+            <button type="button" className="btn btn-primary" autoFocus onClick={() => dismissToast(error.id)}>
+              {t("close")}
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+    </>
   )
 }
 

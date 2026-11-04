@@ -432,6 +432,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   function pushToast(tone: ToastItem["tone"], text: string) {
     const id = crypto.randomUUID()
     setToasts((current) => [...current, { id, tone, text }])
+    if (tone !== "ok") return
     window.setTimeout(() => {
       setToasts((current) => current.filter((item) => item.id !== id))
     }, 4200)

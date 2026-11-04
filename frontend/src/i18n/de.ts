@@ -1010,6 +1010,9 @@ export const de = {
   },
   toast: {
     dismiss: "Hinweis schließen",
+    errorTitle: "Fehler",
+    copy: "Meldung kopieren",
+    copied: "Kopiert",
   },
   activity: {
     sync: "Demo-Snapshot angenommen",
