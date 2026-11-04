@@ -354,7 +354,7 @@ function LiveCanvas({
     const stage = stageRef.current
     if (!marker || !viewport || !stage) return
     focused.current = selected
-    const k = Math.max(cam.current.k, 2.2)
+    const k = Math.max(cam.current.k, 4.5)
     const px = (marker.x / 100) * viewport.clientWidth
     const py = (marker.y / 100) * viewport.clientHeight
     cam.current = {
@@ -452,19 +452,20 @@ function LiveCanvas({
             {markers.map((marker) => {
               const on = marker.key === selected
               const rotation = marker.heading == null ? 0 : (-marker.heading * 180) / Math.PI
+              const mark = (on ? 1.15 : 0.8) / Math.max(zoom, 1)
               return (
                 <g
                   key={marker.key}
                   data-marker={marker.key}
                   className={on ? `live-marker is-${marker.kind} is-on` : `live-marker is-${marker.kind}`}
-                  transform={`translate(${marker.x} ${marker.y}) rotate(${rotation})`}
+                  transform={`translate(${marker.x} ${marker.y}) rotate(${rotation}) scale(${mark})`}
                 >
                   {marker.kind === "vehicle" && marker.heading != null ? (
-                    <polygon points="0,1.7 -0.85,-1.05 0.85,-1.05" />
+                    <polygon points="0,1.15 -0.72,-0.85 0.72,-0.85" />
                   ) : marker.kind === "place" ? (
-                    <polygon points="0,-1.15 1.15,0 0,1.15 -1.15,0" />
+                    <polygon points="0,-0.85 0.85,0 0,0.85 -0.85,0" />
                   ) : (
-                    <circle r="0.9" />
+                    <circle r="0.62" />
                   )}
                 </g>
               )

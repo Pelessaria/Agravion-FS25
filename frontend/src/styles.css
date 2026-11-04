@@ -3510,6 +3510,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-list li.is-on button { background: rgba(228, 184, 74, 0.16); }
 .live-list span { color: #9aa59c; font-size: 0.85rem; }
 .live-marker { cursor: pointer; }
+.live-marker circle, .live-marker polygon { vector-effect: non-scaling-stroke; }
 .live-marker.is-vehicle { fill: #e4b84a; }
 .live-marker.is-player { fill: #f4f7f4; }
 .live-marker.is-place { fill: #c9843a; }
