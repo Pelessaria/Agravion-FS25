@@ -3484,7 +3484,13 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   border: 1px solid var(--line);
 }
 .live-frame, .live-frame .fields-viewport { height: 100%; min-height: 0; }
-.live-frame .fields-viewport { background: #121814; }
+.live-frame .fields-viewport { background: #1a221c; }
+.fields-stage img.live-sheet,
+.fields-stage svg.live-sheet {
+  inset: auto;
+  max-width: none;
+  object-fit: fill;
+}
 .live-hud {
   position: absolute;
   z-index: 4;

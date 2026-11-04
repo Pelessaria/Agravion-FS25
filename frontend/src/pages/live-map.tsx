@@ -360,6 +360,7 @@ function LiveCanvas({
   const [dragging, setDragging] = useState(false)
   const [zoom, setZoom] = useState(1)
   const [mapFailed, setMapFailed] = useState(false)
+  const [view, setView] = useState({ w: 0, h: 0 })
 
   function apply() {
     const el = stageRef.current
@@ -382,6 +383,28 @@ function LiveCanvas({
     cam.current.k = clamped
     apply()
   }
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const measure = () => setView({ w: viewport.clientWidth, h: viewport.clientHeight })
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [])
+
+  const sheet = useMemo(() => {
+    const cropW = frame.scaleX > 0.05 ? frame.scaleX : 1
+    const cropH = frame.scaleZ > 0.05 ? frame.scaleZ : 1
+    if (view.w < 8 || view.h < 8) return { left: 0, top: 0, size: Math.max(view.w, view.h) }
+    const size = Math.max(view.w / cropW, view.h / cropH)
+    return {
+      size,
+      left: (view.w - size * cropW) / 2 - size * frame.padX,
+      top: (view.h - size * cropH) / 2 - size * frame.padZ,
+    }
+  }, [frame, view])
 
   useEffect(() => {
     const viewport = viewportRef.current
@@ -462,11 +485,11 @@ function LiveCanvas({
     const marker = markers.find((item) => item.key === selected)
     const viewport = viewportRef.current
     const stage = stageRef.current
-    if (!marker || !viewport || !stage) return
+    if (!marker || !viewport || !stage || sheet.size < 8) return
     focused.current = selected
-    const k = Math.max(cam.current.k, 4.2)
-    const px = (marker.x / 100) * viewport.clientWidth
-    const py = (marker.y / 100) * viewport.clientHeight
+    const k = Math.max(cam.current.k, 3.4)
+    const px = sheet.left + (marker.x / 100) * sheet.size
+    const py = sheet.top + (marker.y / 100) * sheet.size
     cam.current = {
       k,
       x: viewport.clientWidth / 2 - px * k,
@@ -474,7 +497,7 @@ function LiveCanvas({
     }
     stage.style.transform = `translate(${cam.current.x}px, ${cam.current.y}px) scale(${k})`
     setZoom(k)
-  }, [markers, selected])
+  }, [markers, selected, sheet])
 
   return (
     <div className="fields-map-frame live-frame">
@@ -540,6 +563,8 @@ function LiveCanvas({
         <div ref={stageRef} className="fields-stage" style={{ "--map-zoom": zoom } as CSSProperties}>
           {mapUrl && !mapFailed ? (
             <img
+              className="live-sheet"
+              style={{ left: sheet.left, top: sheet.top, width: sheet.size, height: sheet.size }}
               src={mapUrl}
               alt=""
               onError={() => setMapFailed(true)}
@@ -559,14 +584,14 @@ function LiveCanvas({
           ) : (
             <div className="fields-terrain" />
           )}
-          <svg viewBox="0 0 100 100">
+          <svg className="live-sheet" style={{ left: sheet.left, top: sheet.top, width: sheet.size, height: sheet.size }} viewBox="0 0 100 100">
             {shapes.map((points, index) => (
               <polygon key={`shape-${index}`} className="live-field" points={points} />
             ))}
             {markers.map((marker) => {
               const on = marker.key === selected
               const rotation = marker.heading == null ? 0 : (-marker.heading * 180) / Math.PI
-              const mark = (on ? 2.4 : 1.7) / Math.max(zoom, 1)
+              const mark = (on ? 1.55 : 1.05) / Math.max(zoom, 1)
               return (
                 <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.kind} is-on` : `live-marker is-${marker.kind}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`rotate(${rotation}) scale(${mark})`}>
