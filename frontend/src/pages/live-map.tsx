@@ -591,7 +591,8 @@ function LiveCanvas({
             {markers.map((marker) => {
               const on = marker.key === selected
               const rotation = marker.heading == null ? 0 : (-marker.heading * 180) / Math.PI
-              const mark = (on ? 1.55 : 1.05) / Math.max(zoom, 1)
+              const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
+              const mark = toMap(on ? 15 : 10)
               return (
                 <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.kind} is-on` : `live-marker is-${marker.kind}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`rotate(${rotation}) scale(${mark})`}>
@@ -605,7 +606,7 @@ function LiveCanvas({
                     <circle className="live-marker-ring" r="0.78" />
                   </g>
                   {on && marker.label ? (
-                    <g className="live-caption" transform={`translate(0 ${-2.2 / Math.max(zoom, 1)}) scale(${1.2 / Math.max(zoom, 1)})`}>
+                    <g className="live-caption" transform={`translate(0 ${-toMap(16)}) scale(${toMap(12)})`}>
                       <text textAnchor="middle" y="0">
                         {marker.label}
                       </text>
