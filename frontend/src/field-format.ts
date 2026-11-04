@@ -245,3 +245,70 @@ export function levelLabel(t: TFunction, value: number | null) {
   if (value == null) return null
   return t("fields.level", { value })
 }
+
+export type Tramline = { width: number; direction: number; spacing: number }
+
+function pointInPolygon(x: number, z: number, points: [number, number][]) {
+  let inside = false
+  for (let i = 0, j = points.length - 1; i < points.length; j = i, i += 1) {
+    const xi = points[i][0]
+    const zi = points[i][1]
+    const xj = points[j][0]
+    const zj = points[j][1]
+    const crosses = zi > z !== zj > z
+    if (crosses && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside
+  }
+  return inside
+}
+
+/**
+ * Tramlines follow the stored work direction. The first line is centered on
+ * the field, then repeated by the spacing. Each line is clipped to the
+ * outline, so a concave field keeps only the pieces that sit on the parcel.
+ */
+export function tramlineTracks(points: [number, number][], tram: Tramline, frame: MapFrame): string[] {
+  if (points.length < 3 || !(tram.spacing >= 8) || !(tram.spacing <= 80) || !Number.isFinite(tram.direction)) {
+    return []
+  }
+  const dx = Math.sin(tram.direction)
+  const dz = Math.cos(tram.direction)
+  const px = -dz
+  const pz = dx
+  let minP = Infinity
+  let maxP = -Infinity
+  let minA = Infinity
+  let maxA = -Infinity
+  for (const [x, z] of points) {
+    const along = x * dx + z * dz
+    const across = x * px + z * pz
+    if (across < minP) minP = across
+    if (across > maxP) maxP = across
+    if (along < minA) minA = along
+    if (along > maxA) maxA = along
+  }
+  const span = maxA - minA
+  if (!(span >= 4) || !(maxP > minP)) return []
+  const mid = (minP + maxP) / 2
+  const start = mid - Math.floor((mid - minP) / tram.spacing) * tram.spacing
+  const step = Math.max(4, Math.min(16, span / 28))
+  const lines: string[] = []
+  for (let across = start; across <= maxP + 0.01 && lines.length < 160; across += tram.spacing) {
+    let run: string[] = []
+    const flush = () => {
+      if (run.length >= 2) lines.push(run.join(" "))
+      run = []
+    }
+    for (let along = minA; along <= maxA + 0.01; along += step) {
+      const x = px * across + dx * along
+      const z = pz * across + dz * along
+      if (pointInPolygon(x, z, points)) {
+        const point = projectPoint(x, z, frame)
+        run.push(`${point.x.toFixed(2)},${point.y.toFixed(2)}`)
+      } else {
+        flush()
+      }
+    }
+    flush()
+  }
+  return lines
+}

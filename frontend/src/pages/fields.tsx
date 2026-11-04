@@ -19,6 +19,7 @@ import {
   namedValue,
   projectPoint,
   terrainFrame,
+  tramlineTracks,
   type MapFrame,
 } from "../field-format"
 import {
@@ -52,6 +53,7 @@ type DrawnField = {
   iconUrl: string | null
   mark: string
   label: string
+  tracks: string[]
 }
 
 const LABEL_HEIGHT = 2.7
@@ -137,6 +139,7 @@ function projectFields(
       owned: field.owned,
       group: field.group && field.group.length > 1 ? field.group : null,
       iconUrl: field.iconUrl,
+      tracks: field.tramline ? tramlineTracks(field.points, field.tramline, frame) : [],
       mark: key,
       label: caption.show ? caption.text : "",
     }
@@ -567,6 +570,8 @@ export function FieldsPage() {
                     }
                   : null
               }
+              showTracks={activeLayer === "off" || activeLayer === "tramline"}
+              tracksStrong={activeLayer === "tramline"}
               mapUrl={
                 source?.pdaMap
                   ? `/api/workspaces/${workspace.id}/pda-map`
@@ -799,6 +804,8 @@ function FieldMap({
   outlines,
   painted,
   raster,
+  showTracks,
+  tracksStrong,
   mapUrl,
   live,
   selectedId,
@@ -812,6 +819,8 @@ function FieldMap({
   outlines: { key: string; ids: number[]; polygon: string }[]
   painted: boolean
   raster: { href: string; x: number; y: number; w: number; h: number } | null
+  showTracks: boolean
+  tracksStrong: boolean
   mapUrl: string | null
   live: boolean
   selectedId: number | null
@@ -841,6 +850,8 @@ function FieldMap({
     () => visibleLabels(fields, zoom, sidePx, selectedId, hoverId),
     [fields, hoverId, selectedId, sidePx, zoom],
   )
+  const trackFields = fields.reduce((count, field) => count + (field.tracks.length > 0 ? 1 : 0), 0)
+  const drawAllTracks = showTracks && (tracksStrong || zoom >= 1.45 || trackFields <= 24)
 
   function apply() {
     const el = stageRef.current
@@ -1103,6 +1114,18 @@ function FieldMap({
                 />
               )
             })}
+            {showTracks
+              ? fields.map((field) => {
+                  if (field.tracks.length === 0) return null
+                  const selected =
+                    field.id === selectedId || (selectedId != null && field.group?.includes(selectedId) === true)
+                  if (!drawAllTracks && !selected) return null
+                  const className = tracksStrong || selected ? "field-tram is-on" : "field-tram"
+                  return field.tracks.map((points, index) => (
+                    <polyline key={`tram-${field.id}-${index}`} className={className} points={points} />
+                  ))
+                })
+              : null}
             {fields.map((field) => {
               const hot = labelHot(field, hoverId, selectedId)
               if (!field.label || labels.scale <= 0 || (!labels.ids.has(field.id) && !hot)) return null
@@ -1329,6 +1352,11 @@ function FieldDetail({
               <Fact label={t("fields.scanned")} value={field.scanned == null ? null : field.scanned ? t("yes") : t("no")} />
             </dl>
           )}
+          {field.tramline ? (
+            <dl className="fields-facts">
+              <Fact label={t("fields.tramlineWidth")} value={`${Math.round(field.tramline.width)} m`} />
+            </dl>
+          ) : null}
         </>
       ) : null}
       {precisionFarming === true ? (

@@ -109,6 +109,11 @@ final class PrecisionLayerService
         if ($save === '') {
             return;
         }
+        try {
+            $this->syncTramlines($workspace, $access, $save);
+        } catch (Throwable $e) {
+            Log::warning(HostConnectionError::format($e, 'Fahrspuren'));
+        }
         foreach (array_keys(self::FILES) as $layer) {
             try {
                 $this->rebuild($workspace, $access, $save, $layer);
@@ -155,6 +160,52 @@ final class PrecisionLayerService
         } catch (Throwable) {
             return;
         }
+    }
+
+    /**
+     * @return array<string, array{width: float, direction: float|null, spacing: float}>
+     */
+    public function tramlines(Workspace $workspace): array
+    {
+        $path = storage_path('app/connector/'.$workspace->public_id.'/precision/tramlines.json');
+        if (! is_file($path)) {
+            return [];
+        }
+        $decoded = json_decode((string) file_get_contents($path), true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function syncTramlines(Workspace $workspace, HostAccess $access, string $save): void
+    {
+        $directory = storage_path('app/connector/'.$workspace->public_id.'/precision');
+        if (! is_dir($directory) && ! mkdir($directory, 0775, true) && ! is_dir($directory)) {
+            return;
+        }
+        $json = $directory.'/tramlines.json';
+        $stamp = $directory.'/tramlines.sha';
+        $attempt = $directory.'/tramlines.attempt';
+        if (is_file($stamp) && (time() - (int) filemtime($stamp)) < 240) {
+            return;
+        }
+        if (is_file($attempt) && (time() - (int) filemtime($attempt)) < 240) {
+            return;
+        }
+        $bytes = $this->download($access, $save.'/precisionFarming.xml');
+        if ($bytes === null || strlen($bytes) > 4 * 1024 * 1024) {
+            touch($attempt);
+
+            return;
+        }
+        $hash = hash('sha256', $bytes);
+        if (is_file($stamp) && trim((string) file_get_contents($stamp)) === $hash) {
+            touch($stamp);
+
+            return;
+        }
+        $parsed = TramlineSettingsParser::fromXml($bytes);
+        file_put_contents($json, json_encode($parsed, JSON_THROW_ON_ERROR));
+        file_put_contents($stamp, $hash);
     }
 
     private function download(HostAccess $access, string $path): ?string

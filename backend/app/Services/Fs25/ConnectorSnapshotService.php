@@ -173,7 +173,7 @@ final class ConnectorSnapshotService
             $detail = $detail ?? $e->getMessage();
         }
 
-        foreach (['fields_geometry.xml', 'fields_state.xml', 'fruits_manifest.xml', 'storage_state.xml'] as $file) {
+        foreach (['fields_geometry.xml', 'fields_state.xml', 'fruits_manifest.xml', 'storage_state.xml', 'live_map.xml'] as $file) {
             try {
                 $remote = $client->read($base.'/state/'.$file);
                 $this->storeLocalIfChanged($this->localStateDir($workspace).'/'.$file, $remote);
@@ -235,11 +235,23 @@ final class ConnectorSnapshotService
             $merged['mapSize'] = (int) $workspace->map_size;
         }
 
+        $savedTramlines = $this->savedTramlines($workspace);
         foreach ($merged['fields'] as &$field) {
             $key = $field['fruitIcon'] ?? null;
             $field['iconUrl'] = null;
             if (is_string($key) && $this->fruitIconPath($workspace, $key) !== null) {
                 $field['iconUrl'] = '/api/workspaces/'.$workspace->public_id.'/connector/fruits/'.$key;
+            }
+            if (($field['tramline'] ?? null) === null) {
+                $farmlandId = $field['farmlandId'] ?? null;
+                $saved = is_numeric($farmlandId) ? ($savedTramlines[(string) $farmlandId] ?? null) : null;
+                if (is_array($saved) && isset($saved['direction']) && is_numeric($saved['direction'])) {
+                    $field['tramline'] = [
+                        'width' => (float) $saved['width'],
+                        'direction' => (float) $saved['direction'],
+                        'spacing' => (float) $saved['spacing'],
+                    ];
+                }
             }
         }
         unset($field);
@@ -277,6 +289,91 @@ final class ConnectorSnapshotService
             'error' => null,
             'writtenAt' => $parsed['writtenAt'],
             'places' => $parsed['places'],
+        ];
+    }
+
+    /**
+     * Local live-map cache. When the connector has not written live_map.xml yet,
+     * vehicle positions from the existing vehicle snapshot are used instead.
+     *
+     * @return array<string, mixed>
+     */
+    public function readLive(Workspace $workspace): array
+    {
+        $path = $this->localStateDir($workspace).'/live_map.xml';
+        if (! is_file($path)) {
+            return $this->liveFromVehicles($workspace);
+        }
+
+        $parsed = ConnectorLiveParser::parse((string) file_get_contents($path));
+        $parsed['writtenAt'] = gmdate('c', (int) filemtime($path));
+
+        return [
+            'ok' => true,
+            'error' => null,
+            'source' => 'live',
+            ...$parsed,
+        ];
+    }
+
+    /**
+     * @return array<string, array{width: float, direction: float, spacing: float}>
+     */
+    private function savedTramlines(Workspace $workspace): array
+    {
+        $path = storage_path('app/connector/'.$workspace->public_id.'/precision/tramlines.json');
+        if (! is_file($path)) {
+            return [];
+        }
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (! is_array($decoded)) {
+            return [];
+        }
+        $out = [];
+        foreach ($decoded as $id => $row) {
+            if (! is_array($row) || ! isset($row['width'], $row['spacing'], $row['direction']) || ! is_numeric($row['direction'])) {
+                continue;
+            }
+            $out[(string) $id] = [
+                'width' => (float) $row['width'],
+                'direction' => (float) $row['direction'],
+                'spacing' => (float) $row['spacing'],
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function liveFromVehicles(Workspace $workspace): array
+    {
+        $blank = ConnectorLiveParser::blank();
+        $vehicles = $this->readVehicles($workspace)['vehicles'] ?? [];
+        foreach ($vehicles as $vehicle) {
+            if (! is_array($vehicle) || ! is_numeric($vehicle['x'] ?? null) || ! is_numeric($vehicle['z'] ?? null)) {
+                continue;
+            }
+            $blank['vehicles'][] = [
+                'id' => (string) ($vehicle['uniqueId'] ?? ''),
+                'name' => $vehicle['name'] ?? $vehicle['nameHint'] ?? null,
+                'farmId' => $vehicle['farmId'] ?? null,
+                'x' => (float) $vehicle['x'],
+                'z' => (float) $vehicle['z'],
+                'heading' => null,
+                'ai' => false,
+                'driver' => null,
+            ];
+        }
+        $path = $this->localVehiclesPath($workspace);
+        $blank['writtenAt'] = is_file($path) ? gmdate('c', (int) filemtime($path)) : null;
+
+        return [
+            'ok' => $blank['vehicles'] !== [],
+            'error' => $blank['vehicles'] === [] ? 'missing' : null,
+            'source' => 'vehicles',
+            ...$blank,
         ];
     }
 

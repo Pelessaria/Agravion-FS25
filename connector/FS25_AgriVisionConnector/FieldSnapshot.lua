@@ -1368,6 +1368,88 @@ local function sampleFruit(points)
     return index, stage, packExtra(extra[index])
 end
 
+local function rememberTramline(index, farmlandId, row)
+    if farmlandId == nil or type(row) ~= "table" then
+        return
+    end
+    if row.enabled == false or row.isEnabled == false then
+        return
+    end
+    local width = num(row.workingWidth) or num(row.width)
+    local direction = num(row.workDirection)
+    if direction == nil then
+        direction = num(row.direction)
+    end
+    local spacing = num(row.spacing) or width
+    if width == nil or direction == nil or spacing == nil then
+        return
+    end
+    if width < 8 or spacing < 8 or spacing > 80 then
+        return
+    end
+    index[farmlandId] = { width = width, direction = direction, spacing = spacing }
+end
+
+local function tramlineIndex(connector)
+    if connector.tramlineIndex ~= nil then
+        return connector.tramlineIndex
+    end
+    local index = {}
+    connector.tramlineIndex = index
+    local ok = pcall(function()
+        local pf = getPrecisionFarming()
+        local map = pf ~= nil and pf.tramlineMap or nil
+        if map == nil then
+            return
+        end
+        local keys = {
+            "farmlandIdToTramline",
+            "farmlandIdToTramlines",
+            "farmlandTramlines",
+            "tramlines",
+            "tramlineData",
+            "dataByFarmlandId",
+        }
+        local keyIndex = 1
+        while keyIndex <= #keys do
+            local source = map[keys[keyIndex]]
+            if type(source) == "table" then
+                local id, row = next(source, nil)
+                while id ~= nil do
+                    local capturedId = id
+                    local captured = row
+                    pcall(function()
+                        local farmlandId = num(capturedId)
+                        if farmlandId == nil and type(captured) == "table" then
+                            farmlandId = num(captured.farmlandId) or num(captured.id)
+                        end
+                        rememberTramline(index, farmlandId, captured)
+                    end)
+                    id, row = next(source, id)
+                end
+            end
+            keyIndex = keyIndex + 1
+        end
+    end)
+    if not ok and not connector.tramlineLogged then
+        connector.tramlineLogged = true
+        log("tramlines unreadable")
+    end
+    return index
+end
+
+local function tramlineText(connector, farmlandId)
+    local id = num(farmlandId)
+    if id == nil then
+        return nil
+    end
+    local row = tramlineIndex(connector)[id]
+    if row == nil then
+        return nil
+    end
+    return string.format("%.1f,%.4f,%.1f", row.width, row.direction, row.spacing)
+end
+
 local function collectState(connector, field, id)
     local record = { id = id }
     if field == nil then
@@ -1445,6 +1527,7 @@ local function collectState(connector, field, id)
         record.soilName = precision.soilName
         record.pf = precisionGrid(getPrecisionFarming(), farmlandId, polygon)
     end
+    record.tram = tramlineText(connector, farmlandId)
     return record
 end
 
@@ -1890,7 +1973,7 @@ end
 
 local function stateLine(connector, row)
     return string.format(
-        "<field%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s />",
+        "<field%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s />",
         attr(connector, "id", row.id),
         attr(connector, "farmId", row.farmId),
         attr(connector, "farmlandId", row.farmlandId),
@@ -1922,7 +2005,8 @@ local function stateLine(connector, row)
         attr(connector, "phTarget", row.phTarget),
         attr(connector, "soil", row.soil),
         attr(connector, "soilName", row.soilName),
-        attr(connector, "pf", row.pf)
+        attr(connector, "pf", row.pf),
+        attr(connector, "tram", row.tram)
     )
 end
 
@@ -2127,6 +2211,7 @@ function FieldSnapshot.writeIfDue(connector)
             return
         end
         connector.fieldAccumMs = 0
+        connector.tramlineIndex = nil
         connector.fieldStateIndex = 1
         connector.fieldStateRecords = {}
         connector.fieldStateIds = ids

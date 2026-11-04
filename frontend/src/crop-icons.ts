@@ -20,6 +20,10 @@ const alias: Record<string, string> = {
   drygrass: "drygrasswindrow",
   oilseedradish: "oilradish",
   sugarbeetroot: "sugarbeet",
+  fieldbeans: "fieldbean",
+  fababean: "fieldbean",
+  broadbean: "fieldbean",
+  horsebean: "fieldbean",
 }
 
 function iconKey(kind: string | null | undefined) {

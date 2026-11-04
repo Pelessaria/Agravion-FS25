@@ -2774,6 +2774,18 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   pointer-events: none;
 }
 .field-outline.is-hot { stroke: #ffe7a8; stroke-width: calc(2.05px / var(--map-zoom, 1)); }
+.field-tram {
+  fill: none;
+  stroke: rgba(62, 44, 28, 0.78);
+  stroke-width: calc(0.9px / var(--map-zoom, 1));
+  stroke-linecap: butt;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.field-tram.is-on {
+  stroke: #efe6d4;
+  stroke-width: calc(1.25px / var(--map-zoom, 1));
+}
 .field-label { cursor: pointer; }
 .field-label rect { fill: rgba(8, 12, 10, 0.5); }
 .field-label text { fill: #f7f8f7; font-weight: 600; }
@@ -3449,4 +3461,60 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 @media (max-width: 980px) {
   .stock-layout, .stock-page .stat-grid { grid-template-columns: 1fr; }
+}
+.live-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.7fr);
+  gap: 16px;
+  align-items: start;
+}
+.live-map-frame { min-height: 72vh; position: relative; }
+.live-map-frame .fields-viewport { min-height: 72vh; }
+.live-zoom {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.live-zoom button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(8, 12, 10, 0.72);
+  color: #f7f8f7;
+}
+.live-meta { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 12px; color: #d7d3c4; }
+.live-note { margin-top: 0; }
+.live-side { display: grid; gap: 14px; }
+.live-side h2 { margin: 0 0 6px; font-size: 1rem; }
+.live-toggles { display: flex; flex-wrap: wrap; gap: 8px; }
+.live-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 240px; overflow: auto; }
+.live-list button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 6px 8px;
+  border-radius: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.live-list li.is-on button { background: rgba(228, 184, 74, 0.16); }
+.live-list span { color: #9aa59c; font-size: 0.85rem; }
+.live-marker { cursor: pointer; }
+.live-marker.is-vehicle { fill: #e4b84a; }
+.live-marker.is-player { fill: #f4f7f4; }
+.live-marker.is-place { fill: #c9843a; }
+.live-marker.is-on { stroke: #fff; stroke-width: calc(1.4px / var(--map-zoom, 1)); }
+@media (max-width: 980px) {
+  .live-layout { grid-template-columns: 1fr; }
+  .live-map-frame, .live-map-frame .fields-viewport { min-height: 62vh; }
 }

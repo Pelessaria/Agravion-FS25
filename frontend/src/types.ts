@@ -234,6 +234,8 @@ export interface FieldSnapshot {
     step: number
     cells: Array<{ x: number; z: number; ph: number | null; n: number | null }>
   } | null
+  /** Precision Farming tramline. Direction is radians, 0 faces world +Z. */
+  tramline?: { width: number; direction: number; spacing: number } | null
 }
 
 export interface FieldsResponse {

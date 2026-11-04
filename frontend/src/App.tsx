@@ -4,6 +4,7 @@ import { ControlPage } from "./pages/control"
 import { CreatePage } from "./pages/create"
 import { DashboardPage } from "./pages/dashboard"
 import { FieldsPage } from "./pages/fields"
+import { LiveMapPage } from "./pages/live-map"
 import { ServerPage } from "./pages/server"
 import { StoragePage } from "./pages/storage"
 import { LoginPage } from "./pages/login"
@@ -49,6 +50,7 @@ export function App() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="w/:id" element={<WorkspaceHomePage />} />
         <Route path="w/:id/m/fields" element={<FieldsPage />} />
+        <Route path="w/:id/m/map" element={<LiveMapPage />} />
         <Route path="w/:id/m/storage" element={<StoragePage />} />
         <Route path="w/:id/m/server" element={<ServerPage />} />
         <Route path="w/:id/equipment" element={<VehiclesPage />} />

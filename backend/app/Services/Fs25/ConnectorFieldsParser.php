@@ -83,6 +83,7 @@ final class ConnectorFieldsParser
                 'soil' => $row['soil'] ?? null,
                 'soilName' => $row['soilName'] ?? null,
                 'precisionGrid' => $row['precisionGrid'] ?? null,
+                'tramline' => $row['tramline'] ?? null,
             ];
         }
 
@@ -177,6 +178,7 @@ final class ConnectorFieldsParser
                 'soil' => self::intAttr($blob, 'soil'),
                 'soilName' => self::attr($blob, 'soilName'),
                 'precisionGrid' => self::precisionGrid(self::attr($blob, 'pf')),
+                'tramline' => self::tramline(self::attr($blob, 'tram')),
             ];
         }
 
@@ -219,6 +221,32 @@ final class ConnectorFieldsParser
     /**
      * @return array{step: float, cells: list<array{x: float, z: float, ph: float|null, n: float|null}>}|null
      */
+    /**
+     * @return array{width: float, direction: float, spacing: float}|null
+     */
+    private static function tramline(?string $raw): ?array
+    {
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        $parts = explode(',', $raw);
+        if (count($parts) < 2 || ! is_numeric($parts[0]) || ! is_numeric($parts[1])) {
+            return null;
+        }
+        $width = (float) $parts[0];
+        $direction = (float) $parts[1];
+        $spacing = isset($parts[2]) && is_numeric($parts[2]) ? (float) $parts[2] : $width;
+        if ($width < 8 || $width > 80 || $spacing < 8 || $spacing > 80 || ! is_finite($direction)) {
+            return null;
+        }
+
+        return [
+            'width' => $width,
+            'direction' => $direction,
+            'spacing' => $spacing,
+        ];
+    }
+
     private static function precisionGrid(?string $raw): ?array
     {
         if ($raw === null || ! str_contains($raw, '|')) {

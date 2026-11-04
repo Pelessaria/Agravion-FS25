@@ -214,6 +214,57 @@ export async function apiWorkspaceStorage(id: string): Promise<StorageResponse> 
   return apiFetch(`/api/workspaces/${encodeURIComponent(id)}/storage`)
 }
 
+export type LiveVehicle = {
+  id: string
+  name: string | null
+  farmId: number | null
+  x: number
+  z: number
+  heading: number | null
+  ai: boolean
+  driver: string | null
+}
+
+export type LivePlayer = {
+  id: string
+  name: string | null
+  x: number
+  z: number
+  heading: number | null
+}
+
+export type LivePlace = {
+  id: string
+  name: string | null
+  type: string | null
+  farmId: number | null
+  x: number
+  z: number
+}
+
+export type LiveMapResponse = {
+  ok: boolean
+  error: string | null
+  source: "live" | "vehicles" | null
+  writtenAt: string | null
+  day: number | null
+  period: number | null
+  dayTime: number | null
+  timeScale: number | null
+  paused: boolean
+  weather: string | null
+  temperature: number | null
+  windSpeed: number | null
+  windDirection: number | null
+  vehicles: LiveVehicle[]
+  players: LivePlayer[]
+  places: LivePlace[]
+}
+
+export async function apiWorkspaceLiveMap(id: string): Promise<LiveMapResponse> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(id)}/live-map`)
+}
+
 export async function apiWorkspaceVehicles(
   id: string,
 ): Promise<{
