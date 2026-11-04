@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { useTranslation } from "react-i18next"
 import { ChevronLeft, ChevronRight, LocateFixed, Minus, Plus } from "lucide-react"
 import { apiWorkspaceFields } from "../api"
+import { sheetIcon } from "../crop-icons"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { demoFields } from "../demo-fields"
 import { farmDisplayName } from "../farm-label"
@@ -1281,6 +1282,7 @@ function FieldMap({
               const hot = labelHot(field, hoverId, selectedId)
               if (!field.label || labels.scale <= 0 || (!labels.ids.has(field.id) && !hot)) return null
               const withIcon = true
+              const sheet = sheetIcon(field.mark)
               const digits = field.label.length
               const width = labelWidth(digits, withIcon)
               const iconX = -width / 2 + 0.28
@@ -1312,7 +1314,13 @@ function FieldMap({
                       }}
                     />
                   ) : null}
-                  {withIcon && (!field.iconUrl || brokenIcons.has(field.iconUrl)) ? (
+                  {withIcon && (!field.iconUrl || brokenIcons.has(field.iconUrl)) && sheet ? (
+                    <g transform={`translate(${iconX} -1.05)`}>
+                      <rect width="2.1" height="2.1" rx="0.4" fill="#f4f1e6" />
+                      <image href={sheet} x="0.15" y="0.15" width="1.8" height="1.8" />
+                    </g>
+                  ) : null}
+                  {withIcon && (!field.iconUrl || brokenIcons.has(field.iconUrl)) && !sheet ? (
                     <g transform={`translate(${iconX} -1.05)`}>
                       <rect width="2.1" height="2.1" rx="0.4" fill="#f4f1e6" />
                       <g transform="translate(0.12 0.12) scale(0.116)" style={{ color: field.iconColor }}>
@@ -1380,6 +1388,7 @@ function FieldDetail({
   }
 
   const fruit = field.fruitTitle || field.fruitName
+  const sheet = sheetIcon(cropKey(field.fruitName))
   const harvest = formatHarvest(field, t)
   const grassFruit = field.fruitName != null && GRASS_FRUIT.has(field.fruitName.toUpperCase())
   const grassGround = field.ground === 14 || field.ground === 15
@@ -1405,6 +1414,8 @@ function FieldDetail({
                 event.currentTarget.style.display = "none"
               }}
             />
+          ) : sheet ? (
+            <img src={sheet} alt="" />
           ) : null}
         </span>
         <div>
