@@ -521,6 +521,12 @@ local function fruitIconSource(fruit)
         return nil
     end
     local fill = fruit.fillType
+    if type(fill.hudOverlay) == "table" then
+        local overlayName = fill.hudOverlay.filename or fill.hudOverlay.overlayFilename
+        if type(overlayName) == "string" and overlayName ~= "" then
+            return overlayName
+        end
+    end
     return fill.hudOverlayFilename or fill.hudOverlayFilenameSmall or fill.iconFilename
 end
 
@@ -1053,7 +1059,46 @@ local function harvestMonthsFromFruitXml(fruit)
     return nil
 end
 
--- Months come from the fruit's foliage calendar. Unknown structures stay empty.
+-- FS25 period 1 is March. Same index map as a calendar that calls getIsHarvestableInPeriod.
+local PERIOD_TO_MONTH = { 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2 }
+
+local function harvestMonthsFromPeriods(fruit)
+    if fruit == nil or fruit.getIsHarvestableInPeriod == nil then
+        return nil
+    end
+    local growthMode = nil
+    if g_currentMission ~= nil and g_currentMission.missionInfo ~= nil then
+        growthMode = g_currentMission.missionInfo.growthMode
+    end
+    if growthMode == nil then
+        return nil
+    end
+    local months = {}
+    local period = 1
+    while period <= 12 do
+        local ok, harvestable = pcall(fruit.getIsHarvestableInPeriod, fruit, growthMode, period)
+        if not ok then
+            return nil
+        end
+        if harvestable == true then
+            months[#months + 1] = PERIOD_TO_MONTH[period]
+        end
+        period = period + 1
+    end
+    if #months == 0 then
+        return nil
+    end
+    table.sort(months)
+    local out = {}
+    local n = 1
+    while n <= #months do
+        out[n] = tostring(months[n])
+        n = n + 1
+    end
+    return table.concat(out, ",")
+end
+
+-- Months come from the fruit calendar. Unknown structures stay empty.
 local function harvestMonths(fruit)
     if fruit == nil then
         return nil
@@ -1065,6 +1110,13 @@ local function harvestMonths(fruit)
             return nil
         end
         return cached
+    end
+    local fromPeriods = harvestMonthsFromPeriods(fruit)
+    if fromPeriods ~= nil then
+        if cacheKey ~= "" then
+            harvestMonthCache[cacheKey] = fromPeriods
+        end
+        return fromPeriods
     end
     local fromXml = harvestMonthsFromFruitXml(fruit)
     if fromXml ~= nil then
@@ -1775,6 +1827,16 @@ local function copyPendingFruitIcons(connector, budget)
                 copied = copied + 1
                 break
             end
+        end
+    end
+    local left = 0
+    for _ in pairs(pending) do
+        left = left + 1
+    end
+    if copied > 0 or (left > 0 and connector.fruitIconFailureLogged ~= true) then
+        log(string.format("fruit icons copied=%s remaining=%s", tostring(copied), tostring(left)))
+        if left > 0 then
+            connector.fruitIconFailureLogged = true
         end
     end
 end

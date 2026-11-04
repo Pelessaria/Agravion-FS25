@@ -12,7 +12,7 @@
 
 AgriVisionConnector = {}
 AgriVisionConnector.MOD_NAME = "FS25_AgriVisionConnector"
-AgriVisionConnector.VERSION = "0.1.10.0"
+AgriVisionConnector.VERSION = "0.1.11.0"
 AgriVisionConnector.SCHEMA = "1"
 AgriVisionConnector.TICK_MS = 5000
 AgriVisionConnector.HELLO_EVERY_MS = 60000
@@ -289,6 +289,11 @@ function AgriVisionConnector:collectVehiclesFullXml()
                 table.insert(attrs, string.format('name="%s"', self:xmlEscape(name)))
                 table.insert(identity, "n=" .. tostring(name))
             end
+            local category = self:vehicleShopCategory(vehicle, filename)
+            if category ~= nil and category ~= "" then
+                table.insert(attrs, string.format('category="%s"', self:xmlEscape(category)))
+                table.insert(identity, "c=" .. tostring(category))
+            end
             if storeKey ~= nil then
                 table.insert(attrs, string.format('storeKey="%s"', self:xmlEscape(storeKey)))
                 table.insert(identity, "sk=" .. tostring(storeKey))
@@ -494,6 +499,13 @@ function AgriVisionConnector:buildStoreImageCandidates(raw)
         stripped = "data/" .. string.sub(stripped, 7)
     elseif string.sub(stripped, 1, 5) == "$data" then
         stripped = "data" .. string.sub(stripped, 6)
+    end
+    -- The engine loads HUD files as dataS/… and data/… without a drive letter.
+    if stripped ~= path then
+        table.insert(seeds, stripped)
+        if string.sub(stripped, 1, 5) == "dataS" then
+            table.insert(seeds, "data" .. string.sub(stripped, 6))
+        end
     end
     if getAppBasePath ~= nil then
         local ok, base = pcall(getAppBasePath)
@@ -778,6 +790,42 @@ function AgriVisionConnector:vehiclePlate(vehicle)
         end
     end
     return nil
+end
+
+function AgriVisionConnector:vehicleShopCategory(vehicle, filename)
+    local typeName = nil
+    if vehicle ~= nil and type(vehicle.typeName) == "string" and vehicle.typeName ~= "" then
+        typeName = vehicle.typeName
+    end
+    local storeItem = nil
+    if vehicle ~= nil and vehicle.storeItem ~= nil then
+        storeItem = vehicle.storeItem
+    end
+    if storeItem == nil and g_storeManager ~= nil and g_storeManager.getItemByXMLFilename ~= nil and filename ~= nil and filename ~= "" then
+        local ok, item = pcall(function()
+            return g_storeManager:getItemByXMLFilename(filename)
+        end)
+        if ok and item ~= nil then
+            storeItem = item
+        end
+    end
+    local shop = nil
+    if type(storeItem) == "table" then
+        if type(storeItem.categoryName) == "string" and storeItem.categoryName ~= "" then
+            shop = storeItem.categoryName
+        elseif type(storeItem.category) == "string" and storeItem.category ~= "" then
+            shop = storeItem.category
+        elseif type(storeItem.category) == "table" then
+            local named = storeItem.category.name or storeItem.category.title
+            if type(named) == "string" and named ~= "" then
+                shop = named
+            end
+        end
+    end
+    if shop ~= nil then
+        return shop
+    end
+    return typeName
 end
 
 function AgriVisionConnector:vehicleBrand(vehicle, filename)

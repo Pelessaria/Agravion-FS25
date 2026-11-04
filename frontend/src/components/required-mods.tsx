@@ -15,14 +15,14 @@ export function RequiredModsPanel({
 }) {
   const { t } = useTranslation()
   const [data, setData] = useState<RequiredModsResponse | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState(true)
   const [error, setError] = useState(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (fresh = false) => {
     setBusy(true)
     setError(false)
     try {
-      const result = await apiRequiredMods(workspaceId)
+      const result = await apiRequiredMods(workspaceId, fresh)
       setData(result)
     } catch {
       setError(true)
@@ -32,8 +32,21 @@ export function RequiredModsPanel({
   }, [workspaceId])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    let cancelled = false
+    void (async () => {
+      try {
+        const result = await apiRequiredMods(workspaceId)
+        if (!cancelled) setData(result)
+      } catch {
+        if (!cancelled) setError(true)
+      } finally {
+        if (!cancelled) setBusy(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceId])
 
   function statusLabel(mod: RequiredModStatus) {
     if (mod.updateAvailable) {
@@ -58,7 +71,7 @@ export function RequiredModsPanel({
           <h2>{t("wsettings.requiredModsTitle")}</h2>
           {!compact ? <p className="hint">{t("wsettings.requiredModsLead")}</p> : null}
         </div>
-        <button type="button" className="btn btn-ghost btn-small" disabled={busy} onClick={() => void load()}>
+        <button type="button" className="btn btn-ghost btn-small" disabled={busy} onClick={() => void load(true)}>
           {busy ? <LoaderCircle className="icon spin" /> : <RefreshCw className="icon" />}
           {t("wsettings.requiredModsRefresh")}
         </button>

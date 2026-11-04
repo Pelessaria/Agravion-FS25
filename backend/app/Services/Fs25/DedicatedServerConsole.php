@@ -503,6 +503,15 @@ final class DedicatedServerConsole
     }
 
     /**
+     * Record the version of a zip we just uploaded or read from hello.xml.
+     * The mods page and the connector check both read this cache.
+     */
+    public function stampModFile(Workspace $workspace, string $name, string $version, int $bytes): void
+    {
+        $this->rememberModVersion($workspace, $name, $version, $bytes, null);
+    }
+
+    /**
      * A version read from the replaced zip stays, until the file size changes.
      * The web UI keeps showing the old number until the mod is switched off and on.
      *
@@ -530,16 +539,21 @@ final class DedicatedServerConsole
             if (! is_array($prior) || ! is_int($prior['verifiedBytes'] ?? null)) {
                 continue;
             }
-            if (($mod['bytes'] ?? null) !== $prior['verifiedBytes']) {
-                continue;
-            }
             $kept = trim((string) ($prior['version'] ?? ''));
             $shown = trim((string) ($mod['version'] ?? ''));
             if ($kept === '') {
                 continue;
             }
-            $result['mods'][$index]['verifiedBytes'] = $prior['verifiedBytes'];
-            if ($shown !== '' && ! ModHubCatalog::newer($shown, $kept)) {
+            $bytesMatch = ($mod['bytes'] ?? null) === $prior['verifiedBytes'];
+            // newer($shown, $kept) is true when the verified version is ahead of the web page.
+            $verifiedIsNewer = $shown === '' || ModHubCatalog::newer($shown, $kept);
+            if (! $bytesMatch && ! $verifiedIsNewer) {
+                continue;
+            }
+            $result['mods'][$index]['verifiedBytes'] = $bytesMatch || ! is_int($mod['bytes'] ?? null)
+                ? $prior['verifiedBytes']
+                : $mod['bytes'];
+            if (! $verifiedIsNewer) {
                 continue;
             }
             $result['mods'][$index]['version'] = $kept;

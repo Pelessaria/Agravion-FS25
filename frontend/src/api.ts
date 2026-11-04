@@ -336,8 +336,9 @@ export type RequiredModsResponse = {
   feedModsCount: number
 }
 
-export async function apiRequiredMods(workspaceId: string): Promise<RequiredModsResponse> {
-  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/required-mods`)
+export async function apiRequiredMods(workspaceId: string, fresh = false): Promise<RequiredModsResponse> {
+  const query = fresh ? "?fresh=1" : ""
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/required-mods${query}`)
 }
 
 /** Trigger authenticated download of the packaged connector zip. */

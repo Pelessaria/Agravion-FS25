@@ -125,13 +125,21 @@ final class ConnectorDeployService
             for ($attempt = 0; $attempt < 2; $attempt++) {
                 try {
                     $client->writeFile($remote, $local);
+                    $version = $this->packageVersion();
+                    if (is_string($version) && $version !== '') {
+                        try {
+                            (new DedicatedServerConsole)->stampModFile($workspace, self::MOD_ZIP, $version, (int) $bytes);
+                        } catch (Throwable) {
+                            // The file is on the host. The next hello read still corrects the cache.
+                        }
+                    }
 
                     return [
                         'ok' => true,
                         'error' => null,
                         'remotePath' => $remote,
                         'bytes' => (int) $bytes,
-                        'version' => $this->packageVersion(),
+                        'version' => $version,
                     ];
                 } catch (Throwable $e) {
                     $last = $e;

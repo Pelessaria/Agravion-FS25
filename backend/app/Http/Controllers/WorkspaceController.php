@@ -299,11 +299,11 @@ class WorkspaceController extends Controller
         return response()->json($result, $result['ok'] ? 200 : 422);
     }
 
-    public function requiredMods(string $workspace, RequiredModsService $mods): JsonResponse
+    public function requiredMods(Request $request, string $workspace, RequiredModsService $mods): JsonResponse
     {
         $row = $this->findWorkspace($workspace);
 
-        return response()->json($mods->status($row));
+        return response()->json($mods->status($row, $request->boolean('fresh')));
     }
 
     public function connectorIcon(

@@ -227,6 +227,7 @@ final class WorkspaceFeedService
                         $vehicle['type'] ?? null,
                         is_string($filename) ? $filename : null,
                         isset($vehicle['name']) && is_string($vehicle['name']) ? $vehicle['name'] : null,
+                        self::nullableNumber($vehicle['fuelCapacity'] ?? null),
                     ),
                     'farmId' => $vehicle['farmId'] ?? null,
                     'storeKey' => $storeKey,
@@ -400,22 +401,66 @@ final class WorkspaceFeedService
         return (float) $value;
     }
 
-    private static function mapVehicleCategory(?string $category, ?string $type, ?string $filename = null, ?string $name = null): string
+    private static function mapVehicleCategory(?string $category, ?string $type, ?string $filename = null, ?string $name = null, ?float $fuelCapacity = null): string
     {
-        $hay = strtolower(trim(($category ?? '').' '.($type ?? '').' '.($filename ?? '').' '.($name ?? '')));
-        if (str_contains($hay, 'pallet') || str_contains($hay, '/palette')) {
+        $shop = self::shopBucket($category) ?? self::shopBucket($type);
+        if ($shop !== null) {
+            return $shop;
+        }
+        $hay = mb_strtolower(trim(($category ?? '').' '.($type ?? '').' '.($filename ?? '').' '.($name ?? '')), 'UTF-8');
+        if (self::hayHas($hay, ['fork', 'gabel', 'schaufel', 'shovel', 'frontloader', 'frontlader', 'weight', 'gewicht', 'adapter', 'triangle', 'cutter', 'header', 'pickup', 'orbis', 'plow', 'pflug', 'cultivat', 'grubber', 'mower', 'mäher', 'tedder', 'zetter', 'windrow', 'schwader', 'baler', 'presse', 'sprayer', 'spritze', 'seeder', 'sämaschine', 'planter'])) {
+            return 'tool';
+        }
+        if (self::hayHas($hay, ['pallet', '/palette', 'bigbag'])) {
             return 'pallet';
         }
-        if (str_contains($hay, 'harvest') || str_contains($hay, 'combine')) {
+        if (self::hayHas($hay, ['harvest', 'mähdresch', 'maehdresch', 'combine', 'häcksl', 'haecksl'])) {
             return 'harvester';
         }
-        if (str_contains($hay, 'tractor')) {
+        if (self::hayHas($hay, ['trailer', 'anhäng', 'anhaeng', 'wagon', 'kipper', 'tipper', 'ladewagen', 'dolly'])) {
+            return 'trailer';
+        }
+        if (self::hayHas($hay, ['tractor', 'traktor', 'truck', 'lkw', 'wheelloader', 'radlader', 'telehandler', 'teleskop', 'forklift', 'stapler'])) {
             return 'tractor';
         }
-        if (str_contains($hay, 'trailer') || str_contains($hay, 'wagon') || str_contains($hay, 'tipper')) {
-            return 'trailer';
+        if ($fuelCapacity !== null && $fuelCapacity > 1) {
+            return 'tractor';
         }
 
         return 'tool';
+    }
+
+    /**
+     * Shop category ids from the vehicle, when the connector or the stats feed has one.
+     */
+    private static function shopBucket(?string $value): ?string
+    {
+        $token = strtolower(preg_replace('/[^a-z0-9]+/', '', (string) $value) ?? '');
+        if ($token === '') {
+            return null;
+        }
+
+        return match (true) {
+            in_array($token, ['tractors', 'tractor', 'traktoren', 'traktor', 'trucks', 'truck', 'lkw', 'cars', 'car', 'pkw', 'wheelloaders', 'wheelloader', 'telehandlers', 'telehandler', 'skidsteerloaders', 'skidsteerloader', 'forklifts', 'forklift'], true) => 'tractor',
+            in_array($token, ['harvesters', 'harvester', 'forageharvesters', 'forageharvester', 'beetharvesters', 'beetharvester', 'potatoharvesters', 'potatoharvester', 'cottonharvesters', 'cottonharvester', 'sugarcaneharvesters', 'sugarcaneharvester', 'vegetableharvesters', 'vegetableharvester', 'combines', 'combine'], true) => 'harvester',
+            in_array($token, ['trailers', 'trailer', 'augerwagons', 'augerwagon', 'foragewagons', 'foragewagon', 'loaderwagons', 'loaderwagon', 'lowloaders', 'lowloader', 'dollies', 'dolly', 'tippers', 'tipper'], true) => 'trailer',
+            in_array($token, ['pallets', 'pallet', 'bigbags', 'bigbag'], true) => 'pallet',
+            in_array($token, ['cutters', 'cutter', 'cornheaders', 'cornheader', 'headers', 'header', 'weights', 'weight', 'frontloadertools', 'frontloaders', 'frontloader'], true) => 'tool',
+            default => null,
+        };
+    }
+
+    /**
+     * @param  list<string>  $needles
+     */
+    private static function hayHas(string $hay, array $needles): bool
+    {
+        foreach ($needles as $needle) {
+            if ($needle !== '' && str_contains($hay, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

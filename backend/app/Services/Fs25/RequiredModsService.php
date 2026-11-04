@@ -48,7 +48,7 @@ final class RequiredModsService
      *   packageVersion: string|null
      * }
      */
-    public function status(Workspace $workspace): array
+    public function status(Workspace $workspace, bool $fresh = false): array
     {
         $deploy = new ConnectorDeployService;
         $packageVersion = null;
@@ -58,9 +58,10 @@ final class RequiredModsService
             // optional
         }
 
-        // The stats feed does not list mods. The server page already stored
-        // which zip is active. Reading that cache avoids a minute-long FTP pull.
+        // The stats feed does not list mods. One small hello.xml read, and only
+        // while the cached version is behind the package, corrects a stale list.
         $feedMods = [];
+        $this->confirmRunningVersion($workspace, $packageVersion, $fresh);
         $host = $this->hostProbe($workspace);
 
         $mods = [];
@@ -73,9 +74,13 @@ final class RequiredModsService
             if ($loadedVersion === null) {
                 $loadedVersion = $this->feedModVersion($item, $feedMods);
             }
-            // The file in mods/ is what was updated. hello.xml stays on the old
-            // version until the dedicated server starts the new connector.
-            $runningVersion = is_string($zipVersion) && $zipVersion !== '' ? $zipVersion : $loadedVersion;
+            // hello.xml is the version the dedicated server actually loaded.
+            // A newer stamped zip version means the file was replaced and the
+            // process has not been restarted yet.
+            $runningVersion = is_string($zipVersion) && $zipVersion !== '' ? $zipVersion : null;
+            if (! is_string($runningVersion) || $runningVersion === '' || $this->isNewerVersion($loadedVersion, $runningVersion)) {
+                $runningVersion = is_string($loadedVersion) && $loadedVersion !== '' ? $loadedVersion : $runningVersion;
+            }
 
             if ($item['id'] === 'FS25_AgriVisionConnector' && is_string($runningVersion) && $runningVersion !== '') {
                 if ($workspace->connector_version !== $runningVersion) {
@@ -299,6 +304,105 @@ final class RequiredModsService
         }
 
         return null;
+    }
+
+    /**
+     * hello.xml is a few hundred bytes written next to the connector state.
+     * Read it only when the cached mod version is older than the package,
+     * with a hard 4 second cap, and remember the result in the mod list.
+     */
+    private function confirmRunningVersion(Workspace $workspace, ?string $packageVersion, bool $fresh): void
+    {
+        $cached = $this->cachedMods($workspace);
+        $row = null;
+        foreach ($this->catalog() as $item) {
+            if ($item['id'] !== 'FS25_AgriVisionConnector') {
+                continue;
+            }
+            $row = $this->cachedMatch($item, $cached);
+        }
+        $cachedVersion = is_array($row) && is_string($row['version'] ?? null) ? $row['version'] : null;
+        if (! $this->shouldReadHello($workspace, $cachedVersion, $packageVersion, $fresh)) {
+            return;
+        }
+        $this->noteHelloAttempt($workspace);
+        $version = $this->readHelloVersion($workspace);
+        if ($version === null) {
+            return;
+        }
+        $bytes = is_array($row) && is_numeric($row['bytes'] ?? null) ? (int) $row['bytes'] : 0;
+        if ($bytes < 22 && $version === $packageVersion) {
+            $package = (new ConnectorDeployService)->packagePath();
+            $size = is_string($package) && is_file($package) ? filesize($package) : false;
+            $bytes = $size === false ? 0 : (int) $size;
+        }
+        if ($bytes < 22) {
+            return;
+        }
+        try {
+            (new DedicatedServerConsole)->stampModFile($workspace, ConnectorDeployService::MOD_ZIP, $version, $bytes);
+        } catch (Throwable) {
+            // The hello version is still returned from this request via the cache
+            // only when the stamp succeeds. A failed stamp leaves the old row.
+        }
+    }
+
+    private function shouldReadHello(Workspace $workspace, ?string $cachedVersion, ?string $packageVersion, bool $fresh): bool
+    {
+        if ($packageVersion === null || $packageVersion === '') {
+            return false;
+        }
+        if ($cachedVersion !== null && $cachedVersion !== '' && ! $this->isNewerVersion($packageVersion, $cachedVersion)) {
+            return false;
+        }
+        if ($fresh) {
+            return true;
+        }
+        $path = $this->helloAttemptPath($workspace);
+        if (is_file($path) && (time() - (int) filemtime($path)) < 120) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function noteHelloAttempt(Workspace $workspace): void
+    {
+        $path = $this->helloAttemptPath($workspace);
+        $dir = dirname($path);
+        if (! is_dir($dir) && ! mkdir($dir, 0775, true) && ! is_dir($dir)) {
+            return;
+        }
+        @touch($path);
+    }
+
+    private function helloAttemptPath(Workspace $workspace): string
+    {
+        return storage_path('app/connector/'.$workspace->public_id.'/state/hello.attempt');
+    }
+
+    private function readHelloVersion(Workspace $workspace): ?string
+    {
+        $workspace->loadMissing('hostAccess');
+        $access = $workspace->hostAccess;
+        if ($access === null) {
+            return null;
+        }
+        $modSettings = trim(str_replace('\\', '/', (string) ($access->remote_mod_settings_path ?? '')), '/');
+        if ($modSettings === '') {
+            return null;
+        }
+        try {
+            $xml = (new HostFileClient($access))->read($modSettings.'/FS25_AgriVisionConnector/hello.xml', 4);
+        } catch (Throwable) {
+            return null;
+        }
+        if (! is_string($xml) || preg_match('/<agrivisionConnector\b[^>]*\bversion="([^"]+)"/i', $xml, $match) !== 1) {
+            return null;
+        }
+        $version = trim($match[1]);
+
+        return $version !== '' ? $version : null;
     }
 
 }
