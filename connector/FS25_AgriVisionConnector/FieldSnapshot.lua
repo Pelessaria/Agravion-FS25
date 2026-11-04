@@ -1797,71 +1797,22 @@ local function writeState(connector, ids, records)
     connector:writeTextFile(connector.stateDir .. "fields_state.xml", body)
 end
 
-local function hudFillIndex(connector)
-    if connector.hudFillIndex ~= nil then
-        return connector.hudFillIndex
+local function withExtension(path, ext)
+    if type(path) ~= "string" or path == "" then
+        return nil
     end
-    local index = {}
-    connector.hudFillIndex = index
-    if getFiles == nil then
-        return index
+    local replaced = (string.gsub(path, "%.%w+$", "." .. ext))
+    if replaced == path then
+        return nil
     end
-    -- Engine signature is getFiles(directory, callbackName, target).
-    -- The callback is target[callbackName](target, filename, isDirectory).
-    local collector = { names = {} }
-    function collector.fileCallbackFunction(a, b)
-        local filename = b
-        local isDirectory = nil
-        if type(a) == "string" then
-            filename = a
-            isDirectory = b
-        end
-        if isDirectory == true or filename == nil then
-            return
-        end
-        collector.names[#collector.names + 1] = tostring(filename)
+    return replaced
+end
+
+local function virtualHudPath(path)
+    if type(path) ~= "string" then
+        return false
     end
-    local dirs = { "dataS/menu/hud/fillTypes", "$dataS/menu/hud/fillTypes" }
-    local foundDir = nil
-    local i = 1
-    while i <= #dirs do
-        collector.names = {}
-        local ok = pcall(getFiles, dirs[i], "fileCallbackFunction", collector)
-        if ok and #collector.names > 0 then
-            foundDir = dirs[i]
-            local n = 1
-            while n <= #collector.names do
-                local name = collector.names[n]
-                local base = string.match(string.lower(name), "hud_fill_([%w_]+)%.%w+$")
-                if base ~= nil and index[base] == nil then
-                    local full = name
-                    if string.find(name, "/", 1, true) == nil and string.find(name, "\\", 1, true) == nil then
-                        full = dirs[i] .. "/" .. name
-                    end
-                    index[base] = full
-                end
-                n = n + 1
-            end
-            i = #dirs + 1
-        else
-            i = i + 1
-        end
-    end
-    if connector.hudFillDirLogged ~= true then
-        connector.hudFillDirLogged = true
-        local count = 0
-        for _ in pairs(index) do
-            count = count + 1
-        end
-        local sample = index.wheat or index.grass or index.canola
-        log(string.format(
-            "fruit icon directory entries=%s dir=%s sample=%s",
-            tostring(count),
-            tostring(foundDir),
-            tostring(sample)
-        ))
-    end
-    return index
+    return string.find(string.lower(path), "datas/menu/hud/filltypes/", 1, true) ~= nil
 end
 
 local function copyPendingFruitIcons(connector, budget)
@@ -1870,8 +1821,15 @@ local function copyPendingFruitIcons(connector, budget)
         return
     end
     connector.copiedFruitIcons = connector.copiedFruitIcons or {}
-    local listed = hudFillIndex(connector)
     local copied = 0
+    local pendingCount = 0
+    for _ in pairs(pending) do
+        pendingCount = pendingCount + 1
+    end
+    if connector.fruitCopyStartLogged ~= true then
+        connector.fruitCopyStartLogged = true
+        log("fruit icon copy start pending=" .. tostring(pendingCount))
+    end
     for key, src in pairs(pending) do
         if copied >= budget then
             break
@@ -1896,52 +1854,18 @@ local function copyPendingFruitIcons(connector, budget)
                 candidates[#candidates + 1] = path
             end
         end
-        push(listed[key])
+        -- The HUD xml names a png. The file the texture loader stores, and the
+        -- one copyFile can actually write, is the dds sibling. getFiles on this
+        -- directory returns nothing and must not be called: it stalls the tick.
+        push(withExtension(src, "dds"))
         push(src)
-        local function pushTwin(path)
-            if type(path) ~= "string" or path == "" then
-                return
-            end
-            local lower = string.lower(path)
-            local twin = nil
-            if string.find(lower, "%.png$") ~= nil then
-                twin = (string.gsub(path, "[Pp][Nn][Gg]$", "dds"))
-            elseif string.find(lower, "%.dds$") ~= nil then
-                twin = (string.gsub(path, "[Dd][Dd][Ss]$", "png"))
-            end
-            push(twin)
-            local rest = string.match(path, "^%$dataS/(.+)$")
-            if rest == nil then
-                rest = string.match(path, "^dataS/(.+)$")
-            end
-            if rest ~= nil then
-                push("dataS.gar/" .. rest)
-                if twin ~= nil then
-                    local twinRest = string.match(twin, "^%$dataS/(.+)$")
-                    if twinRest == nil then
-                        twinRest = string.match(twin, "^dataS/(.+)$")
-                    end
-                    if twinRest ~= nil then
-                        push("dataS.gar/" .. twinRest)
-                    end
-                end
-            end
-        end
-        local textureKnown = false
-        if connector.textureExists ~= nil and type(src) == "string" and connector:textureExists(src) then
-            textureKnown = true
-        end
-        pushTwin(listed[key])
-        pushTwin(src)
-        if connector.buildStoreImageCandidates ~= nil then
+        if connector.buildStoreImageCandidates ~= nil and not virtualHudPath(src) then
             local expanded = connector:buildStoreImageCandidates(src)
             if type(expanded) == "table" then
                 local j = 1
                 while j <= #expanded do
                     local path = expanded[j]
-                    if connector.textureExists ~= nil and connector:textureExists(path) then
-                        push(path)
-                    elseif connector.engineFileExists ~= nil and connector:engineFileExists(path) then
+                    if connector.engineFileExists ~= nil and connector:engineFileExists(path) then
                         push(path)
                     end
                     j = j + 1
@@ -1952,18 +1876,24 @@ local function copyPendingFruitIcons(connector, budget)
             connector.fruitIconProbeLogged = true
             local texture = false
             local plain = false
+            local ddsPath = withExtension(src, "dds")
+            local ddsTexture = false
             if connector.textureExists ~= nil then
                 texture = connector:textureExists(src)
+                if ddsPath ~= nil then
+                    ddsTexture = connector:textureExists(ddsPath)
+                end
             end
             if connector.engineFileExists ~= nil then
                 plain = connector:engineFileExists(src)
             end
             log(string.format(
-                "fruit icon probe key=%s src=%s texture=%s file=%s",
+                "fruit icon probe key=%s src=%s texture=%s file=%s ddsTexture=%s",
                 tostring(key),
                 tostring(src),
                 tostring(texture),
-                tostring(plain)
+                tostring(plain),
+                tostring(ddsTexture)
             ))
         end
         local c = 1
@@ -1973,21 +1903,27 @@ local function copyPendingFruitIcons(connector, budget)
             if connector.iconExtFromPath ~= nil then
                 ext = connector:iconExtFromPath(candidate)
             end
-            local dest = connector.fruitsIconsDir .. key .. "." .. ext
-            local trust = textureKnown
-                and type(candidate) == "string"
-                and string.find(string.lower(candidate), "datas/menu/hud/filltypes/", 1, true) ~= nil
-            if connector:copyIconFile(candidate, dest, trust) then
-                if connector.fruitCopyPathLogged ~= true and string.find(tostring(candidate), "dataS", 1, true) ~= nil then
-                    connector.fruitCopyPathLogged = true
-                    log("fruit icon file written key=" .. key .. " from=" .. tostring(candidate))
-                end
-                connector.copiedFruitIcons[key] = "icons/fruits/" .. key .. "." .. ext
-                pending[key] = nil
-                copied = copied + 1
-                c = #candidates + 1
-            else
+            local virtualHud = virtualHudPath(candidate)
+            if virtualHud and ext ~= "dds" then
                 c = c + 1
+            else
+                local dest = connector.fruitsIconsDir .. key .. "." .. ext
+                if virtualHud and connector.fruitDdsAttemptLogged ~= true then
+                    connector.fruitDdsAttemptLogged = true
+                    log("fruit icon dds attempt key=" .. key .. " from=" .. tostring(candidate))
+                end
+                if connector:copyIconFile(candidate, dest, virtualHud) then
+                    if connector.fruitCopyPathLogged ~= true and virtualHud then
+                        connector.fruitCopyPathLogged = true
+                        log("fruit icon file written key=" .. key .. " from=" .. tostring(candidate))
+                    end
+                    connector.copiedFruitIcons[key] = "icons/fruits/" .. key .. "." .. ext
+                    pending[key] = nil
+                    copied = copied + 1
+                    c = #candidates + 1
+                else
+                    c = c + 1
+                end
             end
         end
     end
@@ -2002,7 +1938,6 @@ local function copyPendingFruitIcons(connector, budget)
         end
     end
 end
-
 local function writeFruitManifest(connector)
     local copied = connector.copiedFruitIcons
     if copied == nil then

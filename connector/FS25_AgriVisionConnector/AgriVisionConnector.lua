@@ -12,7 +12,7 @@
 
 AgriVisionConnector = {}
 AgriVisionConnector.MOD_NAME = "FS25_AgriVisionConnector"
-AgriVisionConnector.VERSION = "0.1.13.0"
+AgriVisionConnector.VERSION = "0.1.14.0"
 AgriVisionConnector.SCHEMA = "1"
 AgriVisionConnector.TICK_MS = 5000
 AgriVisionConnector.HELLO_EVERY_MS = 60000
@@ -981,6 +981,23 @@ function AgriVisionConnector:textureExists(path)
     return ok and exists == true
 end
 
+--- True when the copied file is an image the game itself can load.
+--- nil when this build has no overlay loader. false when the file is empty
+--- or not an image. The id is released so the check does not keep the texture.
+function AgriVisionConnector:copiedImageLoads(path)
+    if createImageOverlay == nil or path == nil or path == "" then
+        return nil
+    end
+    local ok, id = pcall(createImageOverlay, path)
+    if not ok or type(id) ~= "number" or id == 0 then
+        return false
+    end
+    if delete ~= nil then
+        pcall(delete, id)
+    end
+    return true
+end
+
 function AgriVisionConnector:engineFileSize(path)
     if path == nil or path == "" or getFileSize == nil then
         return nil
@@ -1044,9 +1061,19 @@ function AgriVisionConnector:copyIconFile(src, dest, trustTexture)
         self:deletePath(dest)
         return false
     end
-    -- A HUD texture inside dataS fails fileExists. Keep the copy when the
-    -- texture loader can see the source, which is how the game draws the icon.
-    if size == nil and not srcVisible then
+    -- A HUD texture inside dataS fails fileExists. copyFile can still leave a
+    -- 0-byte stub, and this build has no getFileSize. An overlay that does not
+    -- load is not an icon, so that stub is removed and the next path is tried.
+    if trustTexture == true and not self:engineFileExists(src) then
+        if self:copiedImageLoads(dest) ~= true then
+            self:deletePath(dest)
+            if self.fruitImageRejectLogged ~= true then
+                self.fruitImageRejectLogged = true
+                print("AgriVisionConnector: fruit icon overlay rejected " .. tostring(dest))
+            end
+            return false
+        end
+    elseif size == nil and not srcVisible then
         self:deletePath(dest)
         return false
     end
