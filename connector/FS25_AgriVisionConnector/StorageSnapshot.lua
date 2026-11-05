@@ -326,12 +326,18 @@ local function rememberStore(connector, placeable)
         return nil
     end
     local storeKey = connector:storeKeyFromFilename(filename)
-    local image = connector:vehicleStoreImage(placeable, filename)
-    if image == nil and connector.placeableStoreImage ~= nil then
+    local image = nil
+    if connector.placeableStoreImage ~= nil then
         image = connector:placeableStoreImage(placeable, filename)
     end
-    if storeKey ~= nil and image ~= nil and connector.pendingStoreIcons ~= nil and connector.pendingStoreIcons[storeKey] == nil then
-        connector.pendingStoreIcons[storeKey] = {
+    if image == nil then
+        image = connector:vehicleStoreImage(placeable, filename)
+    end
+    if connector.pendingPlaceableIcons == nil then
+        connector.pendingPlaceableIcons = {}
+    end
+    if storeKey ~= nil and image ~= nil and connector.pendingPlaceableIcons[storeKey] == nil then
+        connector.pendingPlaceableIcons[storeKey] = {
             src = image,
             filename = filename,
         }
@@ -484,6 +490,7 @@ local function collect(connector)
     if mission == nil or mission.placeableSystem == nil or type(mission.placeableSystem.placeables) ~= "table" then
         return nil
     end
+    connector.pendingPlaceableIcons = {}
     local bins = {}
     local siloIndex = 0
     local baleIndex = 0

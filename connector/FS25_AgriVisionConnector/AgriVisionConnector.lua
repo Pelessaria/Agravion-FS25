@@ -12,7 +12,7 @@
 
 AgriVisionConnector = {}
 AgriVisionConnector.MOD_NAME = "FS25_AgriVisionConnector"
-AgriVisionConnector.VERSION = "0.1.22.0"
+AgriVisionConnector.VERSION = "0.1.23.0"
 AgriVisionConnector.SCHEMA = "1"
 AgriVisionConnector.TICK_MS = 5000
 AgriVisionConnector.HELLO_EVERY_MS = 60000
@@ -65,6 +65,7 @@ function AgriVisionConnector:init()
     self.fruitsIconsDir = self.iconsDir .. "fruits/"
     self.modIconsDir = self.iconsDir .. "mods/"
     self.pendingStoreIcons = {}
+    self.pendingPlaceableIcons = {}
     self.copiedStorePaths = {}
     self.failedStoreIcons = {}
     self.loggedStoreIconFails = {}
@@ -540,7 +541,7 @@ function AgriVisionConnector:buildStoreImageCandidates(raw)
     return out
 end
 
-function AgriVisionConnector:resolveStoreImagePath(raw)
+function AgriVisionConnector:resolveStoreImagePath(raw, presentOnly)
     local candidates = self:buildStoreImageCandidates(raw)
     if #candidates == 0 then
         return nil
@@ -549,6 +550,9 @@ function AgriVisionConnector:resolveStoreImagePath(raw)
         if self:fileLooksPresent(candidate) then
             return candidate
         end
+    end
+    if presentOnly then
+        return nil
     end
     -- Fallback: first DDS candidate, else first seed — copyIconFile will try.
     for _, candidate in ipairs(candidates) do
@@ -959,12 +963,22 @@ function AgriVisionConnector:placeableStoreImage(placeable, filename)
             add(dir .. "/" .. base .. ".dds")
         end
     end
+    local normalized = {}
     for _, raw in ipairs(seeds) do
         local image = tostring(raw):gsub("\\", "/")
         if not string.find(image, "/") and dir ~= nil and dir ~= "" then
             image = dir .. "/" .. image
         end
-        local resolved = self:resolveStoreImagePath(image)
+        table.insert(normalized, image)
+    end
+    for _, image in ipairs(normalized) do
+        local resolved = self:resolveStoreImagePath(image, true)
+        if resolved ~= nil then
+            return resolved
+        end
+    end
+    for _, image in ipairs(normalized) do
+        local resolved = self:resolveStoreImagePath(image, false)
         if resolved ~= nil then
             return resolved
         end
@@ -1110,7 +1124,7 @@ function AgriVisionConnector:iconExtFromPath(path)
     return "png"
 end
 
---- Vehicle store icons only (unique types in the current mission). Mod-pack icons are deferred.
+--- Vehicle and placeable store icons for the current mission. Mod-pack icons are deferred.
 --- forceWrite: rewrite the manifest even when nothing new was copied (fleet changed).
 function AgriVisionConnector:writeStoreIconsManifest(forceWrite)
     ensureDir(self.storeIconsDir)
@@ -1118,7 +1132,15 @@ function AgriVisionConnector:writeStoreIconsManifest(forceWrite)
     local copiedCount = 0
     local newlyCopied = 0
     local failedCount = 0
-    local pending = self.pendingStoreIcons or {}
+    local pending = {}
+    for storeKey, meta in pairs(self.pendingStoreIcons or {}) do
+        pending[storeKey] = meta
+    end
+    for storeKey, meta in pairs(self.pendingPlaceableIcons or {}) do
+        if pending[storeKey] == nil then
+            pending[storeKey] = meta
+        end
+    end
     local failSamples = {}
     local retryFails = (self.iconRetryAccumMs or 0) >= (self.ICON_RETRY_EVERY_MS or 600000)
     if retryFails then
