@@ -34,6 +34,7 @@ import {
   type FieldQuery,
 } from "../field-layers"
 import { joinedContours } from "../field-outline"
+import { clampCamera, readMapView, sheetFor, writeMapView, type MapCamera } from "../map-camera"
 import { useStore } from "../store"
 import type { FieldSnapshot, FieldsResponse } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
@@ -149,7 +150,7 @@ function projectFields(
 export function FieldsPage() {
   const { t, i18n } = useTranslation()
   const stamp = useTimeLabel()
-  const { liveMode, moduleAccess, selectedFarm, farmByGameId } = useStore()
+  const { liveMode, moduleAccess, selectedFarm, farmByGameId, sessionUserId } = useStore()
   const { workspace, allowed } = useWorkspaceRoute()
   const access = workspace ? moduleAccess(workspace.id, "fields") : null
   const farm = workspace ? selectedFarm(workspace.id) : null
@@ -573,6 +574,9 @@ export function FieldsPage() {
               fields={visible}
               outlines={outlines}
               painted={activeLayer !== "off"}
+              frame={frame}
+              viewUserId={sessionUserId}
+              viewScope={`${workspace.id}.fields`}
               raster={
                 liveMode && precisionRasterLayer(activeLayer)
                   ? {
@@ -835,6 +839,9 @@ function FieldMap({
   selectedId,
   focusToken,
   label,
+  frame,
+  viewUserId,
+  viewScope,
   onSelect,
   onContentBox,
   children,
@@ -850,13 +857,17 @@ function FieldMap({
   selectedId: number | null
   focusToken: number
   label: string
+  frame: { scaleX: number; scaleZ: number; padX: number; padZ: number }
+  viewUserId: string | null
+  viewScope: string
   onSelect: (id: number) => void
   onContentBox: (box: { x: number; y: number; w: number; h: number } | null) => void
   children?: ReactNode
 }) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const cam = useRef({ x: 0, y: 0, k: 1 })
+  const savedView = useRef(readMapView(viewUserId, viewScope))
+  const cam = useRef<MapCamera>(savedView.current ?? { x: 0, y: 0, k: 1 })
   const drag = useRef<{ x: number; y: number; cx: number; cy: number; moved: boolean } | null>(null)
   const { t } = useTranslation()
   const [dragging, setDragging] = useState(false)
@@ -867,9 +878,15 @@ function FieldMap({
   const [tracksFailed, setTracksFailed] = useState(false)
   const [brokenIcons, setBrokenIcons] = useState<ReadonlySet<string>>(() => new Set())
   const rasterReady = raster != null && failedRaster !== raster.href && loadedRasters.has(raster.href)
-  const [zoom, setZoom] = useState(1)
-  const [sidePx, setSidePx] = useState(0)
+  const [zoom, setZoom] = useState(cam.current.k)
+  const [view, setView] = useState({ w: 0, h: 0 })
   const [hoverId, setHoverId] = useState<number | null>(null)
+  const viewRef = useRef(view)
+  const sheet = useMemo(() => sheetFor(view, frame), [frame, view])
+  const sheetRef = useRef(sheet)
+  viewRef.current = view
+  sheetRef.current = sheet
+  const sidePx = sheet.size
   const fieldsRef = useRef(fields)
   const selectedRef = useRef(selectedId)
   const labels = useMemo(
@@ -882,35 +899,37 @@ function FieldMap({
     const { x, y, k } = cam.current
     el.style.transform = `translate(${x}px, ${y}px) scale(${k})`
     setZoom((prev) => (prev === k ? prev : k))
+    writeMapView(viewUserId, viewScope, cam.current)
+  }
+
+  function commit(next: MapCamera) {
+    cam.current = clampCamera(next, viewRef.current, sheetRef.current)
+    apply()
   }
 
   function zoomAt(next: number, px: number, py: number) {
     const prev = cam.current.k
     const clamped = Math.min(6, Math.max(1, next))
-    if (clamped === 1) {
-      cam.current = { x: 0, y: 0, k: 1 }
-      apply()
-      return
-    }
     const ratio = clamped / prev
-    cam.current.x = px - (px - cam.current.x) * ratio
-    cam.current.y = py - (py - cam.current.y) * ratio
-    cam.current.k = clamped
-    apply()
+    commit({
+      k: clamped,
+      x: px - (px - cam.current.x) * ratio,
+      y: py - (py - cam.current.y) * ratio,
+    })
   }
 
   function focusField(field: DrawnField | undefined) {
     const viewport = viewportRef.current
-    if (!viewport || !field) return
-    const width = viewport.clientWidth
-    const height = viewport.clientHeight
+    const placed = sheetRef.current
+    if (!viewport || !field || placed.size < 8) return
     const k = 2.6
-    const px = (field.x / 100) * width
-    const py = (field.y / 100) * height
-    cam.current.k = k
-    cam.current.x = width / 2 - px * k
-    cam.current.y = height / 2 - py * k
-    apply()
+    const px = placed.left + (field.x / 100) * placed.size
+    const py = placed.top + (field.y / 100) * placed.size
+    commit({
+      k,
+      x: viewport.clientWidth / 2 - px * k,
+      y: viewport.clientHeight / 2 - py * k,
+    })
   }
 
   useEffect(() => {
@@ -937,14 +956,20 @@ function FieldMap({
     const viewport = viewportRef.current
     if (!viewport) return
     const measure = () => {
-      const next = Math.min(viewport.clientWidth, viewport.clientHeight)
-      setSidePx((prev) => (prev === next ? prev : next))
+      const next = { w: viewport.clientWidth, h: viewport.clientHeight }
+      setView((prev) => (prev.w === next.w && prev.h === next.h ? prev : next))
     }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(viewport)
     return () => observer.disconnect()
   }, [])
+
+  useEffect(() => {
+    if (view.w < 8) return
+    cam.current = clampCamera(cam.current, view, sheet)
+    apply()
+  }, [sheet, view])
 
   useEffect(() => {
     const viewport = viewportRef.current
@@ -983,10 +1008,7 @@ function FieldMap({
             const dx = event.clientX - current.x
             const dy = event.clientY - current.y
             if (Math.abs(dx) + Math.abs(dy) > 4) current.moved = true
-            if (cam.current.k <= 1) return
-            cam.current.x = current.cx + dx
-            cam.current.y = current.cy + dy
-            apply()
+            commit({ x: current.cx + dx, y: current.cy + dy, k: cam.current.k })
             return
           }
           const hit = document
@@ -1014,9 +1036,11 @@ function FieldMap({
         <div ref={stageRef} className="fields-stage">
           {mapUrl && !mapFailed ? (
             <img
+              className="live-sheet"
               src={mapUrl}
               alt=""
               draggable={false}
+              style={{ left: sheet.left, top: sheet.top, width: sheet.size, height: sheet.size }}
               onError={() => {
                 setMapFailed(true)
                 onContentBox(null)
@@ -1050,11 +1074,12 @@ function FieldMap({
             <div className="fields-terrain" aria-hidden="true" />
           )}
           <svg
+            className="live-sheet"
             viewBox="0 0 100 100"
             preserveAspectRatio="xMidYMid meet"
             role="img"
             aria-label={label}
-            style={{ "--map-zoom": zoom } as CSSProperties}
+            style={{ left: sheet.left, top: sheet.top, width: sheet.size, height: sheet.size, "--map-zoom": zoom } as CSSProperties}
           >
             {raster ? (
               <g clipPath="url(#precision-fields)">

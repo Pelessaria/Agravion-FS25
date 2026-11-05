@@ -13,6 +13,7 @@ import {
 } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { projectPoint, effectiveMapSize, frameFromContentBox, measureMapContent, terrainFrame, type MapFrame } from "../field-format"
+import { clampCamera, readMapView, sheetFor, writeMapView, type MapCamera } from "../map-camera"
 import { useStore } from "../store"
 import type { FieldsResponse, Vehicle } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
@@ -117,7 +118,7 @@ export function LiveMapPage() {
   const stamp = useTimeLabel()
   const [params] = useSearchParams()
   const pin = readPin(params)
-  const { liveMode, moduleAccess } = useStore()
+  const { liveMode, moduleAccess, sessionUserId } = useStore()
   const { workspace, allowed } = useWorkspaceRoute()
   const access = workspace ? moduleAccess(workspace.id, "map") : null
   const [payload, setPayload] = useState<LiveMapResponse | null>(null)
@@ -265,7 +266,12 @@ export function LiveMapPage() {
   const filteredPlaces = places.filter(
     (place) => (buildingFilter === "all" || buildingKind(place) === buildingFilter) && matches(query, place.name ?? place.type),
   )
-  const mapPlaces = filteredPlaces.filter((place) => showBuildings || selected === `o:${place.id}`)
+  const mapPlaces = filteredPlaces.filter((place) => {
+    if (selected === `o:${place.id}`) return true
+    if (tab === "vehicle" || tab === "implement" || tab === "player") return false
+    if (tab === "building") return true
+    return showBuildings
+  })
   const visibleVehicles = vehicles.filter((vehicle) => matches(query, vehicle.name))
   const visiblePlayers = players.filter((player) => matches(query, player.name))
 
@@ -279,6 +285,13 @@ export function LiveMapPage() {
   if (!allowed || !access) return <PermissionBlock />
 
   const roleOf = (vehicle: LiveVehicle) => markerRole("vehicle", fleetMatch(vehicle.id)?.category ?? null)
+  const mapVehicles = visibleVehicles.filter((vehicle) => {
+    const kind = objectKind(roleOf(vehicle))
+    if (tab === "building" || tab === "player") return false
+    if (tab === "all") return true
+    return kind === tab
+  })
+  const mapPlayers = tab === "all" || tab === "player" ? visiblePlayers : []
   const catalog = [
     ...visibleVehicles.map((vehicle) => ({
       key: `v:${vehicle.id}`,
@@ -355,9 +368,11 @@ export function LiveMapPage() {
           mapUrl={fields?.pdaMap && liveMode ? `/api/workspaces/${workspace.id}/pda-map` : null}
           frame={frame}
           shapes={shapes}
-          vehicles={vehicles}
-          players={players}
+          vehicles={mapVehicles}
+          players={mapPlayers}
           places={mapPlaces}
+          viewUserId={sessionUserId}
+          viewScope={`${workspace.id}.live`}
           pin={pin}
           selected={selected}
           showFields={showFields}
@@ -536,6 +551,8 @@ function LiveCanvas({
   selected,
   showFields,
   resetToken,
+  viewUserId,
+  viewScope,
   vehicleRole,
   vehicleIcon,
   placeColor,
@@ -552,6 +569,8 @@ function LiveCanvas({
   selected: string | null
   showFields: boolean
   resetToken: number
+  viewUserId: string | null
+  viewScope: string
   vehicleRole: (vehicle: LiveVehicle) => MarkerRole
   vehicleIcon: (vehicle: LiveVehicle) => string | null
   placeColor: (farmId: number | null) => string | null
@@ -561,42 +580,57 @@ function LiveCanvas({
   const { t } = useTranslation()
   const viewportRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const cam = useRef({ x: 0, y: 0, k: 1 })
+  const savedView = useRef(readMapView(viewUserId, viewScope))
+  const cam = useRef<MapCamera>(savedView.current ?? { x: 0, y: 0, k: 1 })
   const drag = useRef<{ x: number; y: number; cx: number; cy: number; moved: boolean } | null>(null)
   const [dragging, setDragging] = useState(false)
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(cam.current.k)
   const [mapFailed, setMapFailed] = useState(false)
   const [view, setView] = useState({ w: 0, h: 0 })
   const [cluster, setCluster] = useState<Marker[] | null>(null)
-
-  useEffect(() => {
-    cam.current = { x: 0, y: 0, k: 1 }
-    const el = stageRef.current
-    if (el) el.style.transform = "translate(0px, 0px) scale(1)"
-    setZoom(1)
-  }, [resetToken])
+  const resetSeen = useRef(resetToken)
+  const sheetRef = useRef(sheetFor(view, frame))
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const sheet = useMemo(() => sheetFor(view, frame), [frame, view])
+  sheetRef.current = sheet
 
   function apply() {
     const el = stageRef.current
     if (!el) return
     el.style.transform = `translate(${cam.current.x}px, ${cam.current.y}px) scale(${cam.current.k})`
     setZoom((prev) => (prev === cam.current.k ? prev : cam.current.k))
+    writeMapView(viewUserId, viewScope, cam.current)
+  }
+
+  function commit(next: MapCamera) {
+    cam.current = clampCamera(next, viewRef.current, sheetRef.current)
+    apply()
   }
 
   function zoomAt(next: number, px: number, py: number) {
     const prev = cam.current.k
     const clamped = Math.min(10, Math.max(1, next))
-    if (clamped === 1) {
-      cam.current = { x: 0, y: 0, k: 1 }
-      apply()
-      return
-    }
     const ratio = clamped / prev
-    cam.current.x = px - (px - cam.current.x) * ratio
-    cam.current.y = py - (py - cam.current.y) * ratio
-    cam.current.k = clamped
-    apply()
+    commit({
+      k: clamped,
+      x: px - (px - cam.current.x) * ratio,
+      y: py - (py - cam.current.y) * ratio,
+    })
   }
+
+  useEffect(() => {
+    if (resetSeen.current === resetToken) return
+    resetSeen.current = resetToken
+    cam.current = clampCamera({ x: 0, y: 0, k: 1 }, viewRef.current, sheetRef.current)
+    apply()
+  }, [resetToken, viewScope, viewUserId])
+
+  useEffect(() => {
+    if (view.w < 8) return
+    cam.current = clampCamera(cam.current, view, sheet)
+    apply()
+  }, [sheet, view])
 
   useEffect(() => {
     const viewport = viewportRef.current
@@ -608,18 +642,6 @@ function LiveCanvas({
     return () => observer.disconnect()
   }, [])
 
-  const sheet = useMemo(() => {
-    const cropW = frame.scaleX > 0.05 ? frame.scaleX : 1
-    const cropH = frame.scaleZ > 0.05 ? frame.scaleZ : 1
-    if (view.w < 8 || view.h < 8) return { left: 0, top: 0, size: Math.max(view.w, view.h) }
-    const size = Math.max(view.w / cropW, view.h / cropH)
-    return {
-      size,
-      left: (view.w - size * cropW) / 2 - size * frame.padX,
-      top: (view.h - size * cropH) / 2 - size * frame.padZ,
-    }
-  }, [frame, view])
-
   useEffect(() => {
     const viewport = viewportRef.current
     if (!viewport) return
@@ -627,21 +649,7 @@ function LiveCanvas({
       event.preventDefault()
       const rect = viewport.getBoundingClientRect()
       const next = cam.current.k * (event.deltaY > 0 ? 1 / 1.12 : 1.12)
-      const prev = cam.current.k
-      const clamped = Math.min(10, Math.max(1, next))
-      if (clamped === 1) {
-        cam.current = { x: 0, y: 0, k: 1 }
-      } else {
-        const ratio = clamped / prev
-        const px = event.clientX - rect.left
-        const py = event.clientY - rect.top
-        cam.current.x = px - (px - cam.current.x) * ratio
-        cam.current.y = py - (py - cam.current.y) * ratio
-        cam.current.k = clamped
-      }
-      const el = stageRef.current
-      if (el) el.style.transform = `translate(${cam.current.x}px, ${cam.current.y}px) scale(${cam.current.k})`
-      setZoom(cam.current.k)
+      zoomAt(next, event.clientX - rect.left, event.clientY - rect.top)
     }
     viewport.addEventListener("wheel", onWheel, { passive: false })
     return () => viewport.removeEventListener("wheel", onWheel)
@@ -776,13 +784,11 @@ function LiveCanvas({
     const k = Math.max(cam.current.k, 3.4)
     const px = sheet.left + (marker.x / 100) * sheet.size
     const py = sheet.top + (marker.y / 100) * sheet.size
-    cam.current = {
+    commit({
       k,
       x: viewport.clientWidth / 2 - px * k,
       y: viewport.clientHeight / 2 - py * k,
-    }
-    stage.style.transform = `translate(${cam.current.x}px, ${cam.current.y}px) scale(${k})`
-    setZoom(k)
+    })
   }, [markers, selected, sheet])
 
   return (
@@ -866,10 +872,7 @@ function LiveCanvas({
           const dx = event.clientX - start.x
           const dy = event.clientY - start.y
           if (Math.abs(dx) + Math.abs(dy) > 4) start.moved = true
-          if (cam.current.k <= 1) return
-          cam.current.x = start.cx + dx
-          cam.current.y = start.cy + dy
-          apply()
+          commit({ x: start.cx + dx, y: start.cy + dy, k: cam.current.k })
         }}
         onPointerUp={(event) => {
           const start = drag.current
@@ -968,10 +971,10 @@ function LiveCanvas({
                     {on ? <circle r="1.16" className="live-marker-rim" /> : null}
                   </g>
                   {piled ? (
-                    <g className="live-count" transform={`translate(${toMap(12)} ${toMap(-12)}) scale(${toMap(13)})`}>
-                      <circle r="0.78" />
-                      <text textAnchor="middle" y="0.34">
-                        {marker.count}
+                    <g className="live-count" transform={`translate(${toMap(14)} ${toMap(-14)}) scale(${toMap(16)})`}>
+                      <circle r="1.05" />
+                      <text textAnchor="middle" y="0.32">
+                        {`+${marker.count}`}
                       </text>
                     </g>
                   ) : null}

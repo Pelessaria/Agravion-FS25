@@ -3718,10 +3718,10 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-side {
   position: absolute;
   z-index: 5;
-  top: 64px;
-  right: 12px;
-  bottom: 12px;
-  width: min(320px, calc(100% - 24px));
+  top: 58px;
+  right: 10px;
+  bottom: 10px;
+  width: min(272px, calc(100% - 20px));
   display: flex;
   min-width: 0;
   pointer-events: none;
@@ -3733,13 +3733,14 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   min-height: 0;
   width: 100%;
   margin: 0;
-  padding: 12px;
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  padding: 10px;
+  gap: 8px;
+  background: color-mix(in srgb, #121816 94%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.35);
 }
 .live-stats-bar {
   position: absolute;
@@ -3771,10 +3772,10 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-objects header h2, .live-stats h2 { margin: 0; }
 .live-objects header span, .live-stats p { color: var(--text-faint); font-size: 0.78rem; }
 .live-objects { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; overflow: hidden; }
-.live-groups { display: grid; gap: 10px; overflow: auto; min-height: 0; }
+.live-groups { display: grid; gap: 4px; overflow: auto; min-height: 0; padding-right: 2px; }
 .live-groups section { border: 0; overflow: visible; }
 .live-groups header {
-  padding: 12px 4px 4px;
+  padding: 8px 4px 2px;
   background: transparent;
   color: var(--text-faint);
   font-size: 0.68rem;
@@ -3786,7 +3787,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-groups button {
   width: 100%;
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr);
   gap: 8px;
   align-items: center;
   text-align: left;
@@ -3794,7 +3795,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   border-radius: 10px;
   background: transparent;
   color: inherit;
-  padding: 8px 10px;
+  padding: 5px 6px;
 }
 .live-groups button.is-on { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .live-kind-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
@@ -3813,12 +3814,12 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-kind-filters button.is-on { color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .live-kind-filters em { font-style: normal; color: var(--text-faint); }
 .live-groups button img, .live-groups button .icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
   background: #141c19;
-  border-radius: 8px;
-  padding: 2px;
+  border-radius: 50%;
+  padding: 3px;
 }
 .live-groups button strong, .live-groups button small { display: block; }
 .live-groups button strong { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3933,20 +3934,28 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-dock-head p { margin: 4px 0 0; color: var(--text-faint); font-size: 0.82rem; }
 .live-search { margin: 0; }
 .live-search input { width: 100%; }
-.live-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.live-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.32);
+}
 .live-tabs button {
   border: 0;
   background: transparent;
   color: var(--text-muted);
-  border-radius: 10px;
-  padding: 7px 4px;
+  border-radius: 9px;
+  padding: 6px 2px;
   display: grid;
   justify-items: center;
-  gap: 2px;
-  font-size: 0.78rem;
+  gap: 1px;
+  font-size: 0.68rem;
+  line-height: 1.15;
 }
 .live-tabs button em { font-style: normal; color: var(--text-faint); font-variant-numeric: tabular-nums; }
-.live-tabs button.is-on { background: var(--surface-3); color: var(--text); }
+.live-tabs button.is-on { background: color-mix(in srgb, var(--accent) 30%, #1c2620); color: var(--text); }
 .live-farm { justify-self: start; }
 .live-card {
   display: grid;
@@ -4032,7 +4041,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-count circle { fill: #101410; stroke: #f4f1e8; stroke-width: 0.12; }
 .live-count text {
   fill: #f4f1e8;
-  font-size: 0.9px;
+  font-size: 0.72px;
   font-weight: 700;
   pointer-events: none;
 }
