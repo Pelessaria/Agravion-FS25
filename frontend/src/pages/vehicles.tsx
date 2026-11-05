@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState, type SyntheticEvent } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
-import { Boxes, Clock, LayoutGrid, LoaderCircle, MapPin, RefreshCw, Tractor, Truck, Wheat, Wrench } from "lucide-react"
-import { apiWorkspaceSyncIcons, apiWorkspaceVehicles } from "../api"
+import { Boxes, Clock, LayoutGrid, MapPin, Tractor, Truck, Wheat, Wrench } from "lucide-react"
+import { apiWorkspaceVehicles } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock } from "../components/ui"
-import { farmDisplayName } from "../farm-label"
 import { useWorkspaceRoute } from "../use-workspace"
 import { useStore } from "../store"
 import { VehicleGauges } from "../components/equip-gauge"
@@ -63,8 +62,6 @@ export function VehiclesPage() {
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState<EquipmentFilter>("all")
   const [loading, setLoading] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  const [syncNote, setSyncNote] = useState<string | null>(null)
   const equipmentAccess = workspace ? moduleAccess(workspace.id, "equipment") : null
   const farm = workspace ? selectedFarm(workspace.id) : null
 
@@ -93,43 +90,6 @@ export function VehiclesPage() {
       cancelled = true
     }
   }, [workspace?.id, liveMode, allowed, equipmentAccess])
-
-  const syncIcons = async () => {
-    if (!workspace || syncing) return
-    setSyncing(true)
-    setSyncNote(null)
-    try {
-      const result = await apiWorkspaceSyncIcons(workspace.id)
-      const sync = result.iconSync
-      const moved = (sync?.downloaded ?? 0) + (sync?.converted ?? 0)
-      const pending = sync?.pending ?? 0
-      if (moved > 0) {
-        const fresh = await apiWorkspaceVehicles(workspace.id)
-        replaceWorkspaceVehicles(workspace.id, fresh.vehicles)
-        if (fresh.farms) replaceWorkspaceFarms(workspace.id, fresh.farms)
-        if (fresh.workspace) upsertWorkspace(fresh.workspace)
-      }
-      if (sync?.skipped === "busy") {
-        setSyncNote(t("vehicles.syncBusy"))
-      } else if (pending > 0) {
-        setSyncNote(t("vehicles.syncRemaining", { count: pending }))
-      } else if (moved > 0) {
-        setSyncNote(t("vehicles.syncDone", { count: moved }))
-      } else if (
-        sync?.skipped === "unchanged" ||
-        sync?.skipped === null ||
-        sync?.skipped === "convert_cooldown"
-      ) {
-        setSyncNote(t("vehicles.syncUnchanged"))
-      } else {
-        setSyncNote(t("vehicles.syncFailed"))
-      }
-    } catch {
-      setSyncNote(t("vehicles.syncFailed"))
-    } finally {
-      setSyncing(false)
-    }
-  }
 
   const rows = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
@@ -179,24 +139,7 @@ export function VehiclesPage() {
   return (
     <section className="equipment-page">
       <div className="fields-mast">
-        <div className="fields-mast-top">
-          <h1>{t("modules.equipment")}</h1>
-          <p className="faint">
-            {farm ? t("vehicles.leadFarm", { farm: farmDisplayName(farm, t) }) : t("vehicles.lead")}
-          </p>
-          <div className="toolbar">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => void syncIcons()}
-              disabled={syncing || !liveMode}
-            >
-              {syncing ? <LoaderCircle className="icon spin" /> : <RefreshCw className="icon" />}
-              {syncing ? t("vehicles.syncing") : t("vehicles.sync")}
-            </button>
-            {syncNote ? <span className="faint">{syncNote}</span> : null}
-          </div>
-        </div>
+        <h1>{t("modules.equipment")}</h1>
         <div className="fields-stats">
           <p>
             <strong>{rows.length.toLocaleString(i18n.language)}</strong>

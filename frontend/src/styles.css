@@ -2725,18 +2725,15 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-stats {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: baseline;
   gap: 0;
   width: max-content;
   max-width: 100%;
 }
 .fields-stats p {
-  display: grid;
-  grid-template-columns: auto max-content;
-  grid-template-rows: auto auto;
-  column-gap: 8px;
-  row-gap: 3px;
-  align-items: start;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   margin: 0;
   padding: 0 16px 0 0;
 }
@@ -2745,30 +2742,29 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   box-shadow: inset 1px 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .fields-stats strong {
-  grid-column: 1;
-  grid-row: 1;
-  align-self: start;
   font-size: 1.45rem;
   font-weight: 560;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-  line-height: 1.05;
+  line-height: 1;
 }
 .fields-stats strong.warn { color: var(--warning); }
 .fields-stats span {
-  grid-column: 2;
-  grid-row: 1;
-  align-self: start;
-  padding-top: 0.12rem;
   color: var(--text-faint);
   font-size: 0.72rem;
-  line-height: 1.05;
+  line-height: 1.15;
 }
-.fields-stats em {
-  grid-column: 2;
-  grid-row: 2;
-  align-self: start;
-  margin-top: 1px;
+.fields-stats p.has-note {
+  align-items: flex-start;
+}
+.fields-stats p.has-note span {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding-top: 0.18rem;
+}
+.fields-stats p.has-note em {
   font-style: normal;
   color: var(--text-muted);
   font-size: 0.7rem;

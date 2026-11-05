@@ -371,10 +371,12 @@ export function FieldsPage() {
           <strong>{ownedAll.toLocaleString(i18n.language)}</strong>
           <span>{t("fields.allFarms")}</span>
         </p>
-        <p>
+        <p className={harvestGrass > 0 ? "has-note" : undefined}>
           <strong>{harvest.toLocaleString(i18n.language)}</strong>
-          <span>{t("fields.harvest")}</span>
-          <em>{t("fields.harvestGrass", { count: harvestGrass })}</em>
+          <span>
+            {t("fields.harvest")}
+            {harvestGrass > 0 ? <em>{t("fields.harvestGrass", { count: harvestGrass })}</em> : null}
+          </span>
         </p>
         <p>
           <strong>
