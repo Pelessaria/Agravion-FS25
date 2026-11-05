@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
-import { ChevronDown, ChevronLeft, ChevronRight, Minus, Plus, Search } from "lucide-react"
+import {
+  Building2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Home,
+  LandPlot,
+  Map as MapIcon,
+  Minus,
+  Plus,
+  Search,
+  Wheat,
+} from "lucide-react"
 import { apiWorkspaceFields } from "../api"
 import { cropIcon } from "../crop-icons"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
@@ -360,18 +373,22 @@ export function FieldsPage() {
         <h1>{t("modules.fields")}</h1>
         <div className="fields-stats">
         <p>
+          <MapIcon className="fields-stat-icon" aria-hidden="true" />
           <strong>{fields.length.toLocaleString(i18n.language)}</strong>
           <span>{t("fields.count")}</span>
         </p>
         <p>
+          <Home className="fields-stat-icon" aria-hidden="true" />
           <strong>{owned.toLocaleString(i18n.language)}</strong>
           <span>{t("fields.owned")}</span>
         </p>
         <p>
+          <Building2 className="fields-stat-icon" aria-hidden="true" />
           <strong>{ownedAll.toLocaleString(i18n.language)}</strong>
           <span>{t("fields.allFarms")}</span>
         </p>
         <p className={harvestGrass > 0 ? "has-note" : undefined}>
+          <Wheat className="fields-stat-icon" aria-hidden="true" />
           <strong>{harvest.toLocaleString(i18n.language)}</strong>
           <span>
             {t("fields.harvest")}
@@ -379,6 +396,7 @@ export function FieldsPage() {
           </span>
         </p>
         <p>
+          <LandPlot className="fields-stat-icon" aria-hidden="true" />
           <strong>
             {fields.length === 0 ? t("unavailable") : formatHa(knownArea, i18n.language)}
             {missingArea && fields.length > 0 ? " +" : ""}
@@ -386,6 +404,7 @@ export function FieldsPage() {
           <span>{t("fields.area")}</span>
         </p>
         <p>
+          <Clock3 className="fields-stat-icon" aria-hidden="true" />
           <strong>
             {source?.stateAt ? stamp(source.stateAt, t("unavailable")) : loading ? "…" : t("unavailable")}
           </strong>
