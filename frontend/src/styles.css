@@ -3813,6 +3813,14 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-dot.is-building, .live-marker.is-building { background: #f3efe6; fill: #f3efe6; }
 .live-dot.is-player, .live-marker.is-player { background: #f7f7f7; fill: #f7f7f7; }
 .live-dot.is-vehicle, .live-marker.is-vehicle { background: #d7c27a; fill: #d7c27a; }
+.live-marker.is-building polygon { fill: #314039; }
+.live-marker.is-player circle, .live-marker.is-player path { fill: #24302c; }
+.live-marker.is-tool polygon { fill: #3d6b4f; }
+.live-marker.is-trailer rect { fill: #3d6f90; }
+.live-marker.is-harvester polygon { fill: #c45c28; }
+.live-marker.is-tractor polygon { fill: #b8860b; }
+.live-marker.is-pallet rect { fill: #8a7356; }
+.live-marker.is-vehicle circle { fill: #8a7040; }
 .live-marker.is-pin { fill: #ff8f5a; }
 .live-wait { position: absolute; z-index: 2; left: 16px; bottom: 16px; }
 .live-field {

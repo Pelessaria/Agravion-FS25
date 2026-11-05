@@ -52,7 +52,8 @@ function windDegrees(value: number | null) {
 
 function weatherKey(raw: string | null) {
   if (!raw) return null
-  const key = raw.trim().toUpperCase()
+  const key = raw.trim().toUpperCase().replace(/[\s-]+/g, "_")
+  if (key === "PARTIALLY_CLOUDY") return "PARTLY_CLOUDY"
   return KNOWN.has(key) ? key : null
 }
 
@@ -239,12 +240,9 @@ function WeatherSvg({ kind }: { kind: string | null }) {
     return (
       <svg viewBox="0 0 64 64" aria-hidden="true">
         <path d={cloud} fill="#d5e2ea" />
-        <path d={cloud} fill="#f7fbfd" transform="translate(0 -1)" />
-        <g fill="#3d9be0">
-          <path d="M22 46c2 4 2 6 0 9-2-3-2-5 0-9z" />
-          <path d="M32 47c2 4 2 6 0 9-2-3-2-5 0-9z" />
-          <path d="M42 46c2 4 2 6 0 9-2-3-2-5 0-9z" />
-        </g>
+        <path fill="#2f86d6" d="M22 46c1.2 0 2 .8 2.2 2.2.6 3.2-.4 6.2-2.2 8.2-1.8-2-2.8-5-2.2-8.2.2-1.4 1-2.2 2.2-2.2z" />
+        <path fill="#3d9be0" d="M32 48c1.2 0 2 .8 2.2 2.2.6 3.2-.4 6.2-2.2 8.2-1.8-2-2.8-5-2.2-8.2.2-1.4 1-2.2 2.2-2.2z" />
+        <path fill="#2f86d6" d="M42 46c1.2 0 2 .8 2.2 2.2.6 3.2-.4 6.2-2.2 8.2-1.8-2-2.8-5-2.2-8.2.2-1.4 1-2.2 2.2-2.2z" />
       </svg>
     )
   }
@@ -323,9 +321,9 @@ function WindArrow({ degrees }: { degrees: number }) {
 }
 
 function conditionLabel(t: (key: string) => string, raw: string | null) {
+  const key = weatherKey(raw)
+  if (key) return t(`weather.kind.${key}`)
   if (!raw) return t("weather.unknown")
-  const key = raw.trim().toUpperCase()
-  if (KNOWN.has(key)) return t(`weather.kind.${key}`)
   const words = raw.replace(/[_-]+/g, " ").trim()
   return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase()
 }
