@@ -373,10 +373,8 @@ export function FieldsPage() {
         </p>
         <p>
           <strong>{harvest.toLocaleString(i18n.language)}</strong>
-          <span>
-            {t("fields.harvest")}
-            <em>{t("fields.harvestGrass", { count: harvestGrass })}</em>
-          </span>
+          <span>{t("fields.harvest")}</span>
+          <em>{t("fields.harvestGrass", { count: harvestGrass })}</em>
         </p>
         <p>
           <strong>

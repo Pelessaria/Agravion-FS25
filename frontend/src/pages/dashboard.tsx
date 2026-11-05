@@ -157,24 +157,18 @@ export function DashboardPage() {
           <div className="fields-stats">
             <p>
               <strong>{online.length}</strong>
-              <span>
-                {t("dashboard.activeInstances")}
-                <em>{t("dashboard.onlineCount", { count: ordered.length })}</em>
-              </span>
+              <span>{t("dashboard.activeInstances")}</span>
+              <em>{t("dashboard.onlineCount", { count: ordered.length })}</em>
             </p>
             <p>
               <strong className={flagged.length > 0 ? "warn" : undefined}>{flagged.length}</strong>
-              <span>
-                {t("dashboard.attention")}
-                <em>{flagged.length === 0 ? t("dashboard.attentionQuiet") : t("dashboard.attentionSome")}</em>
-              </span>
+              <span>{t("dashboard.attention")}</span>
+              <em>{flagged.length === 0 ? t("dashboard.attentionQuiet") : t("dashboard.attentionSome")}</em>
             </p>
             <p>
               <strong>{reported.length === 0 ? <MissingValue text={null} /> : players}</strong>
-              <span>
-                {t("dashboard.players")}
-                {missingPlayers > 0 ? <em>{t("dashboard.playersMissing", { count: missingPlayers })}</em> : null}
-              </span>
+              <span>{t("dashboard.players")}</span>
+              {missingPlayers > 0 ? <em>{t("dashboard.playersMissing", { count: missingPlayers })}</em> : null}
             </p>
           </div>
         </div>

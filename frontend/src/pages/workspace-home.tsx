@@ -124,21 +124,17 @@ export function WorkspaceHomePage() {
           <strong>
             <MissingValue text={workspace.gameTime} />
           </strong>
-          <span>
-            {t("workspace.gameTime")}
-            <em>
-              <MissingValue text={workspace.gameVersion ?? null} />
-            </em>
-          </span>
+          <span>{t("workspace.gameTime")}</span>
+          <em>
+            <MissingValue text={workspace.gameVersion ?? null} />
+          </em>
         </p>
         <p>
           <strong>
             <MissingValue text={equipmentCount === null ? null : String(equipmentCount)} />
           </strong>
-          <span>
-            {t("modules.equipment")}
-            <em>{t("farm.equipmentHint")}</em>
-          </span>
+          <span>{t("modules.equipment")}</span>
+          <em>{t("farm.equipmentHint")}</em>
         </p>
         {farm ? (
           <>
