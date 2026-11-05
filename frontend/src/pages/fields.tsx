@@ -352,27 +352,29 @@ export function FieldsPage() {
         </p>
       </div>
 
-      <div className="stat-grid">
-        <div className="stat-tile">
-          <span>{t("fields.count")}</span>
+      <div className="fields-stats">
+        <p>
           <strong>{fields.length.toLocaleString(i18n.language)}</strong>
-        </div>
-        <div className="stat-tile">
-          <span>{t("fields.owned")}</span>
+          <span>{t("fields.count")}</span>
+        </p>
+        <p>
           <strong>{owned.toLocaleString(i18n.language)}</strong>
-        </div>
-        <div className="stat-tile">
-          <span>{t("fields.harvest")}</span>
+          <span>{t("fields.owned")}</span>
+        </p>
+        <p>
           <strong>{harvest.toLocaleString(i18n.language)}</strong>
-          <em>{t("fields.harvestGrass", { count: harvestGrass })}</em>
-        </div>
-        <div className="stat-tile">
-          <span>{t("fields.area")}</span>
+          <span>
+            {t("fields.harvest")}
+            <em>{t("fields.harvestGrass", { count: harvestGrass })}</em>
+          </span>
+        </p>
+        <p>
           <strong>
             {fields.length === 0 ? t("unavailable") : formatHa(knownArea, i18n.language)}
             {missingArea && fields.length > 0 ? " +" : ""}
           </strong>
-        </div>
+          <span>{t("fields.area")}</span>
+        </p>
       </div>
 
       {emptyKind ? (
@@ -422,15 +424,16 @@ export function FieldsPage() {
               >
                 <span>{t("fields.fieldShort")}</span>
                 <span className="fields-jump-pipe" aria-hidden="true">|</span>
-                <button type="submit" aria-label={t("fields.pick")}>
-                  <Search className="icon" />
-                </button>
                 <input
                   inputMode="numeric"
+                  maxLength={3}
                   value={query}
                   aria-label={t("fields.fieldNumber")}
                   onChange={(event) => setQuery(event.target.value)}
                 />
+                <button type="submit" aria-label={t("fields.pick")}>
+                  <Search className="icon" />
+                </button>
               </form>
             </div>
             {filtersOpen ? (
