@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import type { TFunction } from "i18next"
 import { useTranslation } from "react-i18next"
-import { LocateFixed } from "lucide-react"
-import { apiWorkspaceStorage, type StorageFill, type StoragePlace, type StorageResponse } from "../api"
+import { LocateFixed, Warehouse } from "lucide-react"
+import { apiWorkspaceFields, apiWorkspaceStorage, type StorageFill, type StoragePlace, type StorageResponse } from "../api"
 import { cropIconExact } from "../crop-icons"
+import { effectiveMapSize, projectPoint, terrainFrame, type MapFrame } from "../field-format"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { useStore } from "../store"
+import type { FieldsResponse } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
 
 const DEMO: StorageResponse = {
@@ -88,6 +90,7 @@ export function StoragePage() {
   const access = workspace ? moduleAccess(workspace.id, "storage") : null
   const farm = workspace ? selectedFarm(workspace.id) : null
   const [payload, setPayload] = useState<StorageResponse | null>(liveMode ? null : DEMO)
+  const [fields, setFields] = useState<FieldsResponse | null>(null)
   const [loading, setLoading] = useState(liveMode)
 
   useEffect(() => {
@@ -108,6 +111,15 @@ export function StoragePage() {
       }
     }
     void load(true)
+    if (liveMode && workspace) {
+      void apiWorkspaceFields(workspace.id)
+        .then((next) => {
+          if (!cancelled) setFields(next)
+        })
+        .catch(() => {
+          if (!cancelled) setFields(null)
+        })
+    }
     const timer = window.setInterval(() => void load(false), 60_000)
     return () => {
       cancelled = true
@@ -214,41 +226,28 @@ export function StoragePage() {
             </div>
           </div>
 
-          <div className="stock-layout">
-            <section className="panel stock-panel">
-              <h2>{t("stock.goods")}</h2>
-              {goods.length === 0 ? <p className="hint">{t("stock.emptyTitle")}</p> : null}
-              <div className="stock-goods">
-                {goods.map((good) => {
-                  const count = Math.round(good.count)
-                  return (
-                    <article key={good.key} className="stock-good">
-                      <FillMark fill={{ fillType: good.fillType, title: good.title, level: good.level, capacity: null, count }} />
-                      <div>
-                        <strong>{good.title}</strong>
-                        <p className="faint">
-                          {good.places === 1
-                            ? t("stock.inPlace_one")
-                            : t("stock.inPlace_other", { count: good.places })}
-                        </p>
-                      </div>
-                      <div className="stock-amount">
-                        <strong>{count > 0 ? (count === 1 ? t("stock.bales_one") : t("stock.bales_other", { count })) : bulk(good.level, i18n.language)}</strong>
-                        {count > 0 && good.level > 0 ? <span className="faint">{liters(good.level, i18n.language)}</span> : null}
-                        {count === 0 && good.level >= 1000 ? <span className="faint">{liters(good.level, i18n.language)}</span> : null}
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
-            </section>
-
-            <div className="stock-columns">
-              <PlaceList title={t("stock.places")} places={own} language={i18n.language} workspaceId={workspace.id} />
-              {intake.length > 0 ? (
-                <PlaceList title={t("stock.intake")} places={intake} language={i18n.language} workspaceId={workspace.id} />
-              ) : null}
-            </div>
+          <div className="stock-board">
+            {own.map((place) => (
+              <PlaceCard
+                key={place.id}
+                place={place}
+                language={i18n.language}
+                workspaceId={workspace.id}
+                fields={fields}
+                live={liveMode}
+              />
+            ))}
+            {intake.map((place) => (
+              <PlaceCard
+                key={place.id}
+                place={place}
+                language={i18n.language}
+                workspaceId={workspace.id}
+                fields={fields}
+                live={liveMode}
+                intake
+              />
+            ))}
           </div>
         </>
       )}
@@ -267,80 +266,119 @@ function mapTarget(workspaceId: string, place: StoragePlace) {
   return `/w/${workspaceId}/m/map?${params.toString()}`
 }
 
-function PlaceList({
-  title,
-  places,
+function mapFrame(fields: FieldsResponse | null): MapFrame | null {
+  if (!fields) return null
+  const reported = fields.mapFrame
+  if (reported && reported.worldX > 0 && reported.worldZ > 0 && reported.scaleX > 0 && reported.scaleZ > 0) {
+    return {
+      originX: reported.originX,
+      originZ: reported.originZ,
+      sizeX: reported.worldX,
+      sizeZ: reported.worldZ,
+      scaleX: reported.scaleX,
+      scaleZ: reported.scaleZ,
+      padX: reported.padX,
+      padZ: reported.padZ,
+    }
+  }
+  return terrainFrame(effectiveMapSize(fields.mapSize, fields.fields))
+}
+
+function PlaceCard({
+  place,
   language,
   workspaceId,
+  fields,
+  live,
+  intake,
 }: {
-  title: string
-  places: StoragePlace[]
+  place: StoragePlace
   language: string
   workspaceId: string
+  fields: FieldsResponse | null
+  live: boolean
+  intake?: boolean
 }) {
   const { t } = useTranslation()
-  if (places.length === 0) return null
+  const bale = place.kind === "baleStorage"
+  const percent = bale ? barPercent(place.used, place.slots) : barPercent(place.level, place.capacity)
+  const frame = mapFrame(fields)
+  const point = place.x != null && place.z != null && frame ? projectPoint(place.x, place.z, frame) : null
+  const mapUrl = fields?.pdaMap && live ? `/api/workspaces/${workspaceId}/pda-map` : null
   return (
-    <section className="panel stock-panel">
-      <h2>{title}</h2>
-      <div className="stock-places">
-        {places.map((place) => {
-          const bale = place.kind === "baleStorage"
-          const percent = bale ? barPercent(place.used, place.slots) : barPercent(place.level, place.capacity)
-          return (
-            <article key={place.id} className="stock-place">
-              <header>
-                <strong>{place.name || kindLabel(t, place.kind)}</strong>
-                <span className="badge">{kindLabel(t, place.kind)}</span>
-                <Link className="btn btn-secondary stock-map" to={mapTarget(workspaceId, place)}>
-                  <LocateFixed className="icon" />
-                  {t("stock.showOnMap")}
-                </Link>
-              </header>
-              {percent != null ? (
-                <div className="stock-meter">
-                  <div className="stock-bar" aria-hidden="true">
-                    <span style={{ width: `${percent}%` }} />
-                  </div>
-                  <p className="faint">
-                    {bale
-                      ? t("stock.slots", {
-                          used: Math.round(place.used ?? 0).toLocaleString(language),
-                          cap: Math.round(place.slots ?? 0).toLocaleString(language),
-                        })
-                      : t("stock.ofCapacity", {
-                          used: bulk(place.level ?? 0, language),
-                          cap: bulk(place.capacity ?? 0, language),
-                        })}
-                  </p>
-                </div>
-              ) : null}
-              {place.fills.length === 0 ? <p className="hint">{t("stock.emptyPlace")}</p> : null}
-              <ul>
-                {place.fills.map((fill, index) => {
-                  const count = fill.count != null ? Math.round(fill.count) : 0
-                  const label = fill.title || fill.fillType || t("stock.goods")
-                  return (
-                    <li key={`${place.id}-${index}`}>
-                      <FillMark fill={fill} />
-                      <span>{label}</span>
-                      <strong>
-                        {count > 0
-                          ? count === 1
-                            ? t("stock.bales_one")
-                            : t("stock.bales_other", { count })
-                          : fill.level != null
-                            ? bulk(fill.level, language)
-                            : t("unavailable")}
-                      </strong>
-                    </li>
-                  )
-                })}
-              </ul>
-            </article>
-          )
-        })}
+    <article className={intake ? "stock-card is-intake" : "stock-card"}>
+      <div className="stock-card-main">
+        <div className="stock-store">
+          {place.iconUrl ? <img src={place.iconUrl} alt="" /> : <Warehouse className="icon" aria-hidden="true" />}
+        </div>
+        <div className="stock-card-copy">
+          <header>
+            <h2>{place.name || kindLabel(t, place.kind)}</h2>
+            <span className="badge">{intake ? t("stock.intake") : kindLabel(t, place.kind)}</span>
+          </header>
+          {percent != null ? (
+            <div className="stock-meter">
+              <div className="stock-bar" aria-hidden="true">
+                <span style={{ width: `${percent}%` }} />
+              </div>
+              <p className="faint">
+                {bale
+                  ? t("stock.slots", {
+                      used: Math.round(place.used ?? 0).toLocaleString(language),
+                      cap: Math.round(place.slots ?? 0).toLocaleString(language),
+                    })
+                  : t("stock.ofCapacity", {
+                      used: bulk(place.level ?? 0, language),
+                      cap: bulk(place.capacity ?? 0, language),
+                    })}
+              </p>
+            </div>
+          ) : null}
+          {place.fills.length === 0 ? <p className="hint">{t("stock.emptyPlace")}</p> : null}
+          <ul>
+            {place.fills.map((fill, index) => {
+              const count = fill.count != null ? Math.round(fill.count) : 0
+              const label = fill.title || fill.fillType || t("stock.goods")
+              return (
+                <li key={`${place.id}-${index}`}>
+                  <FillMark fill={fill} />
+                  <span>{label}</span>
+                  <strong>
+                    {count > 0
+                      ? count === 1
+                        ? t("stock.bales_one")
+                        : t("stock.bales_other", { count })
+                      : fill.level != null
+                        ? bulk(fill.level, language)
+                        : t("unavailable")}
+                  </strong>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
       </div>
-    </section>
+      {place.x != null && place.z != null ? (
+        <Link className="stock-peek" to={mapTarget(workspaceId, place)} aria-label={t("stock.showOnMap")}>
+          {mapUrl && point ? (
+            <span className="stock-peek-map" aria-hidden="true">
+              <img
+                src={mapUrl}
+                alt=""
+                style={{
+                  width: "320%",
+                  height: "320%",
+                  left: `${50 - point.x * 3.2}%`,
+                  top: `${50 - point.y * 3.2}%`,
+                }}
+              />
+              <i />
+            </span>
+          ) : (
+            <LocateFixed className="icon" />
+          )}
+        </Link>
+      ) : null}
+    </article>
   )
 }

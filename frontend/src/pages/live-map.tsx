@@ -195,17 +195,25 @@ export function LiveMapPage() {
 
   const shapes = useMemo(() => {
     const rows = fields?.fields ?? []
-    const next: string[] = []
+    const next: { id: number; points: string; x: number; y: number }[] = []
     for (const field of rows) {
       if (field.points.length < 3) continue
-      next.push(
-        field.points
-          .map(([x, z]) => {
-            const point = projectPoint(x, z, frame)
-            return `${point.x.toFixed(2)},${point.y.toFixed(2)}`
-          })
-          .join(" "),
-      )
+      let sumX = 0
+      let sumY = 0
+      const points = field.points
+        .map(([x, z]) => {
+          const point = projectPoint(x, z, frame)
+          sumX += point.x
+          sumY += point.y
+          return `${point.x.toFixed(2)},${point.y.toFixed(2)}`
+        })
+        .join(" ")
+      next.push({
+        id: field.id,
+        points,
+        x: sumX / field.points.length,
+        y: sumY / field.points.length,
+      })
     }
     return next
   }, [fields, frame])
@@ -396,17 +404,13 @@ export function LiveMapPage() {
             })}
           </div>
         </section>
-        <section className="panel live-stats">
-          <h2>{t("live.stats")}</h2>
-          <div>
-            <span><Tractor className="icon" /><strong>{vehicleCount}</strong><small>{t("live.vehicles")}</small></span>
-            <span><Wrench className="icon" /><strong>{implementCount}</strong><small>{t("live.implements")}</small></span>
-            <span><Warehouse className="icon" /><strong>{places.length}</strong><small>{t("live.buildings")}</small></span>
-            <span><strong>{fields?.fields.length ?? 0}</strong><small>{t("modules.fields")}</small></span>
-          </div>
-          {payload?.writtenAt ? <p>{t("live.updated", { time: stamp(payload.writtenAt, "") })}</p> : null}
-        </section>
       </aside>
+      <div className="live-stats-bar">
+        <span><Tractor className="icon" /><strong>{vehicleCount}</strong><small>{t("live.vehicles")}</small></span>
+        <span><Wrench className="icon" /><strong>{implementCount}</strong><small>{t("live.implements")}</small></span>
+        <span><Warehouse className="icon" /><strong>{places.length}</strong><small>{t("live.buildings")}</small></span>
+        <span><strong>{fields?.fields.length ?? 0}</strong><small>{t("modules.fields")}</small></span>
+      </div>
       </div>
     </div>
   )
@@ -470,7 +474,7 @@ function LiveCanvas({
 }: {
   mapUrl: string | null
   frame: MapFrame
-  shapes: string[]
+  shapes: { id: number; points: string; x: number; y: number }[]
   vehicles: LiveVehicle[]
   players: LivePlayer[]
   places: LivePlace[]
@@ -766,7 +770,25 @@ function LiveCanvas({
               </clipPath>
             </defs>
             {showFields
-              ? shapes.map((points, index) => <polygon key={`shape-${index}`} className="live-field" points={points} />)
+              ? shapes.map((shape) => {
+                  const labelSize = (11 * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
+                  return (
+                    <g key={`shape-${shape.id}`}>
+                      <polygon className="live-field" points={shape.points} />
+                      <text
+                        className="live-field-no"
+                        x={shape.x}
+                        y={shape.y}
+                        fontSize={labelSize}
+                        strokeWidth={labelSize * 0.16}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                      >
+                        {shape.id}
+                      </text>
+                    </g>
+                  )
+                })
               : null}
             {draw.map((marker) => {
               const on = marker.key === selected

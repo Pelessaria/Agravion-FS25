@@ -283,6 +283,16 @@ final class ConnectorSnapshotService
         }
 
         $parsed = ConnectorStorageParser::parse((string) file_get_contents($path));
+        $icons = new ModIconCacheService;
+        foreach ($parsed['places'] as &$place) {
+            $storeKey = $place['storeKey'] ?? null;
+            $place['iconUrl'] = null;
+            if (is_string($storeKey) && $storeKey !== ''
+                && ($icons->localPath($workspace, $storeKey) !== null || $icons->localDdsPath($workspace, $storeKey) !== null)) {
+                $place['iconUrl'] = $icons->publicUrl($workspace, $storeKey);
+            }
+        }
+        unset($place);
 
         return [
             'ok' => true,

@@ -261,7 +261,39 @@ local function placeableXZ(placeable)
     return math.floor(x * 10 + 0.5) / 10, math.floor(z * 10 + 0.5) / 10
 end
 
-local function addSilo(bins, storage, placeable, kind, sourceIndex)
+local function configFilename(placeable)
+    if placeable == nil then
+        return nil
+    end
+    local names = { placeable.configFileName, placeable.configFilename, placeable.xmlFilename, placeable.filename }
+    for _, value in ipairs(names) do
+        if type(value) == "string" and value ~= "" then
+            return value
+        end
+    end
+    return nil
+end
+
+local function rememberStore(connector, placeable)
+    if connector == nil or connector.storeKeyFromFilename == nil or connector.vehicleStoreImage == nil then
+        return nil
+    end
+    local filename = configFilename(placeable)
+    if filename == nil then
+        return nil
+    end
+    local storeKey = connector:storeKeyFromFilename(filename)
+    local image = connector:vehicleStoreImage(placeable, filename)
+    if storeKey ~= nil and image ~= nil and connector.pendingStoreIcons ~= nil and connector.pendingStoreIcons[storeKey] == nil then
+        connector.pendingStoreIcons[storeKey] = {
+            src = image,
+            filename = filename,
+        }
+    end
+    return storeKey
+end
+
+local function addSilo(bins, storage, placeable, kind, sourceIndex, connector)
     if storage == nil then
         return
     end
@@ -301,11 +333,12 @@ local function addSilo(bins, storage, placeable, kind, sourceIndex)
         capacity = round(totalCapacity(storage)),
         x = x,
         z = z,
+        storeKey = rememberStore(connector, placeable),
         fills = fills,
     }
 end
 
-local function addBales(bins, placeable, sourceIndex)
+local function addBales(bins, placeable, sourceIndex, connector)
     local spec = placeable ~= nil and placeable.spec_objectStorage or nil
     if spec == nil or spec.supportsBales ~= true then
         return
@@ -385,11 +418,12 @@ local function addBales(bins, placeable, sourceIndex)
         slots = slots ~= nil and math.floor(slots) or nil,
         x = x,
         z = z,
+        storeKey = rememberStore(connector, placeable),
         fills = fills,
     }
 end
 
-local function collect()
+local function collect(connector)
     local mission = g_currentMission
     if mission == nil or mission.placeableSystem == nil or type(mission.placeableSystem.placeables) ~= "table" then
         return nil
@@ -407,17 +441,17 @@ local function collect()
             if silo ~= nil and type(silo.storages) == "table" then
                 for _, storage in ipairs(silo.storages) do
                     siloIndex = siloIndex + 1
-                    addSilo(bins, storage, placeable, "silo", siloIndex)
+                    addSilo(bins, storage, placeable, "silo", siloIndex, connector)
                 end
             end
             local extension = placeable.spec_siloExtension
             if extension ~= nil and extension.storage ~= nil then
                 siloIndex = siloIndex + 1
-                addSilo(bins, extension.storage, placeable, "siloExtension", siloIndex)
+                addSilo(bins, extension.storage, placeable, "siloExtension", siloIndex, connector)
             end
             if placeable.spec_objectStorage ~= nil then
                 baleIndex = baleIndex + 1
-                addBales(bins, placeable, baleIndex)
+                addBales(bins, placeable, baleIndex, connector)
             end
         end)
         if not ok then
@@ -446,7 +480,7 @@ end
 local function binXml(connector, row)
     local lines = {}
     lines[#lines + 1] = string.format(
-        "<bin%s%s%s%s%s%s%s%s%s%s%s />",
+        "<bin%s%s%s%s%s%s%s%s%s%s%s%s />",
         attr(connector, "id", row.id),
         attr(connector, "kind", row.kind),
         attr(connector, "farmId", row.farmId),
@@ -457,7 +491,8 @@ local function binXml(connector, row)
         attr(connector, "used", row.used),
         attr(connector, "slots", row.slots),
         attr(connector, "x", row.x),
-        attr(connector, "z", row.z)
+        attr(connector, "z", row.z),
+        attr(connector, "storeKey", row.storeKey)
     )
     for _, fill in ipairs(row.fills or {}) do
         lines[#lines + 1] = string.format(
@@ -483,7 +518,7 @@ function StorageSnapshot.writeIfDue(connector)
     end
     connector.storageAccumMs = 0
 
-    local bins, failed = collect()
+    local bins, failed = collect(connector)
     if bins == nil then
         return
     end

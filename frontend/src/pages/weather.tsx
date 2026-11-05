@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Cloud, CloudFog, CloudRain, Droplets, Gauge, Snowflake, Wind } from "lucide-react"
+import { Cloud, CloudRain, Droplets, Snowflake, Wind } from "lucide-react"
 import { apiWorkspaceLiveMap, type LiveForecastDay, type LiveForecastHour, type LiveMapResponse } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { useStore } from "../store"
@@ -23,12 +23,29 @@ const TONE: Record<string, string> = {
   FOG: "fog",
 }
 
-function clockLabel(value: number | null) {
+function clockParts(value: number | null) {
   if (value == null || !Number.isFinite(value)) return null
   const ms = value > 0 && value <= 1 ? value * 24 * 60 * 60 * 1000 : value
   if (ms < 0 || ms > 48 * 60 * 60 * 1000) return null
   const minutes = Math.floor(ms / 60000) % (24 * 60)
-  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
+  return { hour: Math.floor(minutes / 60), minute: minutes % 60 }
+}
+
+function clockLabel(value: number | null) {
+  const parts = clockParts(value)
+  if (!parts) return null
+  return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`
+}
+
+function fullHourLabel(value: number | null) {
+  const parts = clockParts(value)
+  if (!parts) return null
+  return `${String(parts.hour).padStart(2, "0")}:00`
+}
+
+function windText(value: number | null, language: string) {
+  if (value == null || !Number.isFinite(value)) return null
+  return `${value.toLocaleString(language, { maximumFractionDigits: 1 })} m/s`
 }
 
 function share(value: number | null) {
@@ -145,17 +162,20 @@ export function WeatherPage() {
                 </div>
               </div>
               <div className="weather-metrics">
-                <Metric icon={<Wind />} label={t("weather.wind")} value={payload.windSpeed != null ? `${payload.windSpeed}${wind != null ? ` (${compass(wind, i18n.language)})` : ""}` : null} />
-                <Metric icon={<Droplets />} label={t("weather.humidity")} value={share(payload.humidity)} />
-                <Metric icon={<CloudRain />} label={t("weather.rain")} value={share(payload.rain)} />
-                <Metric icon={<Cloud />} label={t("weather.clouds")} value={share(payload.clouds)} />
+                {payload.windSpeed != null ? (
+                  <Metric
+                    icon={<Wind />}
+                    label={t("weather.wind")}
+                    value={`${windText(payload.windSpeed, i18n.language)}${wind != null ? ` ${compass(wind, i18n.language)}` : ""}`}
+                  />
+                ) : null}
+                {share(payload.humidity) ? <Metric icon={<Droplets />} label={t("weather.humidity")} value={share(payload.humidity)} /> : null}
+                {share(payload.rain) ? <Metric icon={<CloudRain />} label={t("weather.rain")} value={share(payload.rain)} /> : null}
+                {share(payload.clouds) ? <Metric icon={<Cloud />} label={t("weather.clouds")} value={share(payload.clouds)} /> : null}
+                {payload.snow != null && payload.snow > 0 ? (
+                  <Metric icon={<Snowflake />} label={t("weather.snow")} value={`${payload.snow}`} />
+                ) : null}
               </div>
-            </article>
-            <article className="panel weather-extra">
-              <Extra icon={<WindArrow degrees={wind ?? 0} />} label={t("weather.direction")} value={wind != null ? `${wind}° ${compass(wind, i18n.language)}` : null} />
-              <Extra icon={<CloudFog />} label={t("weather.fog")} value={share(payload.fog)} />
-              <Extra icon={<Snowflake />} label={t("weather.snow")} value={payload.snow != null ? `${payload.snow}` : null} />
-              <Extra icon={<Gauge />} label={t("weather.timeScale")} value={payload.timeScale != null ? `${payload.timeScale}×` : null} />
             </article>
           </section>
           {(payload.days ?? []).length > 0 || (payload.hours ?? []).length > 0 ? (
@@ -170,6 +190,7 @@ export function WeatherPage() {
                         day={day}
                         label={conditionLabel(t, day.type)}
                         dayLabel={day.day != null ? t("live.day", { day: day.day }) : t("weather.dayAhead", { day: index + 1 })}
+                        wind={windText(day.windSpeed, i18n.language)}
                         today={index === 0}
                       />
                     ))}
@@ -184,25 +205,24 @@ export function WeatherPage() {
               ) : null}
             </section>
           ) : null}
-          <section className="weather-low">
-            {(payload.hours ?? []).length > 0 ? (
+          {(payload.hours ?? []).length > 0 ? (
+            <section className="weather-low">
               <article className="panel">
                 <h2>{t("weather.hourly")}</h2>
                 <div className="weather-hours">
                   {(payload.hours ?? []).slice(0, 12).map((hour, index) => (
-                    <HourCard key={`${hour.time ?? "h"}-${index}`} hour={hour} label={conditionLabel(t, hour.type)} now={index === 0} />
+                    <HourCard
+                      key={`${hour.time ?? "h"}-${index}`}
+                      hour={hour}
+                      language={i18n.language}
+                      now={index === 0}
+                    />
                   ))}
                 </div>
               </article>
-            ) : null}
-            <article className="panel weather-sync">
-              <h2>{t("weather.conditions")}</h2>
-              <p><i />{t("weather.synced")}</p>
-              <p><i />{t("weather.syncGame")}</p>
-              {payload.writtenAt ? <footer>{t("live.updated", { time: stamp(payload.writtenAt, "") })}</footer> : null}
-              <small>{t("weather.precision")}</small>
-            </article>
-          </section>
+            </section>
+          ) : null}
+          <p className="faint weather-note">{t("weather.precision")}</p>
         </>
       ) : null}
     </div>
@@ -231,8 +251,9 @@ function WeatherSvg({ kind }: { kind: string | null }) {
         <g stroke="#f0a202" strokeWidth="3.4" strokeLinecap="round">
           <path d="M32 6v8M32 50v8M6 32h8M50 32h8M13 13l6 6M45 45l6 6M51 13l-6 6M19 45l-6 6" />
         </g>
-        <circle cx="32" cy="32" r="13" fill="#ffc83d" />
-        <circle cx="27" cy="28" r="5" fill="#ffe7a3" />
+        <circle cx="32" cy="32" r="14" fill="#fff6d4" />
+        <circle cx="32" cy="32" r="11" fill="#ffc83d" />
+        <circle cx="27" cy="28" r="4" fill="#fff1b8" />
       </svg>
     )
   }
@@ -310,16 +331,6 @@ function WeatherSvg({ kind }: { kind: string | null }) {
   )
 }
 
-function WindArrow({ degrees }: { degrees: number }) {
-  return (
-    <span className="weather-arrow" style={{ transform: `rotate(${degrees}deg)` }}>
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path fill="currentColor" d="M12 2.5 17.2 12H13.4v9.2h-2.8V12H6.8L12 2.5Z" />
-      </svg>
-    </span>
-  )
-}
-
 function conditionLabel(t: (key: string) => string, raw: string | null) {
   const key = weatherKey(raw)
   if (key) return t(`weather.kind.${key}`)
@@ -338,29 +349,32 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
   )
 }
 
-function Extra({ icon, label, value }: { icon: ReactNode; label: string; value: string | null }) {
-  return (
-    <div className="weather-extra-item">
-      <div>{icon}</div>
-      <span>{label}</span>
-      <strong>{value ?? "–"}</strong>
-    </div>
-  )
-}
-
-function HourCard({ hour, label, now }: { hour: LiveForecastHour; label: string; now?: boolean }) {
-  const when = clockLabel(hour.time)
+function HourCard({ hour, language, now }: { hour: LiveForecastHour; language: string; now?: boolean }) {
+  const when = fullHourLabel(hour.time)
+  const wind = windText(hour.windSpeed, language)
   return (
     <article className={now ? `weather-hour is-now is-${toneOf(hour.type)}` : `weather-hour is-${toneOf(hour.type)}`}>
-      <time>{when ?? label}</time>
+      <time>{when ?? "–"}</time>
       <SkyMark raw={hour.type} />
       <strong>{hour.temperature != null ? `${hour.temperature.toFixed(0)}°` : "–"}</strong>
-      <small>{hour.windSpeed != null ? hour.windSpeed : label}</small>
+      {wind ? <small>{wind}</small> : null}
     </article>
   )
 }
 
-function DayCard({ day, label, dayLabel, today }: { day: LiveForecastDay; label: string; dayLabel: string; today?: boolean }) {
+function DayCard({
+  day,
+  label,
+  dayLabel,
+  wind,
+  today,
+}: {
+  day: LiveForecastDay
+  label: string
+  dayLabel: string
+  wind: string | null
+  today?: boolean
+}) {
   return (
     <article className={today ? `weather-day is-today is-${toneOf(day.type)}` : `weather-day is-${toneOf(day.type)}`}>
       <span>{dayLabel}</span>
@@ -368,7 +382,7 @@ function DayCard({ day, label, dayLabel, today }: { day: LiveForecastDay; label:
       <strong>{day.high != null ? `${day.high.toFixed(0)}°` : "–"}</strong>
       <em>{day.low != null ? `${day.low.toFixed(0)}°` : "–"}</em>
       <small>{label}</small>
-      {day.windSpeed != null ? <small>{day.windSpeed}</small> : null}
+      {wind ? <small>{wind}</small> : null}
     </article>
   )
 }
@@ -378,6 +392,7 @@ function Trend({ days, highLabel, lowLabel }: { days: LiveForecastDay[]; highLab
   const highs = rows.map((day) => day.high)
   const lows = rows.map((day) => day.low)
   const values = [...highs, ...lows].filter((value): value is number => value != null && Number.isFinite(value))
+  const [hover, setHover] = useState<number | null>(null)
   if (values.length === 0) return null
   const max = Math.max(...values) + 2
   const min = Math.min(...values) - 2
@@ -392,6 +407,7 @@ function Trend({ days, highLabel, lowLabel }: { days: LiveForecastDay[]; highLab
     })
     return drawing.trim()
   }
+  const tip = hover != null ? rows[hover] : null
   return (
     <div className="weather-chart">
       <svg viewBox="0 0 500 200" role="img" aria-label={highLabel}>
@@ -414,9 +430,32 @@ function Trend({ days, highLabel, lowLabel }: { days: LiveForecastDay[]; highLab
         ))}
         <path d={path(highs)} className="is-high" />
         <path d={path(lows)} className="is-low" />
-        {highs.map((value, index) => (value == null ? null : <circle key={`h-${index}`} cx={x(index)} cy={y(value)} r="3.2" className="is-high" />))}
-        {lows.map((value, index) => (value == null ? null : <circle key={`l-${index}`} cx={x(index)} cy={y(value)} r="3.2" className="is-low" />))}
+        {rows.map((day, index) => (
+          <rect
+            key={`hit-${day.day ?? index}`}
+            x={x(index) - 24}
+            y="20"
+            width="48"
+            height="160"
+            fill="transparent"
+            onMouseEnter={() => setHover(index)}
+            onMouseLeave={() => setHover(null)}
+          />
+        ))}
+        {highs.map((value, index) => (value == null ? null : <circle key={`h-${index}`} cx={x(index)} cy={y(value)} r={hover === index ? 5 : 3.2} className="is-high" />))}
+        {lows.map((value, index) => (value == null ? null : <circle key={`l-${index}`} cx={x(index)} cy={y(value)} r={hover === index ? 5 : 3.2} className="is-low" />))}
       </svg>
+      {tip ? (
+        <div className="weather-tip" style={{ left: `${(x(hover ?? 0) / 500) * 100}%` }}>
+          <strong>{tip.day != null ? tip.day : (hover ?? 0) + 1}</strong>
+          <span>
+            {highLabel} {tip.high != null ? `${tip.high.toFixed(0)}°` : "–"}
+          </span>
+          <span>
+            {lowLabel} {tip.low != null ? `${tip.low.toFixed(0)}°` : "–"}
+          </span>
+        </div>
+      ) : null}
       <p>
         <i className="is-high" />
         {highLabel}

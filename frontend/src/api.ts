@@ -202,6 +202,7 @@ export type StoragePlace = {
   slots: number | null
   x: number | null
   z: number | null
+  iconUrl?: string | null
   fills: StorageFill[]
 }
 

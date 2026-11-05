@@ -45,6 +45,7 @@ final class ConnectorStorageParser
                 'slots' => self::float($node['slots'] ?? null),
                 'x' => self::float($node['x'] ?? null),
                 'z' => self::float($node['z'] ?? null),
+                'storeKey' => self::text($node['storeKey'] ?? null),
                 'fills' => [],
             ];
         }
