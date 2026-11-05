@@ -1251,6 +1251,11 @@ h1, h2, h3, p { margin: 0; }
   margin-inline: auto;
   padding: 18px 0 64px;
 }
+.content:has(.live-page) {
+  width: calc(100% - 20px);
+  padding-top: 8px;
+  padding-bottom: 10px;
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -3664,11 +3669,13 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .live-page {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
-  height: calc(100vh - 130px);
+  height: calc(100vh - 78px);
   grid-template-rows: auto minmax(0, 1fr);
 }
+.live-page .page-head { margin-bottom: 0; align-items: center; }
+.live-page .page-head p { display: none; }
 .live-farm-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; color: var(--text-faint); font-size: 0.78rem; }
 .live-farm-row .chip-check { display: inline-flex; align-items: center; gap: 6px; }
 .live-farm-row .chip-check i { width: 9px; height: 9px; border-radius: 3px; }
@@ -3790,11 +3797,26 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   padding: 8px 10px;
 }
 .live-groups button.is-on { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.live-kind-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.live-kind-filters button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 99px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.72rem;
+}
+.live-kind-filters button.is-on { color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.live-kind-filters em { font-style: normal; color: var(--text-faint); }
 .live-groups button img, .live-groups button .icon {
   width: 32px;
   height: 32px;
   object-fit: contain;
-  background: #f4f1e6;
+  background: #141c19;
   border-radius: 8px;
   padding: 2px;
 }
@@ -3814,7 +3836,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .live-stats strong { font-size: 1.25rem; }
 .live-stats small { color: var(--text-faint); font-size: 0.7rem; }
-.live-marker .live-marker-plate { fill: #f6f3ea; }
+.live-marker .live-marker-plate { fill: #141c19; }
 .live-marker .live-marker-rim { fill: none; stroke: #f4c95a; stroke-width: 0.14; }
 .live-heading { stroke: #101410; stroke-width: 0.08; }
 .live-marker.is-on .live-marker-rim { stroke: #f4c95a; stroke-width: 0.16; }
@@ -3855,7 +3877,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   width: 32px;
   height: 32px;
   object-fit: contain;
-  background: #f4f1e6;
+  background: #141c19;
   border-radius: 50%;
   padding: 3px;
 }
@@ -3981,15 +4003,15 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-dot.is-building, .live-marker.is-building { background: #f3efe6; fill: #f3efe6; }
 .live-dot.is-player, .live-marker.is-player { background: #f7f7f7; fill: #f7f7f7; }
 .live-dot.is-vehicle, .live-marker.is-vehicle { background: #d7c27a; fill: #d7c27a; }
-.live-marker.is-building .live-glyph polygon { fill: #314039; }
-.live-marker.is-player .live-glyph circle, .live-marker.is-player .live-glyph path { fill: #24302c; }
-.live-marker.is-tool .live-glyph polygon { fill: #3d6b4f; }
-.live-marker.is-trailer .live-glyph rect { fill: #3d6f90; }
-.live-marker.is-harvester .live-glyph polygon { fill: #c45c28; }
-.live-marker.is-tractor .live-glyph polygon { fill: #b8860b; }
-.live-marker.is-pallet .live-glyph rect { fill: #8a7356; }
-.live-marker.is-vehicle .live-glyph circle { fill: #8a7040; }
-.live-marker.is-pin .live-glyph polygon { fill: #ff8f5a; }
+.live-marker.is-building .live-glyph polygon { fill: #d5ddd6; }
+.live-marker.is-player .live-glyph circle, .live-marker.is-player .live-glyph path { fill: #f3f6f4; }
+.live-marker.is-tool .live-glyph polygon { fill: #9ddec0; }
+.live-marker.is-trailer .live-glyph rect { fill: #9fd0ef; }
+.live-marker.is-harvester .live-glyph polygon { fill: #f0a36a; }
+.live-marker.is-tractor .live-glyph polygon { fill: #f0d078; }
+.live-marker.is-pallet .live-glyph rect { fill: #e4d2b4; }
+.live-marker.is-vehicle .live-glyph circle { fill: #f0d078; }
+.live-marker.is-pin .live-glyph polygon { fill: #ffb088; }
 .live-wait { position: absolute; z-index: 2; left: 16px; bottom: 16px; }
 .live-field {
   fill: rgba(255, 255, 255, 0.03);

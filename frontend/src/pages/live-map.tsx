@@ -87,9 +87,23 @@ function objectKind(role: MarkerRole): Exclude<ObjectTab, "all"> {
   return "vehicle"
 }
 
+type BuildingFilter = "all" | "silo" | "animal" | "production" | "trade" | "yard"
+
+function placeText(place: LivePlace) {
+  return `${place.type ?? ""} ${place.name ?? ""}`.toLowerCase()
+}
+
 function usedPlace(place: LivePlace) {
-  const type = `${place.type ?? ""} ${place.name ?? ""}`.toLowerCase()
-  return /silo|husband|animal|production|sell|unload|load|bunker|barn|stall|stable|workshop|garage|shed/.test(type)
+  return /silo|husband|animal|production|sell|unload|load|bunker|barn|stall|stable|workshop|garage|shed/.test(placeText(place))
+}
+
+function buildingKind(place: LivePlace): Exclude<BuildingFilter, "all"> {
+  const type = placeText(place)
+  if (/silo|bunker|tank|lager|storage/.test(type)) return "silo"
+  if (/husband|animal|barn|stall|stable/.test(type)) return "animal"
+  if (/production/.test(type)) return "production"
+  if (/sell|unload|load/.test(type)) return "trade"
+  return "yard"
 }
 
 function matches(query: string, value: string | null) {
@@ -113,6 +127,8 @@ export function LiveMapPage() {
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [hiddenFarms, setHiddenFarms] = useState<number[]>([])
   const [showFields, setShowFields] = useState(true)
+  const [showBuildings, setShowBuildings] = useState(pin != null)
+  const [buildingFilter, setBuildingFilter] = useState<BuildingFilter>("all")
   const [resetToken, setResetToken] = useState(0)
   const [tab, setTab] = useState<ObjectTab>(pin ? "building" : "all")
   const [query, setQuery] = useState(pin?.name ?? "")
@@ -239,9 +255,19 @@ export function LiveMapPage() {
   const vehicles = (payload?.vehicles ?? []).filter((vehicle) => farmOpen(vehicle.farmId))
   const players = payload?.players ?? []
   const places = (payload?.places ?? []).filter((place) => usedPlace(place) && farmOpen(place.farmId))
+  const buildingCounts = places.reduce<Record<Exclude<BuildingFilter, "all">, number>>(
+    (counts, place) => {
+      counts[buildingKind(place)] += 1
+      return counts
+    },
+    { silo: 0, animal: 0, production: 0, trade: 0, yard: 0 },
+  )
+  const filteredPlaces = places.filter(
+    (place) => (buildingFilter === "all" || buildingKind(place) === buildingFilter) && matches(query, place.name ?? place.type),
+  )
+  const mapPlaces = filteredPlaces.filter((place) => showBuildings || selected === `o:${place.id}`)
   const visibleVehicles = vehicles.filter((vehicle) => matches(query, vehicle.name))
   const visiblePlayers = players.filter((player) => matches(query, player.name))
-  const visiblePlaces = places.filter((place) => matches(query, place.name ?? place.type))
 
   const month = payload?.period != null && payload.period >= 1 && payload.period <= 12 ? PERIOD_TO_MONTH[payload.period - 1] : null
   const clock = clockLabel(payload?.dayTime ?? null)
@@ -272,7 +298,7 @@ export function LiveMapPage() {
       iconUrl: null,
       role: "player" as const,
     })),
-    ...visiblePlaces.map((place) => ({
+    ...filteredPlaces.map((place) => ({
       key: `o:${place.id}`,
       farmId: place.farmId,
       kind: "building" as const,
@@ -281,7 +307,7 @@ export function LiveMapPage() {
       iconUrl: null,
       role: "building" as const,
     })),
-  ].filter((row) => tab === "all" || row.kind === tab)
+  ].filter((row) => (tab === "all" ? row.kind !== "building" : row.kind === tab))
   const farmIds = [...new Set(catalog.map((row) => row.farmId))]
   const vehicleCount = vehicles.filter((vehicle) => objectKind(roleOf(vehicle)) === "vehicle").length
   const implementCount = vehicles.filter((vehicle) => objectKind(roleOf(vehicle)) === "implement").length
@@ -331,7 +357,7 @@ export function LiveMapPage() {
           shapes={shapes}
           vehicles={vehicles}
           players={players}
-          places={places}
+          places={mapPlaces}
           pin={pin}
           selected={selected}
           showFields={showFields}
@@ -347,6 +373,9 @@ export function LiveMapPage() {
           <div>
             <button type="button" className={showFields ? "is-on" : ""} onClick={() => setShowFields((value) => !value)}>
               {t("live.fieldsLayer")}
+            </button>
+            <button type="button" className={showBuildings ? "is-on" : ""} onClick={() => setShowBuildings((value) => !value)}>
+              {t("live.buildings")}
             </button>
             <button type="button" onClick={() => setResetToken((value) => value + 1)}>
               {t("live.resetView")}
@@ -380,11 +409,31 @@ export function LiveMapPage() {
           </label>
           <div className="live-tabs" role="tablist">
             {(["all", "vehicle", "implement", "building", "player"] as const).map((id) => (
-              <button key={id} type="button" className={tab === id ? "is-on" : ""} onClick={() => setTab(id)}>
+              <button
+                key={id}
+                type="button"
+                className={tab === id ? "is-on" : ""}
+                onClick={() => {
+                  setTab(id)
+                  if (id === "building") setShowBuildings(true)
+                }}
+              >
                 {t(id === "all" ? "live.all" : id === "vehicle" ? "live.vehicles" : id === "implement" ? "live.implements" : id === "building" ? "live.buildings" : "live.players")}
               </button>
             ))}
           </div>
+          {tab === "building" ? (
+            <div className="live-kind-filters">
+              {(["all", "silo", "animal", "production", "trade", "yard"] as const)
+                .filter((id) => id === "all" || buildingCounts[id] > 0)
+                .map((id) => (
+                  <button key={id} type="button" className={buildingFilter === id ? "is-on" : ""} onClick={() => setBuildingFilter(id)}>
+                    {t(`live.buildingKind.${id}`)}
+                    {id === "all" ? null : <em>{buildingCounts[id]}</em>}
+                  </button>
+                ))}
+            </div>
+          ) : null}
           {selectedVehicle ? (
             <div className="live-card">
               <strong>{selectedVehicle.name || selectedVehicle.id}</strong>
@@ -395,7 +444,11 @@ export function LiveMapPage() {
             </div>
           ) : null}
           <div className="live-groups">
-            {catalog.length === 0 ? <p className="live-empty">{t("live.emptyVehicles")}</p> : null}
+            {catalog.length === 0 ? (
+              <p className="live-empty">
+                {t(tab === "building" ? "live.emptyPlaces" : tab === "player" ? "live.emptyPlayers" : "live.emptyVehicles")}
+              </p>
+            ) : null}
             {farmIds.map((groupId) => {
               const group = catalog.filter((row) => row.farmId === groupId)
               if (group.length === 0) return null
