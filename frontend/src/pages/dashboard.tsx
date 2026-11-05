@@ -153,21 +153,29 @@ export function DashboardPage() {
   function renderWidget(id: DashboardWidgetId) {
     if (id === "stats") {
       return (
-        <div className="stat-grid dash-stats" key={id}>
-          <div className="stat-tile">
-            <span>{t("dashboard.activeInstances")}</span>
-            <strong>{online.length}</strong>
-            <em>{t("dashboard.onlineCount", { count: ordered.length })}</em>
-          </div>
-          <div className="stat-tile">
-            <span>{t("dashboard.attention")}</span>
-            <strong className={flagged.length > 0 ? "warn" : undefined}>{flagged.length}</strong>
-            <em>{flagged.length === 0 ? t("dashboard.attentionQuiet") : t("dashboard.attentionSome")}</em>
-          </div>
-          <div className="stat-tile">
-            <span>{t("dashboard.players")}</span>
-            <strong>{reported.length === 0 ? <MissingValue text={null} /> : players}</strong>
-            {missingPlayers > 0 ? <em>{t("dashboard.playersMissing", { count: missingPlayers })}</em> : null}
+        <div className="fields-mast" key={id}>
+          <div className="fields-stats">
+            <p>
+              <strong>{online.length}</strong>
+              <span>
+                {t("dashboard.activeInstances")}
+                <em>{t("dashboard.onlineCount", { count: ordered.length })}</em>
+              </span>
+            </p>
+            <p>
+              <strong className={flagged.length > 0 ? "warn" : undefined}>{flagged.length}</strong>
+              <span>
+                {t("dashboard.attention")}
+                <em>{flagged.length === 0 ? t("dashboard.attentionQuiet") : t("dashboard.attentionSome")}</em>
+              </span>
+            </p>
+            <p>
+              <strong>{reported.length === 0 ? <MissingValue text={null} /> : players}</strong>
+              <span>
+                {t("dashboard.players")}
+                {missingPlayers > 0 ? <em>{t("dashboard.playersMissing", { count: missingPlayers })}</em> : null}
+              </span>
+            </p>
           </div>
         </div>
       )

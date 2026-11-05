@@ -178,43 +178,38 @@ export function VehiclesPage() {
 
   return (
     <section className="equipment-page">
-      <div className="page-head">
-        <div>
+      <div className="fields-mast">
+        <div className="fields-mast-top">
           <h1>{t("modules.equipment")}</h1>
-          <p>
-            {farm
-              ? t("vehicles.leadFarm", { farm: farmDisplayName(farm, t) })
-              : t("vehicles.lead")}
+          <p className="faint">
+            {farm ? t("vehicles.leadFarm", { farm: farmDisplayName(farm, t) }) : t("vehicles.lead")}
           </p>
+          <div className="toolbar">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void syncIcons()}
+              disabled={syncing || !liveMode}
+            >
+              {syncing ? <LoaderCircle className="icon spin" /> : <RefreshCw className="icon" />}
+              {syncing ? t("vehicles.syncing") : t("vehicles.sync")}
+            </button>
+            {syncNote ? <span className="faint">{syncNote}</span> : null}
+          </div>
         </div>
-        <div className="toolbar">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => void syncIcons()}
-            disabled={syncing || !liveMode}
-          >
-            {syncing ? <LoaderCircle className="icon spin" /> : <RefreshCw className="icon" />}
-            {syncing ? t("vehicles.syncing") : t("vehicles.sync")}
-          </button>
-          {syncNote ? <span className="faint">{syncNote}</span> : null}
-        </div>
-      </div>
-
-      <div className="stat-grid equip-summary">
-        <div className="stat-tile">
-          <span>{t("vehicles.fleet")}</span>
-          <strong>{rows.length.toLocaleString(i18n.language)}</strong>
-        </div>
-        <div className="stat-tile">
-          <span>{t("vehicles.fleetHours")}</span>
-          <strong>
-            {fleetHours.toLocaleString(i18n.language, { maximumFractionDigits: 0 })} h
-          </strong>
-        </div>
-        <div className="stat-tile">
-          <span>{t("vehicles.fleetMods")}</span>
-          <strong>{fleetMods.toLocaleString(i18n.language)}</strong>
+        <div className="fields-stats">
+          <p>
+            <strong>{rows.length.toLocaleString(i18n.language)}</strong>
+            <span>{t("vehicles.fleet")}</span>
+          </p>
+          <p>
+            <strong>{fleetHours.toLocaleString(i18n.language, { maximumFractionDigits: 0 })} h</strong>
+            <span>{t("vehicles.fleetHours")}</span>
+          </p>
+          <p>
+            <strong>{fleetMods.toLocaleString(i18n.language)}</strong>
+            <span>{t("vehicles.fleetMods")}</span>
+          </p>
         </div>
       </div>
 

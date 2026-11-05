@@ -103,30 +103,28 @@ export function WorkspaceHomePage() {
 
   return (
     <section className="ws-dash">
-      <div className="page-head">
-        <div>
+      <div className="fields-mast">
+        <div className="fields-mast-top">
           <h1>{title}</h1>
-          <p>{lead}</p>
+          <p className="faint">{lead}</p>
+          <div className="ws-dash-meta">
+            {farm ? <span className="ws-no">{farm.gameFarmId}</span> : <span className="ws-no">{workspace.number}</span>}
+            <span className="status-line">
+              <span className={`dot ${workspace.disabled ? "unknown" : workspace.linkState}`} />
+              {workspace.disabled ? t("card.disabled") : t(`link.${workspace.linkState}`)}
+            </span>
+            <span className="faint">
+              {workspace.lastSyncAt
+                ? t("workspace.sync", { time: stamp(workspace.lastSyncAt, "") })
+                : t("workspace.neverSync")}
+            </span>
+          </div>
         </div>
-        <div className="ws-dash-meta">
-          {farm ? <span className="ws-no">{farm.gameFarmId}</span> : <span className="ws-no">{workspace.number}</span>}
-          <span className="status-line">
-            <span className={`dot ${workspace.disabled ? "unknown" : workspace.linkState}`} />
-            {workspace.disabled ? t("card.disabled") : t(`link.${workspace.linkState}`)}
-          </span>
-          <span className="faint">
-            {workspace.lastSyncAt
-              ? t("workspace.sync", { time: stamp(workspace.lastSyncAt, "") })
-              : t("workspace.neverSync")}
-          </span>
-        </div>
-      </div>
 
       {notice ? <p className="notice">{t(`notice.${notice}`)}</p> : null}
 
-      <div className="stat-grid ws-dash-stats">
-        <div className="stat-tile">
-          <span>{t("workspace.players")}</span>
+      <div className="fields-stats">
+        <p>
           <strong>
             <MissingValue
               text={
@@ -136,39 +134,43 @@ export function WorkspaceHomePage() {
               }
             />
           </strong>
-        </div>
-        <div className="stat-tile">
-          <span>{t("workspace.map")}</span>
+          <span>{t("workspace.players")}</span>
+        </p>
+        <p>
           <strong>
             <MissingValue text={workspace.mapName} />
           </strong>
-        </div>
-        <div className="stat-tile">
-          <span>{t("workspace.gameTime")}</span>
+          <span>{t("workspace.map")}</span>
+        </p>
+        <p>
           <strong>
             <MissingValue text={workspace.gameTime} />
           </strong>
-          <em>
-            <MissingValue text={workspace.gameVersion ?? null} />
-          </em>
-        </div>
-        <div className="stat-tile">
-          <span>{t("modules.equipment")}</span>
+          <span>
+            {t("workspace.gameTime")}
+            <em>
+              <MissingValue text={workspace.gameVersion ?? null} />
+            </em>
+          </span>
+        </p>
+        <p>
           <strong>
             <MissingValue text={equipmentCount === null ? null : String(equipmentCount)} />
           </strong>
-          <em>{t("farm.equipmentHint")}</em>
-        </div>
+          <span>
+            {t("modules.equipment")}
+            <em>{t("farm.equipmentHint")}</em>
+          </span>
+        </p>
         {farm ? (
           <>
-            <div className="stat-tile">
-              <span>{t("workspace.balance")}</span>
+            <p>
               <strong>
                 <MissingValue text={money(farm.money, i18n.language)} />
               </strong>
-            </div>
-            <div className="stat-tile">
-              <span>{t("farm.hectares")}</span>
+              <span>{t("workspace.balance")}</span>
+            </p>
+            <p>
               <strong>
                 <MissingValue
                   text={
@@ -178,9 +180,11 @@ export function WorkspaceHomePage() {
                   }
                 />
               </strong>
-            </div>
+              <span>{t("farm.hectares")}</span>
+            </p>
           </>
         ) : null}
+      </div>
       </div>
 
       {liveMode && feedVehicles && feedVehicles.length > 0 ? (

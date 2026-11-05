@@ -281,18 +281,37 @@ export function StoragePage() {
 
   return (
     <section className="stock-page">
-      <div className="page-head">
-        <div>
+      <div className="fields-mast">
+        <div className="fields-mast-top">
           <h1>{t("modules.storage")}</h1>
-          <p>{t("stock.lead")}</p>
+          <p className="faint">
+            {payload?.writtenAt
+              ? t("stock.updated", { time: stamp(payload.writtenAt, t("unavailable")) })
+              : loading
+                ? t("stock.loading")
+                : null}
+          </p>
         </div>
-        <p className="faint">
-          {payload?.writtenAt
-            ? t("stock.updated", { time: stamp(payload.writtenAt, t("unavailable")) })
-            : loading
-              ? t("stock.loading")
-              : null}
-        </p>
+        {emptyKind || (loading && !payload) ? null : (
+          <div className="fields-stats">
+            <p>
+              <strong>{own.length.toLocaleString(language)}</strong>
+              <span>{t("stock.placeCount")}</span>
+            </p>
+            <p>
+              <strong>{bulkRows.length.toLocaleString(language)}</strong>
+              <span>{t("stock.goodCount")}</span>
+            </p>
+            <p>
+              <strong>{hasFree ? bulk(freeLiters, language) : t("unavailable")}</strong>
+              <span>{t("stock.freeSpace")}</span>
+            </p>
+            <p>
+              <strong>{baleRows.reduce((sum, row) => sum + row.count, 0).toLocaleString(language)}</strong>
+              <span>{t("stock.bales")}</span>
+            </p>
+          </div>
+        )}
       </div>
 
       {loading && !payload ? (
@@ -305,25 +324,6 @@ export function StoragePage() {
         <EmptyState title={t("stock.emptyTitle")} body={t("stock.emptyBody")} />
       ) : (
         <>
-          <div className="stat-grid">
-            <div className="stat-tile">
-              <span>{t("stock.placeCount")}</span>
-              <strong>{own.length.toLocaleString(language)}</strong>
-            </div>
-            <div className="stat-tile">
-              <span>{t("stock.goodCount")}</span>
-              <strong>{bulkRows.length.toLocaleString(language)}</strong>
-            </div>
-            <div className="stat-tile">
-              <span>{t("stock.freeSpace")}</span>
-              <strong>{hasFree ? bulk(freeLiters, language) : t("unavailable")}</strong>
-            </div>
-            <div className="stat-tile">
-              <span>{t("stock.bales")}</span>
-              <strong>{baleRows.reduce((sum, row) => sum + row.count, 0).toLocaleString(language)}</strong>
-            </div>
-          </div>
-
           <div className="stock-overview">
             <GoodsPanel title={t("stock.bulk")} empty={t("stock.noBulk")} rows={bulkRows} mode="bulk" language={language} />
             <GoodsPanel title={t("stock.bales")} empty={t("stock.noBales")} rows={baleRows} mode="bale" language={language} note={baleRows.some((row) => row.key === "unknown") ? t("stock.unknownBalesBody") : null} />
