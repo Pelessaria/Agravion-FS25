@@ -2730,9 +2730,6 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   width: max-content;
   max-width: 100%;
 }
-.fields-stats:has(.has-note) {
-  padding-top: calc(1.45rem + 4px);
-}
 .fields-stats p {
   display: flex;
   align-items: baseline;
@@ -2765,26 +2762,22 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   line-height: 1.15;
 }
 /*
- * Mit Subtext: Zahl + Label stehen über dem Subtext; der Subtext teilt
- * die Baseline mit den Hauptwerten der übrigen Kennzahlen.
+ * Mit Subtext: Icon + Zahl + Label bleiben oben (Zahl „wo sie war“).
+ * Der Subtext bildet die Baseline und sitzt damit auf Höhe der
+ * Hauptwerte der übrigen Kennzahlen.
  */
-.fields-stats p.has-note {
-  align-items: baseline;
-}
 .fields-stats p.has-note .fields-stat-stack {
-  position: relative;
   display: inline-block;
 }
 .fields-stats p.has-note .fields-stat-head {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + 2px);
   display: flex;
   align-items: baseline;
   gap: 8px;
+  margin-bottom: 2px;
   white-space: nowrap;
 }
 .fields-stats p.has-note em {
+  display: block;
   font-style: normal;
   color: var(--text-muted);
   font-size: 0.72rem;

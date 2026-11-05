@@ -55,23 +55,20 @@ import { useWorkspaceRoute } from "../use-workspace"
 
 const EMPTY_FIELDS: FieldSnapshot[] = []
 
-/** Lucide hat keine Sense — schlankes Stroke-Icon im gleichen Stil. */
+/** Gefüllte Sense (SVG Repo) — Lucide hat keines. */
 function Scythe({ className, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      viewBox="0 0 769 769"
+      fill="currentColor"
       className={className}
       aria-hidden="true"
       {...props}
     >
-      <path d="M8 22V10" />
-      <path d="M8 10c1.5-5 7-7 11-5 1.2.6 2 1.8 2 3.2 0 2.8-3.2 4.8-7 4.8H8z" />
+      <g transform="translate(0 769) scale(0.1 -0.1)">
+        <path d="M4125 7449c-446-28-990-101-1526-204-450-88-1275-283-1289-305-13-22-23-294-16-443 14-272 58-553 132-837 34-129 92-321 100-329 2-2 46 39 98 91 556 563 1517 984 2591 1137 344 48 460 56 850 56 375 0 521-11 802-55 643-103 1155-314 1565-645 67-54 67-56-17 120-117 246-260 450-445 635-430 430-1016 677-1820 766-172 19-808 27-1025 13zM645 6831c-143-37-273-71-289-75l-28-7 7-87c39-504 151-1039 308-1472 152-420 321-737 615-1149l13-19-43-25c-213-124-513-245-844-341l-185-53 46-51c95-106 251-200 371-224l56-11 77 16c241 52 486 174 699 346l62 51 183-183c342-344 662-603 1287-1038 146-102 376-262 511-357 776-540 1234-938 1607-1398 107-131 252-333 319-444l48-79 388-1 388 0-27 48c-278 487-523 813-878 1168-283 283-531 485-888 723-227 152-411 263-873 526-740 422-1004 596-1321 868-787 677-1203 1637-1319 3045-8 101-15 208-15 238 0 30-3 54-7 53-5 0-125-31-268-68z" />
+      </g>
     </svg>
   )
 }
@@ -408,10 +405,10 @@ export function FieldsPage() {
           <span>{t("fields.allFarms")}</span>
         </p>
         <p className={harvestGrass > 0 ? "has-note" : undefined}>
-          <Scythe className="fields-stat-icon" />
           {harvestGrass > 0 ? (
             <span className="fields-stat-stack">
               <span className="fields-stat-head">
+                <Scythe className="fields-stat-icon" />
                 <strong>{harvest.toLocaleString(i18n.language)}</strong>
                 <span>{t("fields.harvest")}</span>
               </span>
@@ -419,6 +416,7 @@ export function FieldsPage() {
             </span>
           ) : (
             <>
+              <Scythe className="fields-stat-icon" />
               <strong>{harvest.toLocaleString(i18n.language)}</strong>
               <span>{t("fields.harvest")}</span>
             </>
