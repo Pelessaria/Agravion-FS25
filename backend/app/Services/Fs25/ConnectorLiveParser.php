@@ -77,6 +77,7 @@ final class ConnectorLiveParser
                 'heading' => self::floatAttr($node['heading'] ?? null),
                 'ai' => ((string) ($node['ai'] ?? '')) === '1',
                 'driver' => self::text($node['driver'] ?? null),
+                'controlled' => ((string) ($node['controlled'] ?? '')) === '1',
             ];
         }
         foreach ($root->player as $node) {

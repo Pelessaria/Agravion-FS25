@@ -174,7 +174,7 @@ local function appendVehicles(connector, parts, fingerprint)
             end
             local ai = safeMethod(vehicle, "getIsAIActive") == true
             parts[#parts + 1] = string.format(
-                "<vehicle%s%s%s%s%s%s%s%s />",
+                "<vehicle%s%s%s%s%s%s%s%s%s />",
                 attr(connector, "id", id),
                 attr(connector, "name", name),
                 attr(connector, "farmId", farmIdOf(vehicle)),
@@ -182,7 +182,8 @@ local function appendVehicles(connector, parts, fingerprint)
                 attr(connector, "z", round(z, 1)),
                 attr(connector, "heading", heading ~= nil and round(heading, 3) or nil),
                 attr(connector, "ai", ai and "1" or nil),
-                attr(connector, "driver", driver)
+                attr(connector, "driver", driver),
+                attr(connector, "controlled", controlled and "1" or nil)
             )
             fingerprint[#fingerprint + 1] = string.format(
                 "v:%s:%s:%s:%s",

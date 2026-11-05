@@ -12,7 +12,7 @@
 
 AgriVisionConnector = {}
 AgriVisionConnector.MOD_NAME = "FS25_AgriVisionConnector"
-AgriVisionConnector.VERSION = "0.1.19.0"
+AgriVisionConnector.VERSION = "0.1.22.0"
 AgriVisionConnector.SCHEMA = "1"
 AgriVisionConnector.TICK_MS = 5000
 AgriVisionConnector.HELLO_EVERY_MS = 60000
@@ -900,6 +900,71 @@ function AgriVisionConnector:vehicleStoreImage(vehicle, filename)
     end
     for _, raw in ipairs(candidates) do
         local resolved = self:resolveStoreImagePath(raw)
+        if resolved ~= nil then
+            return resolved
+        end
+    end
+    return nil
+end
+
+-- Placeables often have no getImageFilename on a dedicated server. The store
+-- picture lives in placeable.storeData.image, next to the XML.
+function AgriVisionConnector:placeableStoreImage(placeable, filename)
+    local seeds = {}
+    local function add(value)
+        if value ~= nil and tostring(value) ~= "" then
+            table.insert(seeds, tostring(value))
+        end
+    end
+    local function readXml(xmlFile)
+        if xmlFile == nil or xmlFile.getValue == nil then
+            return
+        end
+        local paths = {
+            "placeable.storeData.image",
+            "placeable.base.storeData.image",
+            "vehicle.storeData.image",
+        }
+        for _, path in ipairs(paths) do
+            local ok, image = pcall(function()
+                return xmlFile:getValue(path)
+            end)
+            if ok then
+                add(image)
+            end
+        end
+    end
+    if placeable ~= nil then
+        readXml(placeable.xmlFile)
+    end
+    if filename ~= nil and filename ~= "" and XMLFile ~= nil and XMLFile.load ~= nil then
+        local ok, xmlFile = pcall(function()
+            return XMLFile.load("avStoreImage", filename)
+        end)
+        if ok and xmlFile ~= nil then
+            readXml(xmlFile)
+            if xmlFile.delete ~= nil then
+                pcall(function()
+                    xmlFile:delete()
+                end)
+            end
+        end
+    end
+    local xmlPath = filename ~= nil and tostring(filename):gsub("\\", "/") or ""
+    local dir, base = string.match(xmlPath, "^(.*)/([^/]+)$")
+    if base ~= nil then
+        base = string.gsub(base, "%.[Xx][Mm][Ll]$", "")
+        if dir ~= nil and dir ~= "" then
+            add(dir .. "/store_" .. base .. ".dds")
+            add(dir .. "/" .. base .. ".dds")
+        end
+    end
+    for _, raw in ipairs(seeds) do
+        local image = tostring(raw):gsub("\\", "/")
+        if not string.find(image, "/") and dir ~= nil and dir ~= "" then
+            image = dir .. "/" .. image
+        end
+        local resolved = self:resolveStoreImagePath(image)
         if resolved ~= nil then
             return resolved
         end

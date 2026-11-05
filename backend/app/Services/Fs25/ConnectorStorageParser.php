@@ -61,6 +61,8 @@ final class ConnectorStorageParser
                 'level' => self::float($node['level'] ?? null),
                 'capacity' => self::float($node['capacity'] ?? null),
                 'count' => self::float($node['count'] ?? null),
+                'form' => self::text($node['form'] ?? null),
+                'size' => self::text($node['size'] ?? null),
             ];
         }
 

@@ -11,6 +11,9 @@ import { useStore } from "../store"
 import type { FieldsResponse } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
 
+const PEEK_ZOOM = 18
+const COLORS = ["#c6e88a", "#7ec8f0", "#e4b84a", "#e39ad8", "#f0a07a", "#8fd0c4", "#f2d27a", "#9bb7e8", "#f0c2b0", "#b7d48a"]
+
 const DEMO: StorageResponse = {
   ok: true,
   error: null,
@@ -45,9 +48,22 @@ const DEMO: StorageResponse = {
       slots: 40,
       x: 210,
       z: 30,
-      fills: [{ fillType: "STRAW", title: "Stroh", level: 48000, capacity: null, count: 12 }],
+      fills: [{ fillType: "STRAW", title: "Stroh", level: 48000, capacity: null, count: 12, form: "round", size: "125x120" }],
     },
   ],
+}
+
+type PlaceFilter = "filled" | "silo" | "bale" | "all"
+
+type GoodPlace = { id: string; name: string; amount: string }
+type GoodRow = {
+  key: string
+  title: string
+  fillType: string | null
+  level: number
+  count: number
+  color: string
+  places: GoodPlace[]
 }
 
 function kindLabel(t: TFunction, kind: string | null) {
@@ -75,11 +91,27 @@ function barPercent(level: number | null, capacity: number | null) {
   return Math.max(0, Math.min(100, (level / capacity) * 100))
 }
 
-function FillMark({ fill }: { fill: StorageFill }) {
-  const icon = cropIconExact(fill.fillType ?? fill.title)
-  const label = fill.title || fill.fillType || ""
+function colorFor(key: string) {
+  let hash = 0
+  for (let index = 0; index < key.length; index += 1) hash = (hash * 33 + key.charCodeAt(index)) >>> 0
+  return COLORS[hash % COLORS.length]
+}
+
+function occupied(place: StoragePlace) {
+  if (place.fills.length > 0) return true
+  if ((place.level ?? 0) > 0) return true
+  return place.kind === "baleStorage" && (place.used ?? 0) > 0
+}
+
+function formText(t: TFunction, fill: StorageFill) {
+  const kind = fill.form === "round" ? t("stock.round") : fill.form === "square" ? t("stock.square") : null
+  return [kind, fill.size || null].filter(Boolean).join(" · ")
+}
+
+function FillMark({ fillType, title }: { fillType: string | null; title: string }) {
+  const icon = cropIconExact(fillType ?? title)
   if (icon) return <img src={icon} alt="" />
-  return <span className="stock-mark">{label.slice(0, 1).toUpperCase()}</span>
+  return <span className="stock-mark">{(title || "?").slice(0, 1).toUpperCase()}</span>
 }
 
 export function StoragePage() {
@@ -92,6 +124,7 @@ export function StoragePage() {
   const [payload, setPayload] = useState<StorageResponse | null>(liveMode ? null : DEMO)
   const [fields, setFields] = useState<FieldsResponse | null>(null)
   const [loading, setLoading] = useState(liveMode)
+  const [filter, setFilter] = useState<PlaceFilter>("filled")
 
   useEffect(() => {
     if (!workspace || !allowed || !access || !liveMode) return
@@ -135,34 +168,95 @@ export function StoragePage() {
 
   const own = places.filter((place) => !place.foreign)
   const intake = places.filter((place) => place.foreign && place.fills.length > 0)
+  const language = i18n.language
 
-  const goods = (() => {
-    const map = new Map<string, { key: string; title: string; fillType: string | null; level: number; count: number; places: number }>()
-    for (const place of places) {
-      if (place.foreign) continue
-      const seen = new Set<string>()
+  const bulkRows = useMemo(() => {
+    const map = new Map<string, GoodRow>()
+    for (const place of own) {
+      if (place.kind === "baleStorage") continue
       for (const fill of place.fills) {
         const key = (fill.fillType || fill.title || "").toLowerCase()
-        if (!key) continue
+        if (!key || (fill.level ?? 0) <= 0) continue
         const row = map.get(key) ?? {
           key,
           title: fill.title || fill.fillType || key,
           fillType: fill.fillType,
           level: 0,
           count: 0,
-          places: 0,
+          color: colorFor(key),
+          places: [],
         }
         row.level += fill.level ?? 0
-        row.count += fill.count ?? 0
-        if (!seen.has(key)) {
-          row.places += 1
-          seen.add(key)
-        }
+        row.places.push({
+          id: `${place.id}-${key}`,
+          name: place.name || kindLabel(t, place.kind),
+          amount: bulk(fill.level ?? 0, language),
+        })
         map.set(key, row)
       }
     }
-    return [...map.values()].sort((a, b) => b.level - a.level || b.count - a.count || a.title.localeCompare(b.title, i18n.language))
-  })()
+    return [...map.values()].sort((a, b) => b.level - a.level || a.title.localeCompare(b.title, language))
+  }, [language, own, t])
+
+  const baleRows = useMemo(() => {
+    const map = new Map<string, GoodRow>()
+    for (const place of own) {
+      if (place.kind !== "baleStorage") continue
+      for (const fill of place.fills) {
+        const count = Math.round(fill.count ?? 0)
+        if (count <= 0 && (fill.level ?? 0) <= 0) continue
+        const shape = formText(t, fill)
+        const crop = fill.title || fill.fillType || t("stock.bales")
+        const key = `${(fill.fillType || crop).toLowerCase()}|${fill.form ?? ""}|${fill.size ?? ""}`
+        const row = map.get(key) ?? {
+          key,
+          title: shape ? `${crop} · ${shape}` : crop,
+          fillType: fill.fillType,
+          level: 0,
+          count: 0,
+          color: colorFor(key),
+          places: [],
+        }
+        row.level += fill.level ?? 0
+        row.count += count
+        const amount = count > 0 ? (count === 1 ? t("stock.bales_one") : t("stock.bales_other", { count })) : bulk(fill.level ?? 0, language)
+        row.places.push({ id: `${place.id}-${key}`, name: place.name || kindLabel(t, place.kind), amount })
+        map.set(key, row)
+      }
+    }
+    const unknown = own.filter((place) => place.kind === "baleStorage" && place.fills.length === 0 && (place.used ?? 0) > 0)
+    if (unknown.length > 0) {
+      const count = unknown.reduce((sum, place) => sum + Math.round(place.used ?? 0), 0)
+      map.set("unknown", {
+        key: "unknown",
+        title: t("stock.unknownBales"),
+        fillType: null,
+        level: 0,
+        count,
+        color: "#8b938c",
+        places: unknown.map((place) => ({
+          id: place.id,
+          name: place.name || kindLabel(t, place.kind),
+          amount:
+            place.slots != null
+              ? t("stock.slots", {
+                  used: Math.round(place.used ?? 0).toLocaleString(language),
+                  cap: Math.round(place.slots).toLocaleString(language),
+                })
+              : t("stock.bales_other", { count: Math.round(place.used ?? 0) }),
+        })),
+      })
+    }
+    return [...map.values()].sort((a, b) => b.count - a.count || b.level - a.level || a.title.localeCompare(b.title, language))
+  }, [language, own, t])
+
+  const visiblePlaces = own.filter((place) => {
+    if (filter === "silo") return place.kind !== "baleStorage"
+    if (filter === "bale") return place.kind === "baleStorage"
+    if (filter === "filled") return occupied(place)
+    return true
+  })
+  const emptyCount = own.filter((place) => !occupied(place)).length
 
   const freeLiters = own.reduce((sum, place) => {
     if (place.kind === "baleStorage") return sum
@@ -214,41 +308,135 @@ export function StoragePage() {
           <div className="stat-grid">
             <div className="stat-tile">
               <span>{t("stock.placeCount")}</span>
-              <strong>{own.length.toLocaleString(i18n.language)}</strong>
+              <strong>{own.length.toLocaleString(language)}</strong>
             </div>
             <div className="stat-tile">
               <span>{t("stock.goodCount")}</span>
-              <strong>{goods.length.toLocaleString(i18n.language)}</strong>
+              <strong>{bulkRows.length.toLocaleString(language)}</strong>
             </div>
             <div className="stat-tile">
               <span>{t("stock.freeSpace")}</span>
-              <strong>{hasFree ? bulk(freeLiters, i18n.language) : t("unavailable")}</strong>
+              <strong>{hasFree ? bulk(freeLiters, language) : t("unavailable")}</strong>
             </div>
           </div>
 
-          <div className="stock-board">
-            {own.map((place) => (
-              <PlaceCard
-                key={place.id}
-                place={place}
-                language={i18n.language}
-                workspaceId={workspace.id}
-                fields={fields}
-                live={liveMode}
-              />
-            ))}
-            {intake.map((place) => (
-              <PlaceCard
-                key={place.id}
-                place={place}
-                language={i18n.language}
-                workspaceId={workspace.id}
-                fields={fields}
-                live={liveMode}
-                intake
-              />
-            ))}
+          <div className="stock-overview">
+            <GoodsPanel title={t("stock.bulk")} empty={t("stock.noBulk")} rows={bulkRows} mode="bulk" language={language} />
+            <GoodsPanel title={t("stock.bales")} empty={t("stock.noBales")} rows={baleRows} mode="bale" language={language} note={baleRows.some((row) => row.key === "unknown") ? t("stock.unknownBalesBody") : null} />
           </div>
+
+          <section className="stock-places">
+            <header>
+              <h2>{t("stock.placesTitle")}</h2>
+              <div className="stock-filters">
+                {(["filled", "silo", "bale", "all"] as PlaceFilter[]).map((id) => (
+                  <button key={id} type="button" className={filter === id ? "is-on" : ""} onClick={() => setFilter(id)}>
+                    {id === "filled"
+                      ? t("stock.occupied")
+                      : id === "silo"
+                        ? t("stock.silos")
+                        : id === "bale"
+                          ? t("stock.bales")
+                          : emptyCount > 0
+                            ? t("stock.showEmpty", { count: emptyCount })
+                            : t("stock.allPlaces")}
+                  </button>
+                ))}
+              </div>
+            </header>
+            <div className="stock-board">
+              {visiblePlaces.map((place) => (
+                <PlaceCard key={place.id} place={place} language={language} workspaceId={workspace.id} fields={fields} live={liveMode} />
+              ))}
+              {filter !== "bale"
+                ? intake.map((place) => (
+                    <PlaceCard key={place.id} place={place} language={language} workspaceId={workspace.id} fields={fields} live={liveMode} intake />
+                  ))
+                : null}
+            </div>
+          </section>
+        </>
+      )}
+    </section>
+  )
+}
+
+function GoodsPanel({
+  title,
+  empty,
+  rows,
+  mode,
+  language,
+  note,
+}: {
+  title: string
+  empty: string
+  rows: GoodRow[]
+  mode: "bulk" | "bale"
+  language: string
+  note?: string | null
+}) {
+  const { t } = useTranslation()
+  const total = rows.reduce((sum, row) => sum + (mode === "bale" ? Math.max(row.count, 0) : row.level), 0)
+  const max = Math.max(...rows.map((row) => (mode === "bale" ? Math.max(row.count, row.level) : row.level)), 1)
+  const summary =
+    rows.length === 0
+      ? null
+      : mode === "bale"
+        ? t("stock.bales_other", { count: rows.reduce((sum, row) => sum + row.count, 0) })
+        : bulk(total, language)
+  return (
+    <section className="stock-panel">
+      <header>
+        <h2>{title}</h2>
+        {summary ? <span>{summary}</span> : null}
+      </header>
+      {rows.length === 0 ? (
+        <p className="hint">{empty}</p>
+      ) : (
+        <>
+          <div className="stock-mix" aria-hidden="true">
+            {rows.map((row) => {
+              const value = mode === "bale" ? Math.max(row.count, 0) : row.level
+              if (value <= 0 || total <= 0) return null
+              return <i key={row.key} style={{ width: `${(value / total) * 100}%`, background: row.color }} />
+            })}
+          </div>
+          <ul className="stock-types">
+            {rows.map((row) => {
+              const value = mode === "bale" ? Math.max(row.count, row.level) : row.level
+              const amount =
+                mode === "bale" && row.count > 0
+                  ? row.count === 1
+                    ? t("stock.bales_one")
+                    : t("stock.bales_other", { count: row.count })
+                  : bulk(row.level, language)
+              return (
+                <li key={row.key} className="stock-type">
+                  <FillMark fillType={row.fillType} title={row.title} />
+                  <div>
+                    <div className="stock-type-top">
+                      <span>{row.title}</span>
+                      <strong>{amount}</strong>
+                    </div>
+                    <div className="stock-bar" aria-hidden="true">
+                      <span style={{ width: `${Math.max(4, (value / max) * 100)}%`, background: row.color }} />
+                    </div>
+                    <small>{t("stock.inStores", { count: row.places.length })}</small>
+                  </div>
+                  <div className="stock-tip" role="tooltip">
+                    {row.places.map((place) => (
+                      <p key={place.id}>
+                        <span>{place.name}</span>
+                        <strong>{place.amount}</strong>
+                      </p>
+                    ))}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+          {note ? <p className="hint">{note}</p> : null}
         </>
       )}
     </section>
@@ -339,10 +527,11 @@ function PlaceCard({
             {place.fills.map((fill, index) => {
               const count = fill.count != null ? Math.round(fill.count) : 0
               const label = fill.title || fill.fillType || t("stock.goods")
+              const shape = formText(t, fill)
               return (
                 <li key={`${place.id}-${index}`}>
-                  <FillMark fill={fill} />
-                  <span>{label}</span>
+                  <FillMark fillType={fill.fillType} title={label} />
+                  <span>{shape ? `${label} · ${shape}` : label}</span>
                   <strong>
                     {count > 0
                       ? count === 1
@@ -366,10 +555,10 @@ function PlaceCard({
                 src={mapUrl}
                 alt=""
                 style={{
-                  width: "320%",
-                  height: "320%",
-                  left: `${50 - point.x * 3.2}%`,
-                  top: `${50 - point.y * 3.2}%`,
+                  width: `${PEEK_ZOOM * 100}%`,
+                  height: `${PEEK_ZOOM * 100}%`,
+                  left: `${50 - point.x * PEEK_ZOOM}%`,
+                  top: `${50 - point.y * PEEK_ZOOM}%`,
                 }}
               />
               <i />

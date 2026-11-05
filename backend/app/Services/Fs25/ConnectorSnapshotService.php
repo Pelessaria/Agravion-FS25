@@ -571,6 +571,7 @@ final class ConnectorSnapshotService
         // Vehicles whose copy failed are absent from the manifest. Still ask for
         // icons/store/<storeKey>.dds so a later successful copy is picked up.
         $jobs = $this->mergeVehicleStoreJobs($workspace, $base, $jobs);
+        $jobs = $this->mergeStorageStoreJobs($workspace, $base, $jobs);
 
         if ($jobs === []) {
             return $this->syncResult(
@@ -616,6 +617,40 @@ final class ConnectorSnapshotService
 
         foreach ($vehicles as $vehicle) {
             $key = $vehicle['storeKey'] ?? null;
+            if (! is_string($key) || $key === '' || isset($jobs[$key])) {
+                continue;
+            }
+            $jobs[$key] = [
+                'key' => $key,
+                'ext' => 'dds',
+                'remote' => rtrim($base, '/').'/icons/store/'.$key.'.dds',
+            ];
+        }
+
+        return $jobs;
+    }
+
+    /**
+     * Placeable store images are not vehicles. Pull their keys from the storage snapshot.
+     *
+     * @param  array<string, array{key: string, ext: string, remote: string}>  $jobs
+     * @return array<string, array{key: string, ext: string, remote: string}>
+     */
+    private function mergeStorageStoreJobs(Workspace $workspace, string $base, array $jobs): array
+    {
+        $path = $this->localStateDir($workspace).'/storage_state.xml';
+        if (! is_file($path)) {
+            return $jobs;
+        }
+
+        try {
+            $parsed = ConnectorStorageParser::parse((string) file_get_contents($path));
+        } catch (Throwable) {
+            return $jobs;
+        }
+
+        foreach ($parsed['places'] as $place) {
+            $key = $place['storeKey'] ?? null;
             if (! is_string($key) || $key === '' || isset($jobs[$key])) {
                 continue;
             }

@@ -223,6 +223,49 @@ local function objectFillType(object)
     return id
 end
 
+local function cmSize(value)
+    local n = num(value)
+    if n == nil or n <= 0 then
+        return nil
+    end
+    if n < 20 then
+        n = n * 100
+    end
+    return math.floor(n + 0.5)
+end
+
+local function baleForm(object)
+    if object == nil then
+        return nil, nil
+    end
+    local roundBale = object.isRoundbale
+    if roundBale == nil then
+        roundBale = object.isRoundBale
+    end
+    local form = nil
+    if roundBale == true then
+        form = "round"
+    elseif roundBale == false then
+        form = "square"
+    end
+    local size = nil
+    if form == "round" then
+        local diameter = cmSize(object.diameter)
+        local width = cmSize(object.width)
+        if diameter ~= nil and width ~= nil then
+            size = tostring(diameter) .. "x" .. tostring(width)
+        end
+    else
+        local width = cmSize(object.width)
+        local height = cmSize(object.height)
+        local length = cmSize(object.length)
+        if width ~= nil and height ~= nil and length ~= nil then
+            size = tostring(width) .. "x" .. tostring(length) .. "x" .. tostring(height)
+        end
+    end
+    return form, size
+end
+
 local function objectFillLevel(object)
     if object == nil then
         return nil
@@ -284,6 +327,9 @@ local function rememberStore(connector, placeable)
     end
     local storeKey = connector:storeKeyFromFilename(filename)
     local image = connector:vehicleStoreImage(placeable, filename)
+    if image == nil and connector.placeableStoreImage ~= nil then
+        image = connector:placeableStoreImage(placeable, filename)
+    end
     if storeKey ~= nil and image ~= nil and connector.pendingStoreIcons ~= nil and connector.pendingStoreIcons[storeKey] == nil then
         connector.pendingStoreIcons[storeKey] = {
             src = image,
@@ -357,13 +403,17 @@ local function addBales(bins, placeable, sourceIndex, connector)
     local fills = {}
     local total = 0
     local bales = 0
-    for _, info in pairs(infos) do
+    for key, info in pairs(infos) do
         if type(info) == "table" then
             local representative = nil
             if type(info.objects) == "table" then
                 representative = info.objects[1]
             end
-            if representative ~= nil and isBale(representative, spec) then
+            local counted = representative ~= nil and isBale(representative, spec)
+            if not counted and representative == nil and spec.supportsBales == true and spec.supportsPallets ~= true then
+                counted = true
+            end
+            if counted then
                 local count = num(info.numObjects)
                 if count == nil and type(info.objects) == "table" then
                     count = #info.objects
@@ -372,6 +422,9 @@ local function addBales(bins, placeable, sourceIndex, connector)
                 if count > 0 then
                     local fillType, title = nil, nil
                     local fillTypeId = objectFillType(representative)
+                    if fillTypeId == nil then
+                        fillTypeId = num(info.fillType) or num(info.fillTypeIndex) or num(key)
+                    end
                     if fillTypeId ~= nil then
                         fillType, title = fillInfo(fillTypeId)
                     end
@@ -381,12 +434,15 @@ local function addBales(bins, placeable, sourceIndex, connector)
                         volume = round(each * count)
                         total = total + each * count
                     end
+                    local form, size = baleForm(representative)
                     bales = bales + count
                     fills[#fills + 1] = {
                         fillType = fillType,
                         title = title,
                         level = volume,
                         count = count,
+                        form = form,
+                        size = size,
                     }
                 end
             end
@@ -496,13 +552,15 @@ local function binXml(connector, row)
     )
     for _, fill in ipairs(row.fills or {}) do
         lines[#lines + 1] = string.format(
-            "<fill%s%s%s%s%s%s />",
+            "<fill%s%s%s%s%s%s%s%s />",
             attr(connector, "bin", row.id),
             attr(connector, "fillType", fill.fillType),
             attr(connector, "title", fill.title),
             attr(connector, "level", fill.level),
             attr(connector, "capacity", fill.capacity),
-            attr(connector, "count", fill.count)
+            attr(connector, "count", fill.count),
+            attr(connector, "form", fill.form),
+            attr(connector, "size", fill.size)
         )
     end
     return table.concat(lines, "\n")

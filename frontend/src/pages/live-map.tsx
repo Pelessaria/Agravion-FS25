@@ -32,7 +32,24 @@ type Marker = {
   farmColor: string | null
   label: string
   icon: string | null
+  active: boolean
+  priority: number
+  busy: string | null
   count?: number
+  members?: Marker[]
+}
+
+function rolePriority(role: MarkerRole) {
+  if (role === "harvester" || role === "tractor") return 40
+  if (role === "vehicle") return 30
+  if (role === "player") return 25
+  if (role === "trailer") return 16
+  if (role === "tool" || role === "pallet") return 10
+  return 6
+}
+
+function vehicleActive(vehicle: LiveVehicle) {
+  return vehicle.ai || Boolean(vehicle.driver) || vehicle.controlled === true
 }
 
 function markerRole(kind: MarkerKind, category: string | null): MarkerRole {
@@ -488,6 +505,7 @@ function LiveCanvas({
   onSelect: (id: string) => void
   onContentBox: (box: { x: number; y: number; w: number; h: number } | null) => void
 }) {
+  const { t } = useTranslation()
   const viewportRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const cam = useRef({ x: 0, y: 0, k: 1 })
@@ -496,6 +514,7 @@ function LiveCanvas({
   const [zoom, setZoom] = useState(1)
   const [mapFailed, setMapFailed] = useState(false)
   const [view, setView] = useState({ w: 0, h: 0 })
+  const [cluster, setCluster] = useState<Marker[] | null>(null)
 
   useEffect(() => {
     cam.current = { x: 0, y: 0, k: 1 }
@@ -589,6 +608,9 @@ function LiveCanvas({
         farmColor: placeColor(vehicle.farmId),
         label: vehicle.name || vehicle.id,
         icon: vehicleIcon(vehicle),
+        active: vehicleActive(vehicle),
+        priority: rolePriority(vehicleRole(vehicle)),
+        busy: vehicle.ai ? "ai" : vehicle.driver || (vehicle.controlled ? "moving" : null),
       })
     }
     for (const player of players) {
@@ -603,6 +625,9 @@ function LiveCanvas({
         farmColor: null,
         label: player.name || player.id,
         icon: null,
+        active: false,
+        priority: rolePriority("player"),
+        busy: null,
       })
     }
     for (const place of places) {
@@ -617,11 +642,27 @@ function LiveCanvas({
         farmColor: placeColor(place.farmId),
         label: place.name || place.type || place.id,
         icon: null,
+        active: false,
+        priority: rolePriority("building"),
+        busy: null,
       })
     }
     if (pin) {
       const point = projectPoint(pin.x, pin.z, frame)
-      next.push({ key: "pin", x: point.x, y: point.y, heading: null, kind: "pin", role: "pin", farmColor: null, label: pin.name, icon: null })
+      next.push({
+        key: "pin",
+        x: point.x,
+        y: point.y,
+        heading: null,
+        kind: "pin",
+        role: "pin",
+        farmColor: null,
+        label: pin.name,
+        icon: null,
+        active: false,
+        priority: 50,
+        busy: null,
+      })
     }
     return next
   }, [frame, pin, placeColor, places, players, vehicleIcon, vehicleRole, vehicles])
@@ -637,19 +678,33 @@ function LiveCanvas({
     })
     for (let i = 0; i < pool.length; i += 1) {
       if (used[i]) continue
-      const group = [i]
-      const origin = stageOf(pool[i])
-      for (let j = i + 1; j < pool.length; j += 1) {
-        if (used[j]) continue
-        const other = stageOf(pool[j])
-        if (Math.hypot(origin.x - other.x, origin.y - other.y) * Math.max(zoom, 1) > 18) continue
-        used[j] = true
-        group.push(j)
+      used[i] = true
+      const group = [pool[i]]
+      if (pool[i].kind === "vehicle") {
+        const origin = stageOf(pool[i])
+        for (let j = i + 1; j < pool.length; j += 1) {
+          if (used[j] || pool[j].kind !== "vehicle") continue
+          const other = stageOf(pool[j])
+          if (Math.hypot(origin.x - other.x, origin.y - other.y) * Math.max(zoom, 1) > 48) continue
+          used[j] = true
+          group.push(pool[j])
+        }
       }
-      const leadIndex = group.find((index) => pool[index].kind === "vehicle") ?? group[0]
-      const lead = pool[leadIndex]
-      placed.push(group.length > 1 ? { ...lead, count: group.length } : lead)
+      const lead = [...group].sort((a, b) => b.priority - a.priority || Number(b.active) - Number(a.active))[0]
+      if (group.length > 1) {
+        placed.push({
+          ...lead,
+          key: `c:${group.map((item) => item.key).sort().join("|")}`,
+          count: group.length,
+          members: group,
+          active: false,
+          priority: Math.max(...group.map((item) => item.priority)),
+        })
+      } else {
+        placed.push(lead)
+      }
     }
+    placed.sort((a, b) => a.priority - b.priority)
     return placed
   }, [markers, selected, sheet, zoom])
 
@@ -705,6 +760,43 @@ function LiveCanvas({
           <Minus className="icon" />
         </button>
       </div>
+      {cluster && cluster.length > 0 ? (
+        <section className="live-cluster">
+          <header>
+            <div>
+              <strong>{t("live.cluster", { count: cluster.length })}</strong>
+              <small>{t("live.clusterHint")}</small>
+            </div>
+            <button type="button" onClick={() => setCluster(null)} aria-label="×">
+              ×
+            </button>
+          </header>
+          <ul>
+            {[...cluster]
+              .sort((a, b) => b.priority - a.priority || a.label.localeCompare(b.label))
+              .map((member) => (
+                <li key={member.key}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCluster(null)
+                      onSelect(member.key)
+                    }}
+                  >
+                    {member.icon ? <img src={member.icon} alt="" /> : <RoleIcon role={member.role} />}
+                    <span>
+                      <strong>{member.label}</strong>
+                      <small>
+                        {t(`live.role.${member.role}`)}
+                        {member.busy === "ai" ? ` · ${t("live.ai")}` : member.busy === "moving" ? ` · ${t("live.moving")}` : member.busy ? ` · ${member.busy}` : ""}
+                      </small>
+                    </span>
+                  </button>
+                </li>
+              ))}
+          </ul>
+        </section>
+      ) : null}
       <div
         ref={viewportRef}
         className={dragging ? "fields-viewport is-drag" : "fields-viewport"}
@@ -736,6 +828,12 @@ function LiveCanvas({
             .find((node) => node instanceof Element && node.closest("[data-marker]"))
           const node = hit instanceof Element ? hit.closest("[data-marker]") : null
           const id = node?.getAttribute("data-marker") ?? ""
+          if (id.startsWith("c:")) {
+            const found = draw.find((marker) => marker.key === id)
+            setCluster(found?.members ?? null)
+            return
+          }
+          setCluster(null)
           onSelect(id)
         }}
       >
@@ -794,28 +892,38 @@ function LiveCanvas({
               const on = marker.key === selected
               const rotation = marker.heading == null ? 0 : (-marker.heading * 180) / Math.PI
               const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
-              const mark = toMap(marker.icon ? (on ? 28 : 24) : on ? 20 : 16)
+              const piled = (marker.count ?? 0) > 1
+              const base = piled ? 36 : marker.role === "tool" || marker.role === "trailer" || marker.role === "pallet" ? 22 : marker.role === "building" || marker.role === "player" ? 20 : 30
+              const mark = toMap(on ? base + 4 : base)
+              const ring = marker.farmColor || (marker.role === "player" ? "#f4f1e8" : "#8e9890")
+              const showArrow = marker.active && marker.heading != null && !piled
               return (
                 <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.role} is-on` : `live-marker is-${marker.role}`} transform={`translate(${marker.x} ${marker.y})`}>
-                  <g transform={`rotate(${marker.icon ? 0 : rotation}) scale(${mark})`}>
-                    <circle r="1.08" className="live-marker-plate" />
+                  <g transform={`scale(${mark})`}>
+                    {showArrow ? (
+                      <path className="live-heading" transform={`rotate(${rotation})`} d="M0,-1.78 L0.46,-1.02 L-0.46,-1.02 Z" style={{ fill: ring, stroke: "#101410", strokeWidth: 0.08 }} />
+                    ) : null}
+                    <circle r="1.16" style={{ fill: ring }} />
+                    <circle r="0.94" className="live-marker-plate" />
                     {marker.icon ? (
-                      <image href={marker.icon} x="-0.78" y="-0.78" width="1.56" height="1.56" clipPath="url(#live-icon-clip)" />
+                      <image href={marker.icon} x="-0.86" y="-0.86" width="1.72" height="1.72" clipPath="url(#live-icon-clip)" />
                     ) : (
-                      <MarkerGlyph role={marker.role} />
+                      <g className="live-glyph">
+                        <MarkerGlyph role={marker.role} />
+                      </g>
                     )}
-                    <circle r="1.08" className="live-marker-rim" />
-                    {marker.farmColor ? <circle className="live-marker-farm" cx="0.74" cy="0.74" r="0.32" style={{ fill: marker.farmColor }} /> : null}
+                    {on ? <circle r="1.16" className="live-marker-rim" /> : null}
                   </g>
-                  {marker.count && marker.count > 1 ? (
-                    <g className="live-count" transform={`translate(${toMap(9)} ${toMap(-9)}) scale(${toMap(11)})`}>
-                      <text textAnchor="middle" y="0.35">
+                  {piled ? (
+                    <g className="live-count" transform={`translate(${toMap(12)} ${toMap(-12)}) scale(${toMap(13)})`}>
+                      <circle r="0.78" />
+                      <text textAnchor="middle" y="0.34">
                         {marker.count}
                       </text>
                     </g>
                   ) : null}
                   {on && marker.label ? (
-                    <g className="live-caption" transform={`translate(0 ${-toMap(18)}) scale(${toMap(12)})`}>
+                    <g className="live-caption" transform={`translate(0 ${-toMap(22)}) scale(${toMap(12)})`}>
                       <text textAnchor="middle" y="0">
                         {marker.label}
                       </text>

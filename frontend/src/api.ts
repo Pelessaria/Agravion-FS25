@@ -188,6 +188,8 @@ export type StorageFill = {
   level: number | null
   capacity: number | null
   count: number | null
+  form?: string | null
+  size?: string | null
 }
 
 export type StoragePlace = {
@@ -226,6 +228,7 @@ export type LiveVehicle = {
   heading: number | null
   ai: boolean
   driver: string | null
+  controlled?: boolean
 }
 
 export type LivePlayer = {
