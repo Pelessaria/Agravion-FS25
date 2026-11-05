@@ -1131,7 +1131,7 @@ final class ConnectorSnapshotService
         }
 
         $marker = $dir.'/overview.failed';
-        if (is_file($marker) && time() - (int) filemtime($marker) < 30) {
+        if (is_file($marker) && time() - (int) filemtime($marker) < 600) {
             return;
         }
 

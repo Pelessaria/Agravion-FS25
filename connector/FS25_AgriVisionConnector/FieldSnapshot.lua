@@ -1380,11 +1380,14 @@ local function rememberTramline(index, farmlandId, row)
     if direction == nil then
         direction = num(row.direction)
     end
-    local spacing = num(row.spacing) or width
+    local spacing = num(row.spacing)
+    if spacing == nil or spacing < 8 or spacing > 80 then
+        spacing = width
+    end
     if width == nil or direction == nil or spacing == nil then
         return
     end
-    if width < 8 or spacing < 8 or spacing > 80 then
+    if width < 8 or width > 80 then
         return
     end
     index[farmlandId] = { width = width, direction = direction, spacing = spacing }

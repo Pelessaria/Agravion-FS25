@@ -39,8 +39,14 @@ final class TramlineSettingsParser
             }
             $direction = self::floatAttr($attrs, 'workDirection') ?? self::floatAttr($attrs, 'direction');
             $spacing = self::floatAttr($attrs, 'spacing') ?? $width;
+            // The save often stores the creating implement's width (a few metres)
+            // in spacing, while the tracks a sprayer follows are the working width.
             if ($spacing < 8 || $spacing > 80) {
-                continue;
+                $spacing = $width;
+            }
+            // workDirection on the save is degrees. Tracks use sin/cos, which want radians.
+            if ($direction !== null && abs($direction) > 2 * M_PI) {
+                $direction = deg2rad($direction);
             }
             $out[(string) $id] = [
                 'width' => $width,

@@ -3,6 +3,7 @@
 namespace App\Services\Fs25;
 
 use App\Models\HostAccess;
+use League\Flysystem\FileAttributes;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\PhpseclibV3\SftpAdapter;
@@ -154,6 +155,44 @@ final class HostFileClient
             sort($names);
 
             return array_values(array_unique($names));
+        } catch (Throwable $e) {
+            throw new RuntimeException(
+                HostConnectionError::format($e, 'Listing '.$path.' @ '.$this->endpointLabel()),
+                0,
+                $e
+            );
+        }
+    }
+
+    /**
+     * One directory listing with sizes. Missing sizes stay null instead of a SIZE per file.
+     *
+     * @return list<array{name: string, bytes: int|null, dir: bool}>
+     */
+    public function listEntries(string $path = ''): array
+    {
+        try {
+            if ($this->ftp) {
+                return $this->ftp->listEntries($path);
+            }
+
+            $path = $this->normalizePath($path);
+            $listing = $this->sftp()->listContents($path === '' ? '' : $path, false);
+            $entries = [];
+            /** @var StorageAttributes $item */
+            foreach ($listing as $item) {
+                $name = basename(str_replace('\\', '/', $item->path()));
+                if ($name === '' || $name === '.' || $name === '..') {
+                    continue;
+                }
+                $entries[] = [
+                    'name' => $name,
+                    'bytes' => $item instanceof FileAttributes ? $item->fileSize() : null,
+                    'dir' => $item->isDir(),
+                ];
+            }
+
+            return $entries;
         } catch (Throwable $e) {
             throw new RuntimeException(
                 HostConnectionError::format($e, 'Listing '.$path.' @ '.$this->endpointLabel()),

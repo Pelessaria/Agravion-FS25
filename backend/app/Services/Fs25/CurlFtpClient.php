@@ -23,6 +23,8 @@ final class CurlFtpClient
     /** @var 'ftp'|'ftps_explicit'|'ftps_implicit' */
     private string $mode;
 
+    private ?\CurlHandle $handle = null;
+
     public function __construct(HostAccess $access)
     {
         if (! function_exists('curl_init')) {
@@ -49,6 +51,11 @@ final class CurlFtpClient
         } else {
             throw new RuntimeException('CurlFtpClient unterstützt nur ftp/ftps.');
         }
+    }
+
+    public function __destruct()
+    {
+        $this->closeHandle();
     }
 
     /**
@@ -94,6 +101,19 @@ final class CurlFtpClient
         $body = $this->exec($url, [], 'LIST '.$path);
 
         return $this->parseListBody($body);
+    }
+
+    /**
+     * One LIST. Names and sizes come from that listing, not from SIZE per file.
+     *
+     * @return list<array{name: string, bytes: int|null, dir: bool}>
+     */
+    public function listEntries(string $path = ''): array
+    {
+        $url = $this->urlForPath($path, true);
+        $body = $this->exec($url, [], 'LIST '.$path);
+
+        return $this->parseListEntries($body);
     }
 
     public function delete(string $path): void
@@ -157,7 +177,10 @@ final class CurlFtpClient
             return 0;
         });
         $body = curl_exec($ch);
-        curl_close($ch);
+        $errno = curl_errno($ch);
+        if ($errno !== 0) {
+            $this->closeHandle();
+        }
         $size = null;
         if (preg_match('/\b213\s+(\d+)/', $reply, $match)) {
             $size = (int) $match[1];
@@ -213,6 +236,97 @@ final class CurlFtpClient
         }
 
         return array_values(array_unique($out));
+    }
+
+    /**
+     * @return list<array{name: string, bytes: int|null, dir: bool}>
+     */
+    private function parseListEntries(string $body): array
+    {
+        $lines = preg_split('/\r\n|\n|\r/', trim($body)) ?: [];
+        $out = [];
+        $seen = [];
+        foreach ($lines as $line) {
+            $line = rtrim($line);
+            if ($line === '') {
+                continue;
+            }
+            $entry = $this->entryFromListLine($line);
+            if ($entry === null || isset($seen[$entry['name']])) {
+                continue;
+            }
+            $seen[$entry['name']] = true;
+            $out[] = $entry;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{name: string, bytes: int|null, dir: bool}|null
+     */
+    private function entryFromListLine(string $line): ?array
+    {
+        if (preg_match('/^((?:[a-z0-9.]+=[^;]*;)+)\s*(.+)$/i', $line, $m) === 1
+            && preg_match('/(?:^|;)type=([^;]+)/i', $m[1], $type) === 1) {
+            $kind = strtolower($type[1]);
+            if ($kind === 'cdir' || $kind === 'pdir') {
+                return null;
+            }
+            $name = $this->cleanListName($m[2]);
+            if ($name === null) {
+                return null;
+            }
+            $bytes = preg_match('/(?:^|;)size=(\d+)/i', $m[1], $size) === 1 ? (int) $size[1] : null;
+
+            return ['name' => $name, 'bytes' => $bytes, 'dir' => $kind === 'dir'];
+        }
+
+        if (preg_match('/^\d{2}-\d{2}-\d{2}\s+\d{1,2}:\d{2}(?:AM|PM)\s+(<DIR>|\d+)\s+(.+)$/i', $line, $m) === 1) {
+            $name = $this->cleanListName($m[2]);
+            if ($name === null) {
+                return null;
+            }
+
+            return [
+                'name' => $name,
+                'bytes' => strcasecmp($m[1], '<DIR>') === 0 ? null : (int) $m[1],
+                'dir' => strcasecmp($m[1], '<DIR>') === 0,
+            ];
+        }
+
+        if (preg_match('/^([bcdlps-])[rwxstSTlL-]{9}\s+\d+\s+\S+\s+\S+\s+(\d+)\s+\S+\s+\d+\s+(?:\d{1,2}:\d{2}|\d{4})\s+(.+)$/', $line, $m) === 1) {
+            $name = $this->cleanListName($m[3]);
+            if ($name === null) {
+                return null;
+            }
+
+            return [
+                'name' => $name,
+                'bytes' => $m[1] === 'd' ? null : (int) $m[2],
+                'dir' => $m[1] === 'd',
+            ];
+        }
+
+        $name = $this->nameFromListLine($line);
+        if ($name === null) {
+            return null;
+        }
+
+        return ['name' => $name, 'bytes' => null, 'dir' => str_starts_with($line, 'd') || str_contains($line, '<DIR>')];
+    }
+
+    private function cleanListName(string $raw): ?string
+    {
+        $name = trim($raw);
+        if (str_contains($name, ' -> ')) {
+            $name = trim(explode(' -> ', $name, 2)[0]);
+        }
+        if ($name === '' || $name === '.' || $name === '..') {
+            return null;
+        }
+
+        return $name;
     }
 
     private function looksLikeListLine(string $line): bool
@@ -366,7 +480,9 @@ final class CurlFtpClient
         $errno = curl_errno($ch);
         $error = curl_error($ch);
         $size = (int) curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
-        curl_close($ch);
+        if ($errno !== 0) {
+            $this->closeHandle();
+        }
         if ($errno !== 0 || $size < 0) {
             $detail = $error !== '' ? $error : "cURL errno {$errno}";
             throw new RuntimeException('SIZE '.$path.' fehlgeschlagen: '.$detail);
@@ -399,7 +515,9 @@ final class CurlFtpClient
         curl_exec($ch);
         $errno = curl_errno($ch);
         $error = curl_error($ch);
-        curl_close($ch);
+        if ($errno !== 0) {
+            $this->closeHandle();
+        }
         // Returning 0 from the write callback aborts with CURLE_WRITE_ERROR once the slice is full.
         if ($errno !== 0 && $errno !== 23) {
             $detail = $error !== '' ? $error : "cURL errno {$errno}";
@@ -426,7 +544,9 @@ final class CurlFtpClient
         $error = curl_error($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         $primary = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        if ($body === false || $errno !== 0) {
+            $this->closeHandle();
+        }
 
         if ($body === false || $errno !== 0) {
             $detail = $error !== '' ? $error : "cURL errno {$errno}";
@@ -447,12 +567,19 @@ final class CurlFtpClient
 
     private function open(string $url): \CurlHandle
     {
-        $ch = curl_init($url);
-        if ($ch === false) {
-            throw new RuntimeException('cURL init fehlgeschlagen.');
+        if ($this->handle instanceof \CurlHandle) {
+            curl_reset($this->handle);
+            $ch = $this->handle;
+        } else {
+            $ch = curl_init();
+            if ($ch === false) {
+                throw new RuntimeException('FTP-Verbindung konnte nicht geöffnet werden.');
+            }
+            $this->handle = $ch;
         }
 
         $opts = [
+            CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_USERPWD => $this->username.':'.$this->password,
             CURLOPT_TIMEOUT => 45,
@@ -477,6 +604,14 @@ final class CurlFtpClient
         curl_setopt_array($ch, $opts);
 
         return $ch;
+    }
+
+    private function closeHandle(): void
+    {
+        if ($this->handle instanceof \CurlHandle) {
+            curl_close($this->handle);
+        }
+        $this->handle = null;
     }
 
     private function urlForPath(string $path, bool $asDirectory): string

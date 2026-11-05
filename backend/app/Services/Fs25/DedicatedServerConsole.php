@@ -685,8 +685,11 @@ final class DedicatedServerConsole
         $client = new HostFileClient($access);
         $dir = trim(ConnectorDeployService::resolveModsDirectory($client, $access), '/');
         $listed = [];
-        foreach ($client->listNames($dir) as $name) {
-            $listed[strtolower($name)] = $name;
+        foreach ($client->listEntries($dir) as $entry) {
+            if ($entry['dir']) {
+                continue;
+            }
+            $listed[strtolower($entry['name'])] = $entry;
         }
         $paths = [];
         $total = 0;
@@ -695,8 +698,11 @@ final class DedicatedServerConsole
             if ($found === null) {
                 throw new RuntimeException($name.' liegt nicht im Mods-Ordner.');
             }
-            $path = $dir.'/'.$this->safeZip($found);
-            $size = $client->fileSize($path);
+            $path = $dir.'/'.$this->safeZip($found['name']);
+            $size = $found['bytes'];
+            if ($size === null) {
+                $size = $client->fileSize($path);
+            }
             if ($size > self::MAX_BYTES) {
                 throw new RuntimeException($name.' ist größer als 80 MB.');
             }
@@ -704,7 +710,7 @@ final class DedicatedServerConsole
             if ($total > self::MAX_BYTES * 3) {
                 throw new RuntimeException('Die Auswahl ist größer als 240 MB.');
             }
-            $paths[$this->safeZip($found)] = $path;
+            $paths[$this->safeZip($found['name'])] = $path;
         }
         $tmp = tempnam(sys_get_temp_dir(), 'avmods');
         if ($tmp === false) {
@@ -920,20 +926,34 @@ final class DedicatedServerConsole
         }
         $reads = 0;
         $deadline = microtime(true) + 25;
+        $failed = $this->versionFailTimes($workspace);
+        $failedDirty = false;
         foreach ($targets as $index) {
             if ($reads >= 8 || microtime(true) > $deadline) {
                 break;
             }
-            $reads++;
             try {
                 $name = $this->safeZip((string) $rows[$index]['name']);
+            } catch (Throwable) {
+                continue;
+            }
+            $key = strtolower($name);
+            if (isset($failed[$key]) && time() - (int) $failed[$key] < 600) {
+                continue;
+            }
+            $reads++;
+            try {
                 $path = $dir.'/'.$name;
                 $xml = ZipModDescReader::xml((int) $rows[$index]['bytes'], static fn (int $offset, int $length): string => $client->readRange($path, $offset, $length));
             } catch (Throwable) {
+                $failed[$key] = time();
+                $failedDirty = true;
                 continue;
             }
             $version = self::modDescVersion(is_string($xml) ? $xml : '');
             if ($version === '') {
+                $failed[$key] = time();
+                $failedDirty = true;
                 continue;
             }
             $shown = trim((string) $rows[$index]['version']);
@@ -943,6 +963,9 @@ final class DedicatedServerConsole
             $rows[$index]['version'] = $version;
             $hub = $rows[$index]['hubVersion'] ?? null;
             $rows[$index]['updateAvailable'] = ModHubCatalog::newer($version, is_string($hub) ? $hub : null);
+        }
+        if ($failedDirty) {
+            $this->writeVersionFailTimes($workspace, $failed);
         }
     }
 
@@ -1025,25 +1048,60 @@ final class DedicatedServerConsole
         }
         try {
             $client = new HostFileClient($access);
+            $listed = [];
+            foreach ($client->listEntries($save) as $entry) {
+                if (($entry['dir'] ?? false) === true) {
+                    continue;
+                }
+                $listed[(string) $entry['name']] = is_int($entry['bytes'] ?? null) ? $entry['bytes'] : null;
+            }
+            $cacheDir = dirname($this->cachePath($workspace)).'/savegame-xml';
+            $cap = 40 * 1024 * 1024;
             $out = [];
             foreach (['vehicles.xml', 'placeables.xml', 'farms.xml', 'careerSavegame.xml', 'items.xml'] as $name) {
-                $path = $save.'/'.$name;
-                if (! $client->fileExists($path)) {
-                    if ($name === 'items.xml' || $name === 'careerSavegame.xml') {
+                $optional = $name === 'items.xml' || $name === 'careerSavegame.xml';
+                if (! array_key_exists($name, $listed)) {
+                    if ($optional) {
                         continue;
                     }
 
                     return null;
                 }
-                $size = $client->fileSize($path);
-                if ($size > 40 * 1024 * 1024) {
+                $size = $listed[$name];
+                if (is_int($size) && $size > $cap) {
                     if ($name === 'items.xml') {
                         continue;
                     }
 
                     return null;
                 }
-                $out[$name] = $client->read($path);
+                $cached = $cacheDir.'/'.$name;
+                $stamp = $cached.'.bytes';
+                if (is_int($size) && is_file($cached) && is_file($stamp)
+                    && (int) trim((string) file_get_contents($stamp)) === $size) {
+                    $body = file_get_contents($cached);
+                    if (is_string($body) && $body !== '') {
+                        $out[$name] = $body;
+
+                        continue;
+                    }
+                }
+                $body = $client->read($save.'/'.$name);
+                if (strlen($body) > $cap) {
+                    if ($name === 'items.xml') {
+                        continue;
+                    }
+
+                    return null;
+                }
+                if (! is_dir($cacheDir) && ! mkdir($cacheDir, 0775, true) && ! is_dir($cacheDir)) {
+                    $out[$name] = $body;
+
+                    continue;
+                }
+                file_put_contents($cached, $body);
+                file_put_contents($stamp, (string) strlen($body));
+                $out[$name] = $body;
             }
         } catch (Throwable) {
             return null;
@@ -1106,7 +1164,7 @@ final class DedicatedServerConsole
                 && $mapBytes !== null && (int) ($cachedMap['bytes'] ?? -1) === $mapBytes) {
                 $dependencies = array_values(array_filter($cachedDeps, 'is_string'));
             } else {
-                $xml = $this->readModDesc($client, $modsDir, $mapName);
+                $xml = $this->readModDesc($client, $modsDir, $mapName, $mapBytes);
                 $reads++;
                 if (is_string($xml)) {
                     $dependencies = SavegameUsage::dependencies($xml);
@@ -1139,7 +1197,7 @@ final class DedicatedServerConsole
             if ($reads >= 8 || microtime(true) > $deadline) {
                 continue;
             }
-            $xml = $this->readModDesc($client, $modsDir, $filename);
+            $xml = $this->readModDesc($client, $modsDir, $filename, $bytes);
             $reads++;
             if (! is_string($xml)) {
                 continue;
@@ -1186,15 +1244,19 @@ final class DedicatedServerConsole
         return ['dependencies' => $dependencies, 'store' => $store];
     }
 
-    private function readModDesc(HostFileClient $client, string $modsDir, string $filename): ?string
+    private function readModDesc(HostFileClient $client, string $modsDir, string $filename, ?int $knownBytes = null): ?string
     {
         try {
             $safe = $this->safeZip($filename);
             $remote = $modsDir.'/'.$safe;
-            if (! $client->fileExists($remote)) {
-                return null;
+            if ($knownBytes === null || $knownBytes < 1) {
+                if (! $client->fileExists($remote)) {
+                    return null;
+                }
+                $size = $client->fileSize($remote);
+            } else {
+                $size = $knownBytes;
             }
-            $size = $client->fileSize($remote);
             if ($size < 22 || $size > 2_000_000_000) {
                 return null;
             }
@@ -1847,6 +1909,10 @@ final class DedicatedServerConsole
      */
     private function ftpMods(Workspace $workspace): array
     {
+        $cached = $this->readModListCache($workspace);
+        if ($cached !== null) {
+            return $cached;
+        }
         $access = $workspace->hostAccess;
         if ($access === null) {
             return [];
@@ -1854,25 +1920,24 @@ final class DedicatedServerConsole
         $client = new HostFileClient($access);
         $dir = ConnectorDeployService::resolveModsDirectory($client, $access);
         $mods = [];
-        foreach ($client->listNames($dir) as $name) {
+        foreach ($client->listEntries($dir) as $entry) {
+            if (($entry['dir'] ?? false) === true) {
+                continue;
+            }
+            $name = (string) ($entry['name'] ?? '');
             if (preg_match('/\.zip$/i', $name) !== 1) {
                 continue;
             }
-            $safe = $this->safeZip($name);
-            $path = trim($dir, '/').'/'.$safe;
-            $bytes = null;
-            try {
-                $bytes = $client->fileSize($path);
-            } catch (Throwable) {
-                $bytes = null;
-            }
             $mods[] = [
-                'name' => $safe,
-                'bytes' => $bytes,
+                'name' => $this->safeZip($name),
+                'bytes' => is_int($entry['bytes'] ?? null) ? $entry['bytes'] : null,
                 'active' => null,
                 'source' => 'ftp',
                 'download' => true,
             ];
+        }
+        if ($mods !== []) {
+            $this->writeModListCache($workspace, $mods);
         }
 
         return $mods;
@@ -2043,6 +2108,83 @@ final class DedicatedServerConsole
     private function cachePath(Workspace $workspace): string
     {
         return storage_path('app/connector/'.$workspace->public_id.'/state/server_console.json');
+    }
+
+    /**
+     * @return list<array<string, mixed>>|null
+     */
+    private function readModListCache(Workspace $workspace): ?array
+    {
+        $path = dirname($this->cachePath($workspace)).'/mods_list.json';
+        if (! is_file($path) || time() - (int) filemtime($path) > 900) {
+            return null;
+        }
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (! is_array($decoded) || $decoded === []) {
+            return null;
+        }
+        $mods = [];
+        foreach ($decoded as $row) {
+            if (! is_array($row) || ! is_string($row['name'] ?? null) || $row['name'] === '') {
+                return null;
+            }
+            $mods[] = $row;
+        }
+
+        return $mods;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $mods
+     */
+    private function writeModListCache(Workspace $workspace, array $mods): void
+    {
+        $path = dirname($this->cachePath($workspace)).'/mods_list.json';
+        if (! is_dir(dirname($path))) {
+            mkdir(dirname($path), 0775, true);
+        }
+        file_put_contents($path, json_encode(array_values($mods), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function versionFailTimes(Workspace $workspace): array
+    {
+        $path = dirname($this->cachePath($workspace)).'/mod_version_fail.json';
+        if (! is_file($path)) {
+            return [];
+        }
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (! is_array($decoded)) {
+            return [];
+        }
+        $out = [];
+        foreach ($decoded as $name => $at) {
+            if (is_string($name) && is_int($at) && time() - $at < 3600) {
+                $out[$name] = $at;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, int>  $times
+     */
+    private function writeVersionFailTimes(Workspace $workspace, array $times): void
+    {
+        $path = dirname($this->cachePath($workspace)).'/mod_version_fail.json';
+        if (! is_dir(dirname($path))) {
+            mkdir(dirname($path), 0775, true);
+        }
+        $keep = [];
+        foreach ($times as $name => $at) {
+            if (is_string($name) && is_int($at) && time() - $at < 3600) {
+                $keep[$name] = $at;
+            }
+        }
+        file_put_contents($path, json_encode($keep, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     /**

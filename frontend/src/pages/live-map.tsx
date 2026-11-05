@@ -31,6 +31,7 @@ type Marker = {
   role: MarkerRole
   farmColor: string | null
   label: string
+  count?: number
 }
 
 const ROLES: MarkerRole[] = ["tractor", "harvester", "trailer", "tool", "pallet", "building", "player"]
@@ -545,12 +546,10 @@ function LiveCanvas({
   }, [frame, pin, placeColor, places, players, vehicleRole, vehicles])
 
   const draw = useMemo(() => {
-    const threshold = 26
     const kept = markers.filter((marker) => marker.key === selected || marker.kind === "pin")
     const pool = markers.filter((marker) => marker.key !== selected && marker.kind !== "pin")
     const used = new Array(pool.length).fill(false)
-    const singles: Marker[] = [...kept]
-    const clusters: { key: string; x: number; y: number; count: number; color: string | null; role: MarkerRole }[] = []
+    const placed: Marker[] = [...kept]
     const stageOf = (marker: Marker) => ({
       x: sheet.left + (marker.x / 100) * sheet.size,
       y: sheet.top + (marker.y / 100) * sheet.size,
@@ -561,32 +560,16 @@ function LiveCanvas({
       const origin = stageOf(pool[i])
       for (let j = i + 1; j < pool.length; j += 1) {
         if (used[j]) continue
-        if (pool[j].role !== pool[i].role || pool[j].farmColor !== pool[i].farmColor) continue
         const other = stageOf(pool[j])
-        if (Math.hypot(origin.x - other.x, origin.y - other.y) * Math.max(zoom, 1) > threshold) continue
+        if (Math.hypot(origin.x - other.x, origin.y - other.y) * Math.max(zoom, 1) > 18) continue
         used[j] = true
         group.push(j)
       }
-      if (group.length === 1) {
-        singles.push(pool[i])
-        continue
-      }
-      let sx = 0
-      let sy = 0
-      for (const index of group) {
-        sx += pool[index].x
-        sy += pool[index].y
-      }
-      clusters.push({
-        key: `c:${pool[group[0]].key}`,
-        x: sx / group.length,
-        y: sy / group.length,
-        count: group.length,
-        color: pool[i].farmColor,
-        role: pool[i].role,
-      })
+      const leadIndex = group.find((index) => pool[index].kind === "vehicle") ?? group[0]
+      const lead = pool[leadIndex]
+      placed.push(group.length > 1 ? { ...lead, count: group.length } : lead)
     }
-    return { singles, clusters }
+    return placed
   }, [markers, selected, sheet, zoom])
 
   const focused = useRef<string | null>(null)
@@ -672,14 +655,6 @@ function LiveCanvas({
             .find((node) => node instanceof Element && node.closest("[data-marker]"))
           const node = hit instanceof Element ? hit.closest("[data-marker]") : null
           const id = node?.getAttribute("data-marker") ?? ""
-          if (id.startsWith("c:")) {
-            const cluster = draw.clusters.find((item) => item.key === id)
-            if (!cluster) return
-            const px = sheet.left + (cluster.x / 100) * sheet.size
-            const py = sheet.top + (cluster.y / 100) * sheet.size
-            zoomAt(cam.current.k * 1.8, cam.current.x + px * cam.current.k, cam.current.y + py * cam.current.k)
-            return
-          }
           onSelect(id)
         }}
       >
@@ -711,20 +686,7 @@ function LiveCanvas({
             {shapes.map((points, index) => (
               <polygon key={`shape-${index}`} className="live-field" points={points} />
             ))}
-            {draw.clusters.map((cluster) => {
-              const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
-              return (
-                <g key={cluster.key} data-marker={cluster.key} className={`live-cluster is-${cluster.role}`} transform={`translate(${cluster.x} ${cluster.y})`}>
-                  <circle r={toMap(15)} style={cluster.color ? { stroke: cluster.color } : undefined} />
-                  <g transform={`scale(${toMap(12)})`}>
-                    <text textAnchor="middle" y="0.35">
-                      {cluster.count}
-                    </text>
-                  </g>
-                </g>
-              )
-            })}
-            {draw.singles.map((marker) => {
+            {draw.map((marker) => {
               const on = marker.key === selected
               const rotation = marker.heading == null ? 0 : (-marker.heading * 180) / Math.PI
               const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
@@ -733,8 +695,15 @@ function LiveCanvas({
                 <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.role} is-on` : `live-marker is-${marker.role}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`rotate(${rotation}) scale(${mark})`}>
                     <MarkerGlyph role={marker.role} />
-                    <circle className={marker.farmColor ? "live-marker-ring is-farm" : "live-marker-ring"} r="0.96" style={marker.farmColor ? { stroke: marker.farmColor } : undefined} />
+                    <circle className={marker.farmColor ? "live-marker-ring is-farm" : "live-marker-ring"} r="1.02" style={marker.farmColor ? { stroke: marker.farmColor } : undefined} />
                   </g>
+                  {marker.count && marker.count > 1 ? (
+                    <g className="live-count" transform={`translate(${toMap(9)} ${toMap(-9)}) scale(${toMap(11)})`}>
+                      <text textAnchor="middle" y="0.35">
+                        {marker.count}
+                      </text>
+                    </g>
+                  ) : null}
                   {on && marker.label ? (
                     <g className="live-caption" transform={`translate(0 ${-toMap(18)}) scale(${toMap(12)})`}>
                       <text textAnchor="middle" y="0">

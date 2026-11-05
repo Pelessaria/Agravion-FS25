@@ -25,20 +25,34 @@ final class MapOverviewExtractor
         }
 
         $modsDir = ConnectorDeployService::resolveModsDirectory($client, $access);
-        $zipName = $this->chooseZip($client->listNames($modsDir), $mapName);
+        $names = [];
+        $bytesByName = [];
+        foreach ($client->listEntries($modsDir) as $entry) {
+            if (($entry['dir'] ?? false) === true) {
+                continue;
+            }
+            $name = (string) ($entry['name'] ?? '');
+            if ($name === '') {
+                continue;
+            }
+            $names[] = $name;
+            $bytesByName[$name] = is_int($entry['bytes'] ?? null) ? $entry['bytes'] : null;
+        }
+        $zipName = $this->chooseZip($names, $mapName);
         if ($zipName === null) {
-        $zips = array_values(array_filter(
-            $names,
-            static fn (string $name): bool => str_ends_with(strtolower($name), '.zip'),
-        ));
-        throw new RuntimeException(
-            'Keine Map-Zip zu „'.$mapName.'“ in '.$modsDir
-            .' ('.implode(', ', array_slice($zips, 0, 12)).')'
-        );
+            $zips = array_values(array_filter(
+                $names,
+                static fn (string $name): bool => str_ends_with(strtolower($name), '.zip'),
+            ));
+            throw new RuntimeException(
+                'Keine Map-Zip zu „'.$mapName.'“ in '.$modsDir
+                .' ('.implode(', ', array_slice($zips, 0, 12)).')'
+            );
         }
 
         $path = trim($modsDir, '/').'/'.$zipName;
-        $entries = $this->overviewEntries($client, $path);
+        $known = $bytesByName[$zipName] ?? null;
+        $entries = $this->overviewEntries($client, $path, is_int($known) ? $known : null);
         if ($entries === []) {
             throw new RuntimeException($zipName.' enthält kein overview.dds/png');
         }
@@ -109,9 +123,9 @@ final class MapOverviewExtractor
     /**
      * @return list<array{name: string, method: int, compressed: int, uncompressed: int, offset: int}>
      */
-    private function overviewEntries(HostFileClient $client, string $path): array
+    private function overviewEntries(HostFileClient $client, string $path, ?int $knownSize = null): array
     {
-        $size = $client->fileSize($path);
+        $size = $knownSize ?? $client->fileSize($path);
         if ($size < 22) {
             return [];
         }

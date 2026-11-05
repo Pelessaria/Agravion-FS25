@@ -236,7 +236,10 @@ final class ConnectorFieldsParser
         $width = (float) $parts[0];
         $direction = (float) $parts[1];
         $spacing = isset($parts[2]) && is_numeric($parts[2]) ? (float) $parts[2] : $width;
-        if ($width < 8 || $width > 80 || $spacing < 8 || $spacing > 80 || ! is_finite($direction)) {
+        if ($spacing < 8 || $spacing > 80) {
+            $spacing = $width;
+        }
+        if ($width < 8 || $width > 80 || ! is_finite($direction)) {
             return null;
         }
 

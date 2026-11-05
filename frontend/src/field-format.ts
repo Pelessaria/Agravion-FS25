@@ -267,7 +267,8 @@ function pointInPolygon(x: number, z: number, points: [number, number][]) {
  * outline, so a concave field keeps only the pieces that sit on the parcel.
  */
 export function tramlineTracks(points: [number, number][], tram: Tramline, frame: MapFrame): string[] {
-  if (points.length < 3 || !(tram.spacing >= 8) || !(tram.spacing <= 80) || !Number.isFinite(tram.direction)) {
+  const spacing = tram.spacing >= 8 && tram.spacing <= 80 ? tram.spacing : tram.width
+  if (points.length < 3 || !(spacing >= 8) || !(spacing <= 80) || !Number.isFinite(tram.direction)) {
     return []
   }
   const dx = Math.sin(tram.direction)
@@ -289,10 +290,10 @@ export function tramlineTracks(points: [number, number][], tram: Tramline, frame
   const span = maxA - minA
   if (!(span >= 4) || !(maxP > minP)) return []
   const mid = (minP + maxP) / 2
-  const start = mid - Math.floor((mid - minP) / tram.spacing) * tram.spacing
+  const start = mid - Math.floor((mid - minP) / spacing) * spacing
   const step = Math.max(4, Math.min(16, span / 28))
   const lines: string[] = []
-  for (let across = start; across <= maxP + 0.01 && lines.length < 160; across += tram.spacing) {
+  for (let across = start; across <= maxP + 0.01 && lines.length < 160; across += spacing) {
     let run: string[] = []
     const flush = () => {
       if (run.length >= 2) lines.push(run.join(" "))
