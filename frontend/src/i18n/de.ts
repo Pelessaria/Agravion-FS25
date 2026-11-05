@@ -602,7 +602,7 @@ export const de = {
     back: "Zur Instanzverwaltung",
   },
   stock: {
-    lead: "Zuerst der Bestand nach Sorte, darunter jedes Lager mit Füllstand. Annahme nur, wenn dort gerade etwas liegt.",
+    lead: "Jedes Lager mit Füllstand und einem Kartenausschnitt. Ein Klick auf die Karte öffnet die Live Map.",
     updated: "Lagerstand {{time}}",
     loading: "Lager wird gelesen …",
     missingTitle: "Noch kein Lagerstand",

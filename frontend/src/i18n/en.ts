@@ -604,7 +604,7 @@ export const en = {
     back: "Back to Control Center",
   },
   stock: {
-    lead: "Stock by product first, then each store with its fill. Intake points appear only while they hold something.",
+    lead: "Each store with its fill level and a map snippet. Click the map to open the live map.",
     updated: "Stock {{time}}",
     loading: "Reading storage …",
     missingTitle: "No stock yet",

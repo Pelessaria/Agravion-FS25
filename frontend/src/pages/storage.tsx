@@ -334,7 +334,7 @@ function PlaceCard({
               </p>
             </div>
           ) : null}
-          {place.fills.length === 0 ? <p className="hint">{t("stock.emptyPlace")}</p> : null}
+          {place.fills.length === 0 && !(bale && (place.used ?? 0) > 0) ? <p className="hint">{t("stock.emptyPlace")}</p> : null}
           <ul>
             {place.fills.map((fill, index) => {
               const count = fill.count != null ? Math.round(fill.count) : 0
