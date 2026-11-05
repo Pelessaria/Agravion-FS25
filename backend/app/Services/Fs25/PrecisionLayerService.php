@@ -32,6 +32,7 @@ final class PrecisionLayerService
         'plow' => 'infoLayer_plowLevel.grle',
         'roller' => 'infoLayer_rollerLevel.grle',
         'stubble' => 'infoLayer_stubbleShredLevel.grle',
+        'tramline' => 'precisionFarming_tramlineMap.grle',
     ];
 
     /** @var array<int, array{0: float, 1: array{0: int, 1: int, 2: int}}> */
@@ -150,12 +151,15 @@ final class PrecisionLayerService
         if ($image === null) {
             return;
         }
-        $rgb = $this->colorize($layer, $image['pixels']);
         $width = $image['width'];
         $height = $image['height'];
-        unset($image);
         try {
-            $this->png->write($png, $width, $height, $rgb);
+            if ($layer === 'tramline') {
+                $this->png->writeRgba($png, $width, $height, $this->tramlineRgba($image['pixels']));
+            } else {
+                $this->png->write($png, $width, $height, $this->colorize($layer, $image['pixels']));
+            }
+            unset($image);
             file_put_contents($stamp, $hash);
         } catch (Throwable) {
             return;
@@ -228,6 +232,19 @@ final class PrecisionLayerService
         }
 
         return null;
+    }
+
+    private function tramlineRgba(string $pixels): string
+    {
+        $count = strlen($pixels);
+        $rgba = '';
+        $on = "\xF7\xF1\xE4\xE8";
+        $off = "\x00\x00\x00\x00";
+        for ($index = 0; $index < $count; $index++) {
+            $rgba .= ord($pixels[$index]) > 0 ? $on : $off;
+        }
+
+        return $rgba;
     }
 
     private function colorize(string $layer, string $pixels): string

@@ -49,11 +49,11 @@ function share(value: number | null) {
   return `${Math.round(value)}`
 }
 
-function ratioOf(value: number | null) {
-  if (value == null || !Number.isFinite(value) || value < 0) return null
-  if (value <= 1) return value
-  if (value <= 100) return value / 100
-  return null
+function compass(degrees: number, language: string) {
+  const names = language.startsWith("de")
+    ? ["N", "NO", "O", "SO", "S", "SW", "W", "NW"]
+    : ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+  return names[((Math.round(degrees / 45) % 8) + 8) % 8]
 }
 
 function windDegrees(value: number | null) {
@@ -83,7 +83,7 @@ function hasReport(payload: LiveMapResponse | null) {
 }
 
 export function WeatherPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const stamp = useTimeLabel()
   const { liveMode, moduleAccess } = useStore()
   const { workspace, allowed } = useWorkspaceRoute()
@@ -135,60 +135,85 @@ export function WeatherPage() {
       {!loading && !ready ? <EmptyState title={t("weather.missingTitle")} body={t("weather.missingBody")} /> : null}
       {ready && payload ? (
         <>
-          <section className="weather-now">
-            <div className="weather-hero">
-              <SkyMark raw={payload.weather} large />
-              <div className="weather-hero-copy">
-                <span>{conditionLabel(t, payload.weather)}</span>
-                {payload.temperature != null ? <strong>{payload.temperature.toFixed(1)}°</strong> : null}
-                <p>
-                  {[
-                    clock,
-                    payload.day != null ? t("live.day", { day: payload.day }) : null,
-                    month != null ? t(`fields.month.${month}`) : null,
-                    payload.paused ? t("live.paused") : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
+          <section className="weather-top">
+            <article className="panel weather-current">
+              <h2>{t("weather.now")}</h2>
+              <div className="weather-now-row">
+                <SkyMark raw={payload.weather} large />
+                <div className="weather-hero-copy">
+                  {payload.temperature != null ? <strong>{payload.temperature.toFixed(1)} °C</strong> : null}
+                  <span>{conditionLabel(t, payload.weather)}</span>
+                  <p>
+                    {[
+                      clock,
+                      payload.day != null ? t("live.day", { day: payload.day }) : null,
+                      month != null ? t(`fields.month.${month}`) : null,
+                      payload.paused ? t("live.paused") : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
               </div>
-            </div>
-            <dl className="weather-facts">
-              <Fact icon={<Wind />} label={t("weather.wind")} value={payload.windSpeed != null ? String(payload.windSpeed) : null} />
-              <Fact
-                icon={wind != null ? <WindArrow degrees={wind} /> : <Wind />}
-                label={t("weather.direction")}
-                value={wind != null ? `${wind}°` : null}
-              />
-              <Fact icon={<CloudRain />} label={t("weather.rain")} value={share(payload.rain)} ratio={ratioOf(payload.rain)} />
-              <Fact icon={<Cloud />} label={t("weather.clouds")} value={share(payload.clouds)} ratio={ratioOf(payload.clouds)} />
-              <Fact icon={<Droplets />} label={t("weather.humidity")} value={share(payload.humidity)} ratio={ratioOf(payload.humidity)} />
-              <Fact icon={<CloudFog />} label={t("weather.fog")} value={share(payload.fog)} ratio={ratioOf(payload.fog)} />
-              <Fact icon={<Snowflake />} label={t("weather.snow")} value={payload.snow != null ? `${payload.snow}` : null} ratio={ratioOf(payload.snow)} />
-              <Fact icon={<Gauge />} label={t("weather.timeScale")} value={payload.timeScale != null ? `${payload.timeScale}` : null} />
-            </dl>
+              <div className="weather-metrics">
+                <Metric icon={<Wind />} label={t("weather.wind")} value={payload.windSpeed != null ? `${payload.windSpeed}${wind != null ? ` (${compass(wind, i18n.language)})` : ""}` : null} />
+                <Metric icon={<Droplets />} label={t("weather.humidity")} value={share(payload.humidity)} />
+                <Metric icon={<CloudRain />} label={t("weather.rain")} value={share(payload.rain)} />
+                <Metric icon={<Cloud />} label={t("weather.clouds")} value={share(payload.clouds)} />
+              </div>
+            </article>
+            <article className="panel weather-extra">
+              <Extra icon={<WindArrow degrees={wind ?? 0} />} label={t("weather.direction")} value={wind != null ? `${wind}° ${compass(wind, i18n.language)}` : null} />
+              <Extra icon={<CloudFog />} label={t("weather.fog")} value={share(payload.fog)} />
+              <Extra icon={<Snowflake />} label={t("weather.snow")} value={payload.snow != null ? `${payload.snow}` : null} />
+              <Extra icon={<Gauge />} label={t("weather.timeScale")} value={payload.timeScale != null ? `${payload.timeScale}×` : null} />
+            </article>
           </section>
-          {(payload.hours ?? []).length > 0 ? (
-            <section>
-              <h2>{t("weather.hourly")}</h2>
-              <div className="weather-strip">
-                {(payload.hours ?? []).map((hour, index) => (
-                  <HourCard key={`${hour.time ?? "h"}-${index}`} hour={hour} label={conditionLabel(t, hour.type)} />
-                ))}
-              </div>
+          {(payload.days ?? []).length > 0 || (payload.hours ?? []).length > 0 ? (
+            <section className="weather-mid">
+              {(payload.days ?? []).length > 0 ? (
+                <article className="panel">
+                  <h2>{t("weather.forecast")}</h2>
+                  <div className="weather-days">
+                    {(payload.days ?? []).slice(0, 7).map((day, index) => (
+                      <DayCard
+                        key={`${day.day ?? "d"}-${index}`}
+                        day={day}
+                        label={conditionLabel(t, day.type)}
+                        dayLabel={day.day != null ? t("live.day", { day: day.day }) : t("weather.dayAhead", { day: index + 1 })}
+                        today={index === 0}
+                      />
+                    ))}
+                  </div>
+                </article>
+              ) : null}
+              {(payload.days ?? []).some((day) => day.high != null || day.low != null) ? (
+                <article className="panel">
+                  <h2>{t("weather.trend")}</h2>
+                  <Trend days={payload.days ?? []} highLabel={t("weather.high")} lowLabel={t("weather.low")} />
+                </article>
+              ) : null}
             </section>
           ) : null}
-          {(payload.days ?? []).length > 0 ? (
-            <section>
-              <h2>{t("weather.daily")}</h2>
-              <div className="weather-days">
-                {(payload.days ?? []).map((day, index) => (
-                  <DayCard key={`${day.day ?? "d"}-${index}`} day={day} label={conditionLabel(t, day.type)} dayLabel={day.day != null ? t("live.day", { day: day.day }) : t("weather.dayAhead", { day: index + 1 })} />
-                ))}
-              </div>
-            </section>
-          ) : null}
-          <p className="weather-note">{t("weather.precision")}</p>
+          <section className="weather-low">
+            {(payload.hours ?? []).length > 0 ? (
+              <article className="panel">
+                <h2>{t("weather.hourly")}</h2>
+                <div className="weather-hours">
+                  {(payload.hours ?? []).slice(0, 12).map((hour, index) => (
+                    <HourCard key={`${hour.time ?? "h"}-${index}`} hour={hour} label={conditionLabel(t, hour.type)} now={index === 0} />
+                  ))}
+                </div>
+              </article>
+            ) : null}
+            <article className="panel weather-sync">
+              <h2>{t("weather.conditions")}</h2>
+              <p><i />{t("weather.synced")}</p>
+              <p><i />{t("weather.syncGame")}</p>
+              {payload.writtenAt ? <footer>{t("live.updated", { time: stamp(payload.writtenAt, "") })}</footer> : null}
+              <small>{t("weather.precision")}</small>
+            </article>
+          </section>
         </>
       ) : null}
     </div>
@@ -227,46 +252,101 @@ function conditionLabel(t: (key: string) => string, raw: string | null) {
   return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase()
 }
 
-function Fact({ icon, label, value, ratio }: { icon: ReactNode; label: string; value: string | null; ratio?: number | null }) {
-  if (!value) return null
+function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string | null }) {
   return (
-    <div>
+    <div className="weather-metric">
       {icon}
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-      {ratio != null ? (
-        <span className="weather-meter" aria-hidden="true">
-          <i style={{ width: `${Math.round(Math.min(1, Math.max(0, ratio)) * 100)}%` }} />
-        </span>
-      ) : null}
+      <span>{label}</span>
+      <strong>{value ?? "–"}</strong>
     </div>
   )
 }
 
-function HourCard({ hour, label }: { hour: LiveForecastHour; label: string }) {
+function Extra({ icon, label, value }: { icon: ReactNode; label: string; value: string | null }) {
+  return (
+    <div className="weather-extra-item">
+      <div>{icon}</div>
+      <span>{label}</span>
+      <strong>{value ?? "–"}</strong>
+    </div>
+  )
+}
+
+function HourCard({ hour, label, now }: { hour: LiveForecastHour; label: string; now?: boolean }) {
   const when = clockLabel(hour.time)
   return (
-    <article className="weather-card">
+    <article className={now ? "weather-hour is-now" : "weather-hour"}>
+      <time>{when ?? label}</time>
       <SkyMark raw={hour.type} />
-      <span>{when ?? label}</span>
       <strong>{hour.temperature != null ? `${hour.temperature.toFixed(0)}°` : "–"}</strong>
-      <em>{when ? label : null}</em>
-      {hour.windSpeed != null ? <small>{hour.windSpeed}</small> : null}
+      <small>{hour.windSpeed != null ? hour.windSpeed : label}</small>
     </article>
   )
 }
 
-function DayCard({ day, label, dayLabel }: { day: LiveForecastDay; label: string; dayLabel: string }) {
+function DayCard({ day, label, dayLabel, today }: { day: LiveForecastDay; label: string; dayLabel: string; today?: boolean }) {
   return (
-    <article className="weather-card">
-      <SkyMark raw={day.type} />
+    <article className={today ? "weather-day is-today" : "weather-day"}>
       <span>{dayLabel}</span>
-      <strong>
-        {day.high != null ? `${day.high.toFixed(0)}°` : "–"}
-        {day.low != null ? <small> {day.low.toFixed(0)}°</small> : null}
-      </strong>
-      <em>{label}</em>
+      <SkyMark raw={day.type} />
+      <strong>{day.high != null ? `${day.high.toFixed(0)}°` : "–"}</strong>
+      <em>{day.low != null ? `${day.low.toFixed(0)}°` : "–"}</em>
+      <small>{label}</small>
       {day.windSpeed != null ? <small>{day.windSpeed}</small> : null}
     </article>
+  )
+}
+
+function Trend({ days, highLabel, lowLabel }: { days: LiveForecastDay[]; highLabel: string; lowLabel: string }) {
+  const rows = days.slice(0, 7)
+  const highs = rows.map((day) => day.high)
+  const lows = rows.map((day) => day.low)
+  const values = [...highs, ...lows].filter((value): value is number => value != null && Number.isFinite(value))
+  if (values.length === 0) return null
+  const max = Math.max(...values) + 2
+  const min = Math.min(...values) - 2
+  const span = max - min || 1
+  const x = (index: number) => 42 + (index * 430) / Math.max(rows.length - 1, 1)
+  const y = (value: number) => 168 - ((value - min) / span) * 132
+  const path = (series: Array<number | null>) => {
+    let drawing = ""
+    series.forEach((value, index) => {
+      if (value == null) return
+      drawing += `${drawing === "" ? "M" : "L"} ${x(index).toFixed(1)} ${y(value).toFixed(1)} `
+    })
+    return drawing.trim()
+  }
+  return (
+    <div className="weather-chart">
+      <svg viewBox="0 0 500 200" role="img" aria-label={highLabel}>
+        {[0, 1, 2, 3].map((step) => {
+          const value = max - (step * span) / 3
+          const yy = y(value)
+          return (
+            <g key={step}>
+              <line x1="36" y1={yy} x2="486" y2={yy} />
+              <text x="30" y={yy + 3} textAnchor="end">
+                {Math.round(value)}°
+              </text>
+            </g>
+          )
+        })}
+        {rows.map((day, index) => (
+          <text key={`${day.day ?? "t"}-${index}`} x={x(index)} y="190" textAnchor="middle">
+            {day.day ?? index + 1}
+          </text>
+        ))}
+        <path d={path(highs)} className="is-high" />
+        <path d={path(lows)} className="is-low" />
+        {highs.map((value, index) => (value == null ? null : <circle key={`h-${index}`} cx={x(index)} cy={y(value)} r="3.2" className="is-high" />))}
+        {lows.map((value, index) => (value == null ? null : <circle key={`l-${index}`} cx={x(index)} cy={y(value)} r="3.2" className="is-low" />))}
+      </svg>
+      <p>
+        <i className="is-high" />
+        {highLabel}
+        <i className="is-low" />
+        {lowLabel}
+      </p>
+    </div>
   )
 }

@@ -277,6 +277,28 @@ local function worldXZ(placeable)
     return num(x), num(z)
 end
 
+local function usedBuilding(kind)
+    if type(kind) ~= "string" or kind == "" then
+        return false
+    end
+    local upper = string.upper(kind)
+    if string.find(upper, "SILO", 1, true)
+        or string.find(upper, "HUSBAND", 1, true)
+        or string.find(upper, "ANIMAL", 1, true)
+        or string.find(upper, "PRODUCTION", 1, true)
+        or string.find(upper, "SELL", 1, true)
+        or string.find(upper, "UNLOAD", 1, true)
+        or string.find(upper, "LOAD", 1, true)
+        or string.find(upper, "BUNKER", 1, true)
+        or string.find(upper, "BARN", 1, true)
+        or string.find(upper, "STABLE", 1, true)
+        or string.find(upper, "WORKSHOP", 1, true)
+        or string.find(upper, "GARAGE", 1, true) then
+        return true
+    end
+    return false
+end
+
 local function buildingKind(placeable)
     if placeable == nil then
         return nil
@@ -338,13 +360,17 @@ local function appendPlaces(connector, parts, fingerprint)
                     if type(name) ~= "string" or name == "" then
                         name = safeMethod(placeable, "getName")
                     end
+                    local kind = placeTypeName(hotspot) or buildingKind(placeable)
+                    if not usedBuilding(kind) then
+                        return
+                    end
                     local id = placeable.uniqueId or safeMethod(placeable, "getUniqueId") or count
                     local key = tostring(id)
                     if seen[key] then
                         return
                     end
                     seen[key] = true
-                    count = appendPlace(connector, parts, fingerprint, count, id, name, placeTypeName(hotspot) or buildingKind(placeable), farmIdOf(placeable), x, z)
+                    count = appendPlace(connector, parts, fingerprint, count, id, name, kind, farmIdOf(placeable), x, z)
                     wrote = true
                 end)
             end

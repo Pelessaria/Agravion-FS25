@@ -163,7 +163,7 @@ export function FieldsPage() {
   const [focusToken, setFocusToken] = useState(0)
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [layer, setLayer] = useState<FieldLayerId>("off")
-  const [showTramlines, setShowTramlines] = useState(false)
+  const [showTramlines, setShowTramlines] = useState(true)
   const [fieldQuery, setFieldQuery] = useState<FieldQuery>(EMPTY_FIELD_QUERY)
 
   useEffect(() => {
@@ -585,6 +585,17 @@ export function FieldsPage() {
                   : null
               }
               showTracks={showTramlines}
+              tracks={
+                liveMode && showTramlines
+                  ? {
+                      href: `/api/workspaces/${workspace.id}/precision-layer/tramline`,
+                      x: frame.padX * 100,
+                      y: frame.padZ * 100,
+                      w: frame.scaleX * 100,
+                      h: frame.scaleZ * 100,
+                    }
+                  : null
+              }
               mapUrl={
                 source?.pdaMap
                   ? `/api/workspaces/${workspace.id}/pda-map`
@@ -818,6 +829,7 @@ function FieldMap({
   painted,
   raster,
   showTracks,
+  tracks,
   mapUrl,
   live,
   selectedId,
@@ -832,6 +844,7 @@ function FieldMap({
   painted: boolean
   raster: { href: string; x: number; y: number; w: number; h: number } | null
   showTracks: boolean
+  tracks: { href: string; x: number; y: number; w: number; h: number } | null
   mapUrl: string | null
   live: boolean
   selectedId: number | null
@@ -850,6 +863,8 @@ function FieldMap({
   const [mapFailed, setMapFailed] = useState(false)
   const [loadedRasters, setLoadedRasters] = useState<ReadonlySet<string>>(() => new Set())
   const [failedRaster, setFailedRaster] = useState<string | null>(null)
+  const [tracksReady, setTracksReady] = useState(false)
+  const [tracksFailed, setTracksFailed] = useState(false)
   const [brokenIcons, setBrokenIcons] = useState<ReadonlySet<string>>(() => new Set())
   const rasterReady = raster != null && failedRaster !== raster.href && loadedRasters.has(raster.href)
   const [zoom, setZoom] = useState(1)
@@ -1122,7 +1137,20 @@ function FieldMap({
                 />
               )
             })}
-            {showTracks
+            {showTracks && tracks && !tracksFailed ? (
+              <image
+                className="tram-raster"
+                href={tracks.href}
+                x={tracks.x}
+                y={tracks.y}
+                width={tracks.w}
+                height={tracks.h}
+                preserveAspectRatio="none"
+                onLoad={() => setTracksReady(true)}
+                onError={() => setTracksFailed(true)}
+              />
+            ) : null}
+            {showTracks && !tracksReady
               ? fields.map((field) =>
                   field.tracks.map((points, index) => (
                     <g key={`tram-${field.id}-${index}`} className="field-tramlines">

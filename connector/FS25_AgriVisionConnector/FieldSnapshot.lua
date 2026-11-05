@@ -1380,6 +1380,9 @@ local function rememberTramline(index, farmlandId, row)
     if direction == nil then
         direction = num(row.direction)
     end
+    if direction ~= nil and math.abs(direction) > 6.2832 then
+        direction = direction * math.pi / 180
+    end
     local spacing = num(row.spacing)
     if spacing == nil or spacing < 8 or spacing > 80 then
         spacing = width
@@ -1391,6 +1394,58 @@ local function rememberTramline(index, farmlandId, row)
         return
     end
     index[farmlandId] = { width = width, direction = direction, spacing = spacing }
+end
+
+local function tramlineFromValues(a, b, c, d)
+    if type(a) == "table" then
+        return a
+    end
+    if type(a) == "number" then
+        return { workingWidth = a, workDirection = b, spacing = c, enabled = d }
+    end
+    return nil
+end
+
+local function tramlineFromMap(map, farmlandId)
+    local names = {
+        "getFarmlandTramlines",
+        "getTramlineSettings",
+        "getFarmlandTramline",
+        "getSettings",
+        "getTramlines",
+    }
+    local nameIndex = 1
+    while nameIndex <= #names do
+        local method = map[names[nameIndex]]
+        if method ~= nil then
+            local ok, a, b, c, d = pcall(method, map, farmlandId)
+            local row = ok and tramlineFromValues(a, b, c, d) or nil
+            if row ~= nil then
+                return row
+            end
+        end
+        nameIndex = nameIndex + 1
+    end
+    return nil
+end
+
+local function walkTramlineTable(index, source)
+    if type(source) ~= "table" then
+        return
+    end
+    local id, row = next(source, nil)
+    while id ~= nil do
+        local capturedId = id
+        local captured = row
+        pcall(function()
+            local farmlandId = num(capturedId)
+            if farmlandId == nil and type(captured) == "table" then
+                farmlandId = num(captured.farmlandId) or num(captured.id)
+            end
+            rememberTramline(index, farmlandId, captured)
+        end)
+        id, row = next(source, id)
+    end
 end
 
 local function tramlineIndex(connector)
@@ -1405,33 +1460,27 @@ local function tramlineIndex(connector)
         if map == nil then
             return
         end
-        local keys = {
-            "farmlandIdToTramline",
-            "farmlandIdToTramlines",
-            "farmlandTramlines",
-            "tramlines",
-            "tramlineData",
-            "dataByFarmlandId",
-        }
-        local keyIndex = 1
-        while keyIndex <= #keys do
-            local source = map[keys[keyIndex]]
-            if type(source) == "table" then
-                local id, row = next(source, nil)
-                while id ~= nil do
-                    local capturedId = id
-                    local captured = row
-                    pcall(function()
-                        local farmlandId = num(capturedId)
-                        if farmlandId == nil and type(captured) == "table" then
-                            farmlandId = num(captured.farmlandId) or num(captured.id)
-                        end
-                        rememberTramline(index, farmlandId, captured)
-                    end)
-                    id, row = next(source, id)
+        local manager = g_farmlandManager
+        local farmlands = manager ~= nil and manager.farmlands or nil
+        if type(farmlands) == "table" then
+            local id = next(farmlands, nil)
+            while id ~= nil do
+                local farmlandId = num(id)
+                if farmlandId ~= nil then
+                    local row = tramlineFromMap(map, farmlandId)
+                    if row ~= nil then
+                        rememberTramline(index, farmlandId, row)
+                    end
                 end
+                id = next(farmlands, id)
             end
-            keyIndex = keyIndex + 1
+        end
+        local key, source = next(map, nil)
+        while key ~= nil do
+            if type(source) == "table" then
+                walkTramlineTable(index, source)
+            end
+            key, source = next(map, key)
         end
     end)
     if not ok and not connector.tramlineLogged then

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
-import { Minus, Plus } from "lucide-react"
+import { Boxes, Minus, Plus, Tractor, Truck, UserRound, Warehouse, Wheat, Wrench } from "lucide-react"
 import {
   apiWorkspaceFields,
   apiWorkspaceLiveMap,
@@ -19,7 +19,7 @@ import { useWorkspaceRoute } from "../use-workspace"
 
 const PERIOD_TO_MONTH = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2]
 
-type Tab = "vehicles" | "players" | "places"
+type ObjectTab = "all" | "vehicle" | "implement" | "building" | "player"
 type MarkerKind = "vehicle" | "player" | "place" | "pin"
 type MarkerRole = "tractor" | "harvester" | "trailer" | "tool" | "pallet" | "building" | "player" | "pin" | "vehicle"
 type Marker = {
@@ -31,10 +31,9 @@ type Marker = {
   role: MarkerRole
   farmColor: string | null
   label: string
+  icon: string | null
   count?: number
 }
-
-const ROLES: MarkerRole[] = ["tractor", "harvester", "trailer", "tool", "pallet", "building", "player"]
 
 function markerRole(kind: MarkerKind, category: string | null): MarkerRole {
   if (kind === "place") return "building"
@@ -64,6 +63,18 @@ function readPin(params: URLSearchParams) {
   return { x, z, name: params.get("name") || "" }
 }
 
+function objectKind(role: MarkerRole): Exclude<ObjectTab, "all"> {
+  if (role === "player") return "player"
+  if (role === "building") return "building"
+  if (role === "tool" || role === "trailer" || role === "pallet") return "implement"
+  return "vehicle"
+}
+
+function usedPlace(place: LivePlace) {
+  const type = `${place.type ?? ""} ${place.name ?? ""}`.toLowerCase()
+  return /silo|husband|animal|production|sell|unload|load|bunker|barn|stall|stable|workshop|garage|shed/.test(type)
+}
+
 function matches(query: string, value: string | null) {
   const needle = query.trim().toLowerCase()
   if (!needle) return true
@@ -75,17 +86,18 @@ export function LiveMapPage() {
   const stamp = useTimeLabel()
   const [params] = useSearchParams()
   const pin = readPin(params)
-  const { liveMode, moduleAccess, selectedFarm } = useStore()
+  const { liveMode, moduleAccess } = useStore()
   const { workspace, allowed } = useWorkspaceRoute()
   const access = workspace ? moduleAccess(workspace.id, "map") : null
-  const farm = workspace ? selectedFarm(workspace.id) : null
   const [payload, setPayload] = useState<LiveMapResponse | null>(null)
   const [fields, setFields] = useState<FieldsResponse | null>(null)
   const [fleet, setFleet] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(liveMode)
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
-  const [ownOnly, setOwnOnly] = useState(true)
-  const [tab, setTab] = useState<Tab>(pin ? "places" : "vehicles")
+  const [hiddenFarms, setHiddenFarms] = useState<number[]>([])
+  const [showFields, setShowFields] = useState(true)
+  const [resetToken, setResetToken] = useState(0)
+  const [tab, setTab] = useState<ObjectTab>(pin ? "building" : "all")
   const [query, setQuery] = useState(pin?.name ?? "")
   const [selected, setSelected] = useState<string | null>(pin ? "pin" : null)
 
@@ -198,10 +210,10 @@ export function LiveMapPage() {
     return next
   }, [fields, frame])
 
-  const farmId = farm?.gameFarmId ?? null
-  const vehicles = (payload?.vehicles ?? []).filter((vehicle) => !ownOnly || farmId == null || vehicle.farmId === farmId)
+  const farmOpen = (id: number | null) => id == null || !hiddenFarms.includes(id)
+  const vehicles = (payload?.vehicles ?? []).filter((vehicle) => farmOpen(vehicle.farmId))
   const players = payload?.players ?? []
-  const places = (payload?.places ?? []).filter((place) => !ownOnly || farmId == null || place.farmId == null || place.farmId === farmId)
+  const places = (payload?.places ?? []).filter((place) => usedPlace(place) && farmOpen(place.farmId))
   const visibleVehicles = vehicles.filter((vehicle) => matches(query, vehicle.name))
   const visiblePlayers = players.filter((player) => matches(query, player.name))
   const visiblePlaces = places.filter((place) => matches(query, place.name ?? place.type))
@@ -211,17 +223,76 @@ export function LiveMapPage() {
   const farmColor = (farmId: number | null) => payload?.farms?.find((item) => item.id === farmId)?.color ?? null
   const fleetMatch = (id: string) => fleet.find((item) => item.id === `feed-${workspace?.id ?? ""}-${id}` || item.id === id) ?? null
   const selectedVehicle = vehicles.find((vehicle) => `v:${vehicle.id}` === selected) ?? null
-  const selectedPlayer = players.find((player) => `p:${player.id}` === selected) ?? null
-  const selectedPlace = places.find((place) => `o:${place.id}` === selected) ?? null
 
   if (!workspace) return <MissingWorkspace />
   if (!allowed || !access) return <PermissionBlock />
 
-  const rows =
-    tab === "vehicles" ? visibleVehicles.length : tab === "players" ? visiblePlayers.length : visiblePlaces.length
+  const roleOf = (vehicle: LiveVehicle) => markerRole("vehicle", fleetMatch(vehicle.id)?.category ?? null)
+  const catalog = [
+    ...visibleVehicles.map((vehicle) => ({
+      key: `v:${vehicle.id}`,
+      farmId: vehicle.farmId,
+      kind: objectKind(roleOf(vehicle)),
+      name: vehicle.name || vehicle.id,
+      detail: vehicle.ai ? t("live.ai") : vehicle.driver || t("live.parked"),
+      iconUrl: fleetMatch(vehicle.id)?.iconUrl ?? null,
+      role: roleOf(vehicle),
+    })),
+    ...visiblePlayers.map((player) => ({
+      key: `p:${player.id}`,
+      farmId: null as number | null,
+      kind: "player" as const,
+      name: player.name || player.id,
+      detail: t("live.players"),
+      iconUrl: null,
+      role: "player" as const,
+    })),
+    ...visiblePlaces.map((place) => ({
+      key: `o:${place.id}`,
+      farmId: place.farmId,
+      kind: "building" as const,
+      name: place.name || place.type || place.id,
+      detail: place.type || t("live.buildings"),
+      iconUrl: null,
+      role: "building" as const,
+    })),
+  ].filter((row) => tab === "all" || row.kind === tab)
+  const farmIds = [...new Set(catalog.map((row) => row.farmId))]
+  const vehicleCount = vehicles.filter((vehicle) => objectKind(roleOf(vehicle)) === "vehicle").length
+  const implementCount = vehicles.filter((vehicle) => objectKind(roleOf(vehicle)) === "implement").length
 
   return (
     <div className="page live-page">
+      <header className="page-head">
+        <div>
+          <h1>{t("modules.map")}</h1>
+          <p>{t("modules.mapLead")}</p>
+        </div>
+        <div className="live-farm-row">
+          <span>{t("live.farms")}</span>
+          <button
+            type="button"
+            className={hiddenFarms.length === 0 ? "chip-check on" : "chip-check"}
+            onClick={() => setHiddenFarms(hiddenFarms.length === 0 ? (payload?.farms ?? []).map((item) => item.id) : [])}
+          >
+            {t("live.all")}
+          </button>
+          {(payload?.farms ?? []).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={hiddenFarms.includes(item.id) ? "chip-check" : "chip-check on"}
+              onClick={() =>
+                setHiddenFarms((current) => (current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id]))
+              }
+            >
+              <i style={{ background: item.color || "var(--accent)" }} />
+              {item.name || item.id}
+            </button>
+          ))}
+        </div>
+      </header>
+      <div className="live-layout">
       <div className="live-stage">
         {loading && !payload ? <p className="live-wait">{t("live.loading")}</p> : null}
         {payload?.error === "failed" && payload.vehicles.length === 0 ? (
@@ -239,11 +310,25 @@ export function LiveMapPage() {
           places={places}
           pin={pin}
           selected={selected}
-          vehicleRole={(vehicle) => markerRole("vehicle", fleetMatch(vehicle.id)?.category ?? null)}
+          showFields={showFields}
+          resetToken={resetToken}
+          vehicleRole={roleOf}
+          vehicleIcon={(vehicle) => fleetMatch(vehicle.id)?.iconUrl ?? null}
           placeColor={(farmId) => farmColor(farmId)}
           onSelect={setSelected}
           onContentBox={setContentBox}
         />
+        <div className="live-toolbar">
+          <strong>{workspace.mapName || t("modules.map")}</strong>
+          <div>
+            <button type="button" className={showFields ? "is-on" : ""} onClick={() => setShowFields((value) => !value)}>
+              {t("live.fieldsLayer")}
+            </button>
+            <button type="button" onClick={() => setResetToken((value) => value + 1)}>
+              {t("live.resetView")}
+            </button>
+          </div>
+        </div>
         <div className="live-hud">
           {clock ? (
             <span className="live-chip">
@@ -259,116 +344,94 @@ export function LiveMapPage() {
             </span>
           ) : null}
         </div>
-        <aside className="live-dock">
-          <header className="live-dock-head">
-            <h1>{t("modules.map")}</h1>
-            <p>{t("modules.mapLead")}</p>
+      </div>
+      <aside className="live-side">
+        <section className="panel live-objects">
+          <header>
+            <h2>{t("live.objects")}</h2>
+            <span>{t("live.objectCount", { count: catalog.length })}</span>
           </header>
           <label className="live-search">
             <span className="sr-only">{t("live.search")}</span>
             <input value={query} placeholder={t("live.search")} onChange={(event) => setQuery(event.target.value)} />
           </label>
           <div className="live-tabs" role="tablist">
-            <button type="button" className={tab === "vehicles" ? "is-on" : ""} onClick={() => setTab("vehicles")}>
-              {t("live.vehicles")}
-              <em>{vehicles.length}</em>
-            </button>
-            <button type="button" className={tab === "players" ? "is-on" : ""} onClick={() => setTab("players")}>
-              {t("live.players")}
-              <em>{players.length}</em>
-            </button>
-            <button type="button" className={tab === "places" ? "is-on" : ""} onClick={() => setTab("places")}>
-              {t("live.places")}
-              <em>{places.length}</em>
-            </button>
+            {(["all", "vehicle", "implement", "building", "player"] as const).map((id) => (
+              <button key={id} type="button" className={tab === id ? "is-on" : ""} onClick={() => setTab(id)}>
+                {t(id === "all" ? "live.all" : id === "vehicle" ? "live.vehicles" : id === "implement" ? "live.implements" : id === "building" ? "live.buildings" : "live.players")}
+              </button>
+            ))}
           </div>
-          <button type="button" className={ownOnly ? "chip-check on live-farm" : "chip-check live-farm"} onClick={() => setOwnOnly((value) => !value)}>
-            {ownOnly ? t("live.ownFarm") : t("live.allFarms")}
-          </button>
-          {selected === "pin" && pin ? (
-            <div className="live-card">
-              <strong>{pin.name || t("stock.places")}</strong>
-            </div>
-          ) : null}
           {selectedVehicle ? (
             <div className="live-card">
               <strong>{selectedVehicle.name || selectedVehicle.id}</strong>
-              <p>
-                {selectedVehicle.ai ? t("live.ai") : null}
-                {selectedVehicle.driver ? ` ${selectedVehicle.driver}` : null}
-              </p>
+              <p>{selectedVehicle.ai ? t("live.ai") : selectedVehicle.driver}</p>
               {fleetMatch(selectedVehicle.id) ? (
                 <Link to={`/w/${workspace.id}/equipment/${encodeURIComponent(fleetMatch(selectedVehicle.id)!.id)}`}>{t("modules.equipment")}</Link>
               ) : null}
             </div>
           ) : null}
-          {selectedPlayer ? (
-            <div className="live-card">
-              <strong>{selectedPlayer.name || selectedPlayer.id}</strong>
-            </div>
-          ) : null}
-          {selectedPlace ? (
-            <div className="live-card">
-              <strong>{selectedPlace.name || selectedPlace.type || selectedPlace.id}</strong>
-              {selectedPlace.type ? <p>{selectedPlace.type}</p> : null}
-            </div>
-          ) : null}
-          <ul className="live-legend" aria-label={t("live.legend")}>
-            {ROLES.map((role) => (
-              <li key={role}>
-                <i className={`live-dot is-${role}`} />
-                <span>{t(`live.role.${role}`)}</span>
-              </li>
-            ))}
-          </ul>
-          <ul className="live-list">
-            {rows === 0 ? (
-              <li className="live-empty">
-                {tab === "vehicles" ? t("live.emptyVehicles") : tab === "players" ? t("live.emptyPlayers") : t("live.emptyPlaces")}
-              </li>
-            ) : null}
-            {tab === "vehicles"
-              ? visibleVehicles.map((vehicle) => (
-                  <li key={vehicle.id || vehicle.name}>
-                    <button type="button" className={selected === `v:${vehicle.id}` ? "is-on" : ""} onClick={() => setSelected(`v:${vehicle.id}`)}>
-                      <i
-                        className={`live-dot is-${markerRole("vehicle", fleetMatch(vehicle.id)?.category ?? null)}`}
-                        style={farmColor(vehicle.farmId) ? { boxShadow: `0 0 0 2px ${farmColor(vehicle.farmId)}` } : undefined}
-                      />
-                      <span>{vehicle.name || vehicle.id}</span>
-                      {vehicle.ai ? <em>{t("live.ai")}</em> : null}
+          <div className="live-groups">
+            {catalog.length === 0 ? <p className="live-empty">{t("live.emptyVehicles")}</p> : null}
+            {farmIds.map((groupId) => {
+              const group = catalog.filter((row) => row.farmId === groupId)
+              if (group.length === 0) return null
+              const color = farmColor(groupId)
+              const title = (payload?.farms ?? []).find((item) => item.id === groupId)?.name || (groupId == null ? t("live.players") : String(groupId))
+              return (
+                <section key={groupId ?? "none"}>
+                  <header style={color ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}>
+                    <span>{title}</span>
+                    <em>{group.length}</em>
+                  </header>
+                  {group.map((row) => (
+                    <button key={row.key} type="button" className={selected === row.key ? "is-on" : ""} onClick={() => setSelected(row.key)}>
+                      {row.iconUrl ? <img src={row.iconUrl} alt="" /> : <RoleIcon role={row.role} />}
+                      <span>
+                        <strong>{row.name}</strong>
+                        <small>{row.detail}</small>
+                      </span>
                     </button>
-                  </li>
-                ))
-              : null}
-            {tab === "players"
-              ? visiblePlayers.map((player) => (
-                  <li key={player.id}>
-                    <button type="button" className={selected === `p:${player.id}` ? "is-on" : ""} onClick={() => setSelected(`p:${player.id}`)}>
-                      <i className="live-dot is-player" />
-                      <span>{player.name || player.id}</span>
-                    </button>
-                  </li>
-                ))
-              : null}
-            {tab === "places"
-              ? visiblePlaces.map((place) => (
-                  <li key={`${place.id}:${place.x}`}>
-                    <button type="button" className={selected === `o:${place.id}` ? "is-on" : ""} onClick={() => setSelected(`o:${place.id}`)}>
-                      <i
-                        className="live-dot is-building"
-                        style={farmColor(place.farmId) ? { boxShadow: `0 0 0 2px ${farmColor(place.farmId)}` } : undefined}
-                      />
-                      <span>{place.name || place.type || place.id}</span>
-                    </button>
-                  </li>
-                ))
-              : null}
-          </ul>
-        </aside>
+                  ))}
+                </section>
+              )
+            })}
+          </div>
+        </section>
+        <section className="panel live-stats">
+          <h2>{t("live.stats")}</h2>
+          <div>
+            <span><Tractor className="icon" /><strong>{vehicleCount}</strong><small>{t("live.vehicles")}</small></span>
+            <span><Wrench className="icon" /><strong>{implementCount}</strong><small>{t("live.implements")}</small></span>
+            <span><Warehouse className="icon" /><strong>{places.length}</strong><small>{t("live.buildings")}</small></span>
+            <span><strong>{fields?.fields.length ?? 0}</strong><small>{t("modules.fields")}</small></span>
+          </div>
+          {payload?.writtenAt ? <p>{t("live.updated", { time: stamp(payload.writtenAt, "") })}</p> : null}
+        </section>
+      </aside>
       </div>
     </div>
   )
+}
+
+function RoleIcon({ role }: { role: MarkerRole }) {
+  const Icon =
+    role === "tractor"
+      ? Tractor
+      : role === "harvester"
+        ? Wheat
+        : role === "trailer"
+          ? Truck
+          : role === "tool"
+            ? Wrench
+            : role === "pallet"
+              ? Boxes
+              : role === "building"
+                ? Warehouse
+                : role === "player"
+                  ? UserRound
+                  : Tractor
+  return <Icon className="icon" aria-hidden="true" />
 }
 
 function MarkerGlyph({ role }: { role: MarkerRole }) {
@@ -399,7 +462,10 @@ function LiveCanvas({
   places,
   pin,
   selected,
+  showFields,
+  resetToken,
   vehicleRole,
+  vehicleIcon,
   placeColor,
   onSelect,
   onContentBox,
@@ -412,7 +478,10 @@ function LiveCanvas({
   places: LivePlace[]
   pin: { x: number; z: number; name: string } | null
   selected: string | null
+  showFields: boolean
+  resetToken: number
   vehicleRole: (vehicle: LiveVehicle) => MarkerRole
+  vehicleIcon: (vehicle: LiveVehicle) => string | null
   placeColor: (farmId: number | null) => string | null
   onSelect: (id: string) => void
   onContentBox: (box: { x: number; y: number; w: number; h: number } | null) => void
@@ -425,6 +494,13 @@ function LiveCanvas({
   const [zoom, setZoom] = useState(1)
   const [mapFailed, setMapFailed] = useState(false)
   const [view, setView] = useState({ w: 0, h: 0 })
+
+  useEffect(() => {
+    cam.current = { x: 0, y: 0, k: 1 }
+    const el = stageRef.current
+    if (el) el.style.transform = "translate(0px, 0px) scale(1)"
+    setZoom(1)
+  }, [resetToken])
 
   function apply() {
     const el = stageRef.current
@@ -510,6 +586,7 @@ function LiveCanvas({
         role: vehicleRole(vehicle),
         farmColor: placeColor(vehicle.farmId),
         label: vehicle.name || vehicle.id,
+        icon: vehicleIcon(vehicle),
       })
     }
     for (const player of players) {
@@ -523,6 +600,7 @@ function LiveCanvas({
         role: "player",
         farmColor: null,
         label: player.name || player.id,
+        icon: null,
       })
     }
     for (const place of places) {
@@ -536,14 +614,15 @@ function LiveCanvas({
         role: "building",
         farmColor: placeColor(place.farmId),
         label: place.name || place.type || place.id,
+        icon: null,
       })
     }
     if (pin) {
       const point = projectPoint(pin.x, pin.z, frame)
-      next.push({ key: "pin", x: point.x, y: point.y, heading: null, kind: "pin", role: "pin", farmColor: null, label: pin.name })
+      next.push({ key: "pin", x: point.x, y: point.y, heading: null, kind: "pin", role: "pin", farmColor: null, label: pin.name, icon: null })
     }
     return next
-  }, [frame, pin, placeColor, places, players, vehicleRole, vehicles])
+  }, [frame, pin, placeColor, places, players, vehicleIcon, vehicleRole, vehicles])
 
   const draw = useMemo(() => {
     const kept = markers.filter((marker) => marker.key === selected || marker.kind === "pin")
@@ -683,18 +762,23 @@ function LiveCanvas({
             <div className="fields-terrain" />
           )}
           <svg className="live-sheet" style={{ left: sheet.left, top: sheet.top, width: sheet.size, height: sheet.size }} viewBox="0 0 100 100">
-            {shapes.map((points, index) => (
-              <polygon key={`shape-${index}`} className="live-field" points={points} />
-            ))}
+            {showFields
+              ? shapes.map((points, index) => <polygon key={`shape-${index}`} className="live-field" points={points} />)
+              : null}
             {draw.map((marker) => {
               const on = marker.key === selected
               const rotation = marker.heading == null ? 0 : (-marker.heading * 180) / Math.PI
               const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
-              const mark = toMap(on ? 16 : 13)
+              const mark = toMap(marker.icon ? (on ? 22 : 18) : on ? 16 : 13)
               return (
                 <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.role} is-on` : `live-marker is-${marker.role}`} transform={`translate(${marker.x} ${marker.y})`}>
-                  <g transform={`rotate(${rotation}) scale(${mark})`}>
-                    <MarkerGlyph role={marker.role} />
+                  <g transform={`rotate(${marker.icon ? 0 : rotation}) scale(${mark})`}>
+                    <circle r="0.92" className="live-marker-plate" style={marker.farmColor ? { fill: marker.farmColor } : undefined} />
+                    {marker.icon ? (
+                      <image href={marker.icon} x="-0.72" y="-0.72" width="1.44" height="1.44" />
+                    ) : (
+                      <MarkerGlyph role={marker.role} />
+                    )}
                     <circle className={marker.farmColor ? "live-marker-ring is-farm" : "live-marker-ring"} r="1.02" style={marker.farmColor ? { stroke: marker.farmColor } : undefined} />
                   </g>
                   {marker.count && marker.count > 1 ? (

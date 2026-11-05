@@ -31,6 +31,30 @@ final class PngRgbWriter
         }
     }
 
+    public function writeRgba(string $path, int $width, int $height, string $rgba): void
+    {
+        $stride = $width * 4;
+        if ($width < 1 || $height < 1 || strlen($rgba) !== $stride * $height) {
+            throw new RuntimeException('PNG-Puffer passt nicht zur Bildgröße.');
+        }
+        $raw = '';
+        for ($y = 0; $y < $height; $y++) {
+            $raw .= "\x00".substr($rgba, $y * $stride, $stride);
+        }
+        $png = "\x89PNG\r\n\x1a\n";
+        $png .= $this->chunk('IHDR', pack('NNC5', $width, $height, 8, 6, 0, 0, 0));
+        $png .= $this->chunk('IDAT', gzcompress($raw, $width > 1024 ? 1 : 6));
+        $png .= $this->chunk('IEND', '');
+        $temporary = $path.'.tmp';
+        if (file_put_contents($temporary, $png) === false) {
+            throw new RuntimeException('PNG konnte nicht geschrieben werden.');
+        }
+        if (! rename($temporary, $path)) {
+            @unlink($temporary);
+            throw new RuntimeException('PNG konnte nicht übernommen werden.');
+        }
+    }
+
     private function chunk(string $type, string $data): string
     {
         return pack('N', strlen($data)).$type.$data.hash('crc32b', $type.$data, true);
