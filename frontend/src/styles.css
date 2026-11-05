@@ -2696,23 +2696,22 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .fields-mast {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   width: max-content;
   max-width: 100%;
-  padding: 7px 16px 7px 14px;
+  padding: 8px 16px 10px;
   border: 1px solid color-mix(in srgb, #e7d7b0 32%, transparent);
   border-radius: 12px;
   background: color-mix(in srgb, #141c19 55%, transparent);
 }
 .fields-mast h1 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1;
-  padding-right: 16px;
-  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  line-height: 1.1;
 }
 .fields-stats {
   display: flex;
