@@ -59,7 +59,7 @@ type DrawnField = {
 }
 
 const LABEL_HEIGHT = 2.7
-const LABELS_FROM_ZOOM = 1.7
+const FIELDS_MIN_ZOOM = 0.35
 
 function groupCaption(field: FieldSnapshot, fields: FieldSnapshot[]) {
   const group = field.group
@@ -698,7 +698,8 @@ function FilterMenu({
         aria-expanded={open}
         onClick={() => setOpen((currentOpen) => !currentOpen)}
       >
-        {current}
+        <span>{current}</span>
+        <ChevronDown className="icon" aria-hidden="true" />
       </button>
       {open ? (
         <ul role="listbox">
@@ -788,7 +789,8 @@ function LayerMenu({
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        {label}
+        <span>{label}</span>
+        <ChevronDown className="icon" aria-hidden="true" />
       </button>
       {open ? (
         <ul className="layer-menu-list" role="listbox">
@@ -831,52 +833,18 @@ function inActiveGroup(field: DrawnField, hoverId: number | null, selectedId: nu
   return selectedId != null && field.group.includes(selectedId)
 }
 
-/** Quiet when the numbers first appear. Zooming in grows the crop picture with them. */
+/** Larger on the way in. Zooming out shrinks the numbers, and they stay on the field. */
 function labelScreenPx(zoom: number) {
-  return Math.min(36, 15 + 14 * Math.max(zoom - LABELS_FROM_ZOOM, 0))
+  if (zoom <= 1) return Math.max(14, 30 * (0.46 + 0.54 * zoom))
+  return Math.min(54, 30 + 11 * (zoom - 1))
 }
 
-function visibleLabels(
-  fields: DrawnField[],
-  zoom: number,
-  sidePx: number,
-  pinnedId: number | null,
-  hoverId: number | null,
-) {
+function visibleLabels(fields: DrawnField[], zoom: number, sidePx: number) {
   if (sidePx <= 0) return { scale: 0, ids: new Set<number>() }
-  const scale = (labelScreenPx(zoom) / (sidePx * Math.max(zoom, 1))) * 100 / LABEL_HEIGHT
-  const ranked = [...fields].sort((a, b) => {
-    if (a.id === pinnedId) return -1
-    if (b.id === pinnedId) return 1
-    const area = (field: DrawnField) => (field.box ? field.box.w * field.box.h : 0)
-    return area(b) - area(a)
-  })
-  const placed: { x: number; y: number; w: number; h: number }[] = []
+  const scale = (labelScreenPx(zoom) / (sidePx * Math.max(zoom, FIELDS_MIN_ZOOM))) * 100 / LABEL_HEIGHT
   const ids = new Set<number>()
-  for (const field of ranked) {
-    if (!field.label) continue
-    const forced = labelHot(field, hoverId, pinnedId)
-    if (!forced && zoom < LABELS_FROM_ZOOM) continue
-    const width = labelWidth(field.label.length, true) * scale
-    const height = LABEL_HEIGHT * scale
-    const labelBox = { x: field.x - width / 2, y: field.y - height / 2, w: width, h: height }
-    const fits =
-      field.box != null &&
-      field.box.w * field.box.h >= width * height * 0.42 &&
-      field.box.w >= width * 0.55 &&
-      field.box.h >= height * 0.45
-    if (!forced && !fits) continue
-    const gap = 0.15 * scale
-    const blocked = placed.some(
-      (other) =>
-        labelBox.x < other.x + other.w + gap &&
-        labelBox.x + labelBox.w + gap > other.x &&
-        labelBox.y < other.y + other.h + gap &&
-        labelBox.y + labelBox.h + gap > other.y,
-    )
-    if (blocked && !forced) continue
-    placed.push(labelBox)
-    ids.add(field.id)
+  for (const field of fields) {
+    if (field.label) ids.add(field.id)
   }
   return { scale, ids }
 }
@@ -920,7 +888,7 @@ function FieldMap({
 }) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const savedView = useRef(readMapView(viewUserId, viewScope))
+  const savedView = useRef(readMapView(viewUserId, viewScope, FIELDS_MIN_ZOOM))
   const cam = useRef<MapCamera>(savedView.current ?? { x: 0, y: 0, k: 1 })
   const drag = useRef<{ x: number; y: number; cx: number; cy: number; moved: boolean } | null>(null)
   const { t } = useTranslation()
@@ -944,8 +912,8 @@ function FieldMap({
   const fieldsRef = useRef(fields)
   const selectedRef = useRef(selectedId)
   const labels = useMemo(
-    () => visibleLabels(fields, zoom, sidePx, selectedId, hoverId),
-    [fields, hoverId, selectedId, sidePx, zoom],
+    () => visibleLabels(fields, zoom, sidePx),
+    [fields, sidePx, zoom],
   )
   function apply() {
     const el = stageRef.current
@@ -963,7 +931,7 @@ function FieldMap({
 
   function zoomAt(next: number, px: number, py: number) {
     const prev = cam.current.k
-    const clamped = Math.min(6, Math.max(1, next))
+    const clamped = Math.min(6, Math.max(FIELDS_MIN_ZOOM, next))
     const ratio = clamped / prev
     commit({
       k: clamped,

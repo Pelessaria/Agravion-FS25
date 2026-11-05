@@ -3011,6 +3011,9 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .layer-menu { position: relative; min-width: 0; }
 .layer-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   height: 26px;
   margin: 0;
   padding: 0 8px;
@@ -3025,6 +3028,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   white-space: nowrap;
   cursor: pointer;
 }
+.layer-menu-btn .icon { width: 14px; height: 14px; color: var(--text-muted); }
 .layer-menu-list {
   position: absolute;
   z-index: 8;
@@ -3123,14 +3127,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   border: 0;
   background: transparent;
 }
-.fields-seg + .fields-seg::before {
-  content: "";
-  width: 1px;
-  height: 14px;
-  margin: 0 4px;
-  background: color-mix(in srgb, var(--accent) 70%, transparent);
-  transform: rotate(18deg);
-}
+.fields-seg + .fields-seg { margin-left: 8px; }
 .fields-seg button {
   position: relative;
   border: 0;
@@ -3176,35 +3173,26 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-filters .chip-check:disabled { opacity: 0.4; cursor: not-allowed; }
 .fields-filter-menu { position: relative; }
 .fields-filter-menu > button {
-  position: relative;
-  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
   max-width: 220px;
-  padding: 5px 16px 5px 16px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-muted);
+  padding: 4px 8px 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
   font: inherit;
   font-size: 0.78rem;
   line-height: 1.2;
   white-space: nowrap;
   cursor: pointer;
 }
-.fields-filter-menu > button::before {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
-  transform: translateY(-50%) rotate(45deg);
-}
-.fields-filter-menu > button.is-set { color: #f6f0df; }
-.fields-filter-menu > button.is-set::before {
-  background: var(--accent);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+.fields-filter-menu > button .icon { width: 14px; height: 14px; color: var(--text-muted); }
+.fields-filter-menu > button.is-set {
+  color: #f6f0df;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
 }
 .fields-filter-menu ul {
   position: absolute;
