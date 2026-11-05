@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type SVGProps } from "react"
 import { useTranslation } from "react-i18next"
 import {
   Building2,
@@ -12,7 +12,6 @@ import {
   Minus,
   Plus,
   Search,
-  Wheat,
 } from "lucide-react"
 import { apiWorkspaceFields } from "../api"
 import { cropIcon } from "../crop-icons"
@@ -55,6 +54,27 @@ import type { FieldSnapshot, FieldsResponse } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
 
 const EMPTY_FIELDS: FieldSnapshot[] = []
+
+/** Lucide hat keine Sense — schlankes Stroke-Icon im gleichen Stil. */
+function Scythe({ className, ...props }: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M8 22V10" />
+      <path d="M8 10c1.5-5 7-7 11-5 1.2.6 2 1.8 2 3.2 0 2.8-3.2 4.8-7 4.8H8z" />
+    </svg>
+  )
+}
 
 type DrawnField = {
   id: number
@@ -388,12 +408,21 @@ export function FieldsPage() {
           <span>{t("fields.allFarms")}</span>
         </p>
         <p className={harvestGrass > 0 ? "has-note" : undefined}>
-          <Wheat className="fields-stat-icon" aria-hidden="true" />
-          <strong>{harvest.toLocaleString(i18n.language)}</strong>
-          <span>
-            {t("fields.harvest")}
-            {harvestGrass > 0 ? <em>{t("fields.harvestGrass", { count: harvestGrass })}</em> : null}
-          </span>
+          <Scythe className="fields-stat-icon" />
+          {harvestGrass > 0 ? (
+            <span className="fields-stat-stack">
+              <span className="fields-stat-head">
+                <strong>{harvest.toLocaleString(i18n.language)}</strong>
+                <span>{t("fields.harvest")}</span>
+              </span>
+              <em>{t("fields.harvestGrass", { count: harvestGrass })}</em>
+            </span>
+          ) : (
+            <>
+              <strong>{harvest.toLocaleString(i18n.language)}</strong>
+              <span>{t("fields.harvest")}</span>
+            </>
+          )}
         </p>
         <p>
           <LandPlot className="fields-stat-icon" aria-hidden="true" />

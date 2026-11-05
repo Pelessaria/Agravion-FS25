@@ -2730,6 +2730,9 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   width: max-content;
   max-width: 100%;
 }
+.fields-stats:has(.has-note) {
+  padding-top: calc(1.45rem + 4px);
+}
 .fields-stats p {
   display: flex;
   align-items: baseline;
@@ -2761,20 +2764,30 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   font-size: 0.72rem;
   line-height: 1.15;
 }
+/*
+ * Mit Subtext: Zahl + Label stehen über dem Subtext; der Subtext teilt
+ * die Baseline mit den Hauptwerten der übrigen Kennzahlen.
+ */
 .fields-stats p.has-note {
-  align-items: flex-start;
+  align-items: baseline;
 }
-.fields-stats p.has-note span {
+.fields-stats p.has-note .fields-stat-stack {
+  position: relative;
+  display: inline-block;
+}
+.fields-stats p.has-note .fields-stat-head {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 2px);
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  padding-top: 0.18rem;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
 }
 .fields-stats p.has-note em {
   font-style: normal;
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   line-height: 1.15;
   white-space: nowrap;
 }
