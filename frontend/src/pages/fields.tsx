@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next"
 import { ChevronDown, ChevronLeft, ChevronRight, Minus, Plus, Search } from "lucide-react"
 import { apiWorkspaceFields } from "../api"
 import { cropIcon } from "../crop-icons"
-import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
+import { EmptyState, MissingWorkspace, PermissionBlock } from "../components/ui"
 import { demoFields } from "../demo-fields"
 import { farmDisplayName } from "../farm-label"
 import {
@@ -150,14 +150,13 @@ function projectFields(
 
 export function FieldsPage() {
   const { t, i18n } = useTranslation()
-  const stamp = useTimeLabel()
   const { liveMode, moduleAccess, selectedFarm, farmByGameId, sessionUserId } = useStore()
   const { workspace, allowed } = useWorkspaceRoute()
   const access = workspace ? moduleAccess(workspace.id, "fields") : null
   const farm = workspace ? selectedFarm(workspace.id) : null
   const demo = useMemo(() => demoFields(), [])
   const [payload, setPayload] = useState<FieldsResponse | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [, setLoading] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [onlyMine, setOnlyMine] = useState(false)
   const [showUnowned, setShowUnowned] = useState(false)
@@ -338,21 +337,9 @@ export function FieldsPage() {
 
   return (
     <section className="fields-page">
-      <div className="page-head">
-        <div>
-          <h1>{t("modules.fields")}</h1>
-          <p>{t("fields.lead")}</p>
-        </div>
-        <p className="faint">
-          {source?.stateAt
-            ? t("fields.updated", { time: stamp(source.stateAt, t("unavailable")) })
-            : loading
-              ? t("fields.loading")
-              : null}
-        </p>
-      </div>
-
-      <div className="fields-stats">
+      <div className="fields-mast">
+        <h1>{t("modules.fields")}</h1>
+        <div className="fields-stats">
         <p>
           <strong>{fields.length.toLocaleString(i18n.language)}</strong>
           <span>{t("fields.count")}</span>
@@ -375,6 +362,7 @@ export function FieldsPage() {
           </strong>
           <span>{t("fields.area")}</span>
         </p>
+        </div>
       </div>
 
       {emptyKind ? (
