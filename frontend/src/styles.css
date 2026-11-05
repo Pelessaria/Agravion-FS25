@@ -2733,9 +2733,10 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-stats p {
   display: grid;
   grid-template-columns: auto max-content;
+  grid-template-rows: auto auto;
   column-gap: 8px;
-  row-gap: 1px;
-  align-items: center;
+  row-gap: 3px;
+  align-items: start;
   margin: 0;
   padding: 0 16px 0 0;
 }
@@ -2746,26 +2747,31 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-stats strong {
   grid-column: 1;
   grid-row: 1;
+  align-self: start;
   font-size: 1.45rem;
   font-weight: 560;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-  line-height: 1;
+  line-height: 1.05;
 }
 .fields-stats strong.warn { color: var(--warning); }
 .fields-stats span {
   grid-column: 2;
   grid-row: 1;
+  align-self: start;
+  padding-top: 0.12rem;
   color: var(--text-faint);
   font-size: 0.72rem;
-  line-height: 1.15;
+  line-height: 1.05;
 }
 .fields-stats em {
   grid-column: 2;
   grid-row: 2;
+  align-self: start;
+  margin-top: 1px;
   font-style: normal;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   line-height: 1.15;
   white-space: nowrap;
 }

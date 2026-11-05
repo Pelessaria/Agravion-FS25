@@ -282,16 +282,7 @@ export function StoragePage() {
   return (
     <section className="stock-page">
       <div className="fields-mast">
-        <div className="fields-mast-top">
-          <h1>{t("modules.storage")}</h1>
-          <p className="faint">
-            {payload?.writtenAt
-              ? t("stock.updated", { time: stamp(payload.writtenAt, t("unavailable")) })
-              : loading
-                ? t("stock.loading")
-                : null}
-          </p>
-        </div>
+        <h1>{t("modules.storage")}</h1>
         {emptyKind || (loading && !payload) ? null : (
           <div className="fields-stats">
             <p>
@@ -309,6 +300,12 @@ export function StoragePage() {
             <p>
               <strong>{baleRows.reduce((sum, row) => sum + row.count, 0).toLocaleString(language)}</strong>
               <span>{t("stock.bales")}</span>
+            </p>
+            <p>
+              <strong>
+                {payload?.writtenAt ? stamp(payload.writtenAt, t("unavailable")) : t("unavailable")}
+              </strong>
+              <span>{t("stock.asOf")}</span>
             </p>
           </div>
         )}

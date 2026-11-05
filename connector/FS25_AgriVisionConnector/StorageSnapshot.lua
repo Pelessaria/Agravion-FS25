@@ -16,15 +16,16 @@ local function log(msg)
     print("AgriVisionConnector: " .. tostring(msg))
 end
 
+-- Giants: avoid pcall on the hot path. Nil-check, then call directly.
 local function safeMethod(object, methodName, ...)
-    if object == nil or object[methodName] == nil then
+    if object == nil then
         return nil
     end
-    local ok, value = pcall(object[methodName], object, ...)
-    if ok then
-        return value
+    local method = object[methodName]
+    if method == nil then
+        return nil
     end
-    return nil
+    return method(object, ...)
 end
 
 local function num(value)
@@ -292,10 +293,7 @@ local function placeableXZ(placeable)
     if node == nil then
         return nil, nil
     end
-    local ok, x, _, z = pcall(getWorldTranslation, node)
-    if not ok then
-        return nil, nil
-    end
+    local x, _, z = getWorldTranslation(node)
     x = num(x)
     z = num(z)
     if x == nil or z == nil then

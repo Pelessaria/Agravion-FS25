@@ -12,7 +12,7 @@
 
 AgriVisionConnector = {}
 AgriVisionConnector.MOD_NAME = "FS25_AgriVisionConnector"
-AgriVisionConnector.VERSION = "0.1.24.0"
+AgriVisionConnector.VERSION = "0.1.25.0"
 AgriVisionConnector.SCHEMA = "1"
 AgriVisionConnector.TICK_MS = 5000
 AgriVisionConnector.HELLO_EVERY_MS = 60000
@@ -183,22 +183,17 @@ function AgriVisionConnector:writeHello()
 end
 
 function AgriVisionConnector:vehicleWorldPos(vehicle)
-    if vehicle == nil then
+    if vehicle == nil or getWorldTranslation == nil then
         return nil, nil, nil
     end
-    local ok, x, y, z = pcall(function()
-        if vehicle.rootNode ~= nil and getWorldTranslation ~= nil then
-            return getWorldTranslation(vehicle.rootNode)
-        end
-        if vehicle.components ~= nil and vehicle.components[1] ~= nil and vehicle.components[1].node ~= nil and getWorldTranslation ~= nil then
-            return getWorldTranslation(vehicle.components[1].node)
-        end
-        return nil, nil, nil
-    end)
-    if ok then
-        return x, y, z
+    local node = vehicle.rootNode
+    if node == nil and vehicle.components ~= nil and vehicle.components[1] ~= nil then
+        node = vehicle.components[1].node
     end
-    return nil, nil, nil
+    if node == nil then
+        return nil, nil, nil
+    end
+    return getWorldTranslation(node)
 end
 
 function AgriVisionConnector:collectVehiclesFullXml()
@@ -215,10 +210,8 @@ function AgriVisionConnector:collectVehiclesFullXml()
         if vehicle ~= nil then
             local farmId = nil
             if vehicle.getOwnerFarmId ~= nil then
-                local ok, id = pcall(function()
-                    return vehicle:getOwnerFarmId()
-                end)
-                if ok and type(id) == "number" and id > 0 then
+                local id = vehicle:getOwnerFarmId()
+                if type(id) == "number" and id > 0 then
                     farmId = id
                 end
             elseif type(vehicle.ownerFarmId) == "number" and vehicle.ownerFarmId > 0 then
@@ -227,10 +220,8 @@ function AgriVisionConnector:collectVehiclesFullXml()
 
             local uniqueId = nil
             if vehicle.getUniqueId ~= nil then
-                local ok, uid = pcall(function()
-                    return vehicle:getUniqueId()
-                end)
-                if ok and uid ~= nil and tostring(uid) ~= "" then
+                local uid = vehicle:getUniqueId()
+                if uid ~= nil and tostring(uid) ~= "" then
                     uniqueId = tostring(uid)
                 end
             elseif vehicle.uniqueId ~= nil then
@@ -240,10 +231,8 @@ function AgriVisionConnector:collectVehiclesFullXml()
             local filename = vehicle.configFileName or vehicle.xmlFilename or ""
             local name = ""
             if vehicle.getName ~= nil then
-                local ok, n = pcall(function()
-                    return vehicle:getName()
-                end)
-                if ok and n ~= nil then
+                local n = vehicle:getName()
+                if n ~= nil then
                     name = tostring(n)
                 end
             end

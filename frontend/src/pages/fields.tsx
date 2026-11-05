@@ -383,6 +383,12 @@ export function FieldsPage() {
           </strong>
           <span>{t("fields.area")}</span>
         </p>
+        <p>
+          <strong>
+            {source?.stateAt ? stamp(source.stateAt, t("unavailable")) : loading ? "…" : t("unavailable")}
+          </strong>
+          <span>{t("fields.asOf")}</span>
+        </p>
         </div>
       </div>
 
@@ -446,13 +452,6 @@ export function FieldsPage() {
                   <Search className="icon" />
                 </button>
               </form>
-              <p className="fields-freshness">
-                {source?.stateAt
-                  ? t("fields.updated", { time: stamp(source.stateAt, t("unavailable")) })
-                  : loading
-                    ? t("fields.loading")
-                    : null}
-              </p>
             </div>
             {filtersOpen ? (
             <div className="fields-filters">

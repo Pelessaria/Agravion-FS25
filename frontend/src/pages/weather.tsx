@@ -130,13 +130,17 @@ export function WeatherPage() {
 
   return (
     <div className="page weather-page">
-      <header className="page-head">
-        <div>
-          <h1>{t("modules.weather")}</h1>
-          <p>{t("modules.weatherLead")}</p>
+      <div className="fields-mast">
+        <h1>{t("modules.weather")}</h1>
+        <div className="fields-stats">
+          <p>
+            <strong>
+              {payload?.writtenAt ? stamp(payload.writtenAt, t("unavailable")) : loading ? "…" : t("unavailable")}
+            </strong>
+            <span>{t("weather.asOf")}</span>
+          </p>
         </div>
-        {payload?.writtenAt ? <p className="faint">{t("live.updated", { time: stamp(payload.writtenAt, "") })}</p> : null}
-      </header>
+      </div>
       {loading && !payload ? <p className="muted">{t("weather.loading")}</p> : null}
       {!loading && !ready ? <EmptyState title={t("weather.missingTitle")} body={t("weather.missingBody")} /> : null}
       {ready && payload ? (

@@ -31,22 +31,23 @@ local function log(msg)
     print("AgriVisionConnector: " .. tostring(msg))
 end
 
+-- Giants: avoid pcall on the hot path. Nil-check, then call directly.
 local function safeCall(fn, ...)
     if fn == nil then
         return nil
     end
-    local ok, a, b, c = pcall(fn, ...)
-    if ok then
-        return a, b, c
-    end
-    return nil
+    return fn(...)
 end
 
 local function safeMethod(object, methodName, ...)
-    if object == nil or object[methodName] == nil then
+    if object == nil then
         return nil
     end
-    return safeCall(object[methodName], object, ...)
+    local method = object[methodName]
+    if method == nil then
+        return nil
+    end
+    return method(object, ...)
 end
 
 local function num(value)
@@ -1110,11 +1111,7 @@ local function harvestMonthsFromPeriods(fruit)
     local months = {}
     local period = 1
     while period <= 12 do
-        local ok, harvestable = pcall(fruit.getIsHarvestableInPeriod, fruit, growthMode, period)
-        if not ok then
-            return nil
-        end
-        if harvestable == true then
+        if fruit:getIsHarvestableInPeriod(growthMode, period) == true then
             months[#months + 1] = PERIOD_TO_MONTH[period]
         end
         period = period + 1
@@ -1418,8 +1415,8 @@ local function tramlineFromMap(map, farmlandId)
     while nameIndex <= #names do
         local method = map[names[nameIndex]]
         if method ~= nil then
-            local ok, a, b, c, d = pcall(method, map, farmlandId)
-            local row = ok and tramlineFromValues(a, b, c, d) or nil
+            local a, b, c, d = method(map, farmlandId)
+            local row = tramlineFromValues(a, b, c, d)
             if row ~= nil then
                 return row
             end
@@ -1435,15 +1432,11 @@ local function walkTramlineTable(index, source)
     end
     local id, row = next(source, nil)
     while id ~= nil do
-        local capturedId = id
-        local captured = row
-        pcall(function()
-            local farmlandId = num(capturedId)
-            if farmlandId == nil and type(captured) == "table" then
-                farmlandId = num(captured.farmlandId) or num(captured.id)
-            end
-            rememberTramline(index, farmlandId, captured)
-        end)
+        local farmlandId = num(id)
+        if farmlandId == nil and type(row) == "table" then
+            farmlandId = num(row.farmlandId) or num(row.id)
+        end
+        rememberTramline(index, farmlandId, row)
         id, row = next(source, id)
     end
 end

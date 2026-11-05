@@ -401,8 +401,9 @@ export const en = {
     players: "Players",
     map: "Map",
     gameTime: "Game time",
-    gameVersion: "Version",
+    gameVersion: "Game version",
     balance: "Balance",
+    asOf: "As of",
     balanceHint: "The feed does not provide a per-farm balance.",
     activity: "Activity",
     activityLead: "Demo entries, not server logs.",
@@ -607,6 +608,7 @@ export const en = {
   stock: {
     lead: "Stock by product first. Bales stand on their own. Below that, only stores that hold something.",
     updated: "Stock {{time}}",
+    asOf: "As of",
     loading: "Reading storage …",
     missingTitle: "No stock yet",
     missingBody: "The connector writes stock from package 0.1.16. Transfer it and restart the dedicated server.",
@@ -824,6 +826,7 @@ export const en = {
     lead: "Map of every field outline. Numbers and crop symbols appear as you zoom in, and joined fields share a gold outline. A click lists base-game and Precision Farming values.",
     loading: "Loading fields",
     updated: "Field state {{time}}",
+    asOf: "As of",
     count: "Fields",
     owned: "Owned",
     harvest: "Ready to harvest",
@@ -1006,6 +1009,7 @@ export const en = {
   },
   live: {
     updated: "As of {{time}}",
+    asOf: "As of",
     loading: "Loading the map",
     missingTitle: "No positions yet",
     missingBody: "Vehicles show up here once the connector has written their positions. Heading, players and places arrive with package 0.1.17 after a server restart.",
@@ -1064,6 +1068,7 @@ export const en = {
   },
   weather: {
     loading: "Loading weather",
+    asOf: "As of",
     missingTitle: "No weather report yet",
     missingBody: "Temperature, wind, rain, cloud cover and the forecast are written by connector 0.1.20. Transfer the package and restart the dedicated server.",
     precision: "Precision Farming does not publish its own weather. Soil, nitrogen, pH and yield stay on the fields page.",

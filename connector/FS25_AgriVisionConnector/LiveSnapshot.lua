@@ -17,15 +17,16 @@ local function log(msg)
     print("AgriVisionConnector: " .. tostring(msg))
 end
 
+-- Giants: avoid pcall on the hot path. Nil-check, then call directly.
 local function safeMethod(object, methodName, ...)
-    if object == nil or object[methodName] == nil then
+    if object == nil then
         return nil
     end
-    local ok, value = pcall(object[methodName], object, ...)
-    if ok then
-        return value
+    local method = object[methodName]
+    if method == nil then
+        return nil
     end
-    return nil
+    return method(object, ...)
 end
 
 local function num(value)
@@ -80,8 +81,8 @@ local function headingOf(node)
     if node == nil or localDirectionToWorld == nil then
         return nil
     end
-    local ok, dx, _, dz = pcall(localDirectionToWorld, node, 0, 0, 1)
-    if not ok or dx == nil or dz == nil then
+    local dx, _, dz = localDirectionToWorld(node, 0, 0, 1)
+    if dx == nil or dz == nil then
         return nil
     end
     return math.atan2(dx, dz)
@@ -271,10 +272,7 @@ local function worldXZ(placeable)
     if node == nil then
         return nil, nil
     end
-    local ok, x, _, z = pcall(getWorldTranslation, node)
-    if not ok then
-        return nil, nil
-    end
+    local x, _, z = getWorldTranslation(node)
     return num(x), num(z)
 end
 

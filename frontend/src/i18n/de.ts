@@ -399,8 +399,9 @@ export const de = {
     players: "Spieler",
     map: "Karte",
     gameTime: "Spielzeit",
-    gameVersion: "Version",
+    gameVersion: "Spielversion",
     balance: "Kontostand",
+    asOf: "Stand",
     balanceHint: "Der Feed liefert keinen Kontostand je Hof.",
     activity: "Aktivität",
     activityLead: "Demo-Einträge, keine Serverprotokolle.",
@@ -605,6 +606,7 @@ export const de = {
   stock: {
     lead: "Zuerst der Bestand nach Sorte. Ballen stehen extra. Darunter nur die Lager, in denen etwas liegt.",
     updated: "Lagerstand {{time}}",
+    asOf: "Stand",
     loading: "Lager wird gelesen …",
     missingTitle: "Noch kein Lagerstand",
     missingBody: "Der Connector schreibt den Bestand ab Paket 0.1.16. Bitte übertragen und den Dedicated Server neu starten.",
@@ -822,6 +824,7 @@ export const de = {
     lead: "Karte mit allen Feldumrissen. Nummern und Fruchtsymbole kommen beim Heranzoomen, zusammengelegte Felder teilen sich einen goldenen Umriss. Ein Klick öffnet die Werte aus Basispiel und Precision Farming.",
     loading: "Felder werden geladen",
     updated: "Feldstand {{time}}",
+    asOf: "Stand",
     count: "Felder",
     owned: "Im Besitz",
     harvest: "Erntebereit",
@@ -1004,6 +1007,7 @@ export const de = {
   },
   live: {
     updated: "Stand {{time}}",
+    asOf: "Stand",
     loading: "Karte wird geladen",
     missingTitle: "Noch keine Positionen",
     missingBody: "Sobald der Connector Fahrzeugpositionen schreibt, erscheinen sie hier. Richtung, Spieler und Orte kommen mit Paket 0.1.17 nach einem Neustart des Servers.",
@@ -1062,6 +1066,7 @@ export const de = {
   },
   weather: {
     loading: "Wetter wird geladen",
+    asOf: "Stand",
     missingTitle: "Noch kein Wetterbericht",
     missingBody: "Temperatur, Wind, Regen, Bewölkung und die Vorhersage schreibt Connector 0.1.20. Dafür das Paket auf den Server legen und den Dedicated Server neu starten.",
     precision: "Precision Farming hat kein eigenes Wetter. Boden, Stickstoff, pH und Ertrag stehen bei den Feldern.",

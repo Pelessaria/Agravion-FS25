@@ -116,6 +116,12 @@ export function WorkspaceHomePage() {
         </p>
         <p>
           <strong>
+            <MissingValue text={workspace.gameVersion ?? null} />
+          </strong>
+          <span>{t("workspace.gameVersion")}</span>
+        </p>
+        <p>
+          <strong>
             <MissingValue text={workspace.mapName} />
           </strong>
           <span>{t("workspace.map")}</span>
@@ -125,9 +131,6 @@ export function WorkspaceHomePage() {
             <MissingValue text={workspace.gameTime} />
           </strong>
           <span>{t("workspace.gameTime")}</span>
-          <em>
-            <MissingValue text={workspace.gameVersion ?? null} />
-          </em>
         </p>
         <p>
           <strong>
@@ -137,15 +140,23 @@ export function WorkspaceHomePage() {
           <em>{t("farm.equipmentHint")}</em>
         </p>
         {farm ? (
-          <>
-            <p>
-              <strong>
-                <MissingValue text={money(farm.money, i18n.language)} />
-              </strong>
-              <span>{t("workspace.balance")}</span>
-            </p>
-          </>
+          <p>
+            <strong>
+              <MissingValue text={money(farm.money, i18n.language)} />
+            </strong>
+            <span>{t("workspace.balance")}</span>
+          </p>
         ) : null}
+        <p>
+          <strong>
+            <MissingValue
+              text={
+                workspace.lastSyncAt ? stamp(workspace.lastSyncAt, t("unavailable")) : null
+              }
+            />
+          </strong>
+          <span>{t("workspace.asOf")}</span>
+        </p>
       </div>
       </div>
 

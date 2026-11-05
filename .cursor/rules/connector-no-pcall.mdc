@@ -1,0 +1,25 @@
+---
+description: Avoid pcall in the FS25 connector hot path (Giants guidance)
+globs: connector/**/*.lua
+alwaysApply: false
+---
+
+# Connector: no pcall on the hot path
+
+Giants advises against wrapping script calls in `pcall` / `xpcall`. Protected calls are expensive, and the dedicated-server update path already runs often enough that wrapping every method hurts FPS and scan time.
+
+## Do
+
+- Guard with `nil` / type checks, then call the method directly.
+- Keep at most one boundary `pcall` around a whole snapshot write (so one bad field does not kill the mod tick).
+- Prefer `if object ~= nil and object.getName ~= nil then object:getName() end` over `pcall(object.getName, object)`.
+
+## Do not
+
+- Wrap every engine or placeable method in `safeMethod`/`safeCall` that uses `pcall`.
+- Add new `pcall` inside per-field, per-vehicle, or per-placeable loops.
+- Use `pcall` to hide missing APIs that a version check or `nil` test can cover.
+
+## Boundary exception
+
+`AgriVisionConnector` may keep a single `pcall` around `FieldSnapshot.writeIfDue` / `StorageSnapshot.writeIfDue` / `LiveSnapshot.writeIfDue` so a snapshot failure is logged and the next tick continues. That is the outer fence, not a substitute for clean reads inside the snapshot code.
