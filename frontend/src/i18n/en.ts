@@ -827,7 +827,7 @@ export const en = {
     count: "Fields",
     owned: "Owned",
     harvest: "Ready to harvest",
-    harvestGrass: "including {{count}} grass",
+    harvestGrass: "including {{count}} grassland",
     area: "Area",
     missingTitle: "No field shapes yet",
     missingBody: "The connector writes outlines after the next game start. Until then the map stays empty.",
@@ -962,6 +962,7 @@ export const en = {
     layerName: {
       off: "Application map off",
       fruit: "Crop",
+      owner: "Ownership",
       soil: "Soil type",
       nitrogen: "Nitrogen",
       ph: "pH",

@@ -825,7 +825,7 @@ export const de = {
     count: "Felder",
     owned: "Im Besitz",
     harvest: "Erntebereit",
-    harvestGrass: "davon {{count}} mit Gras",
+    harvestGrass: "davon {{count}} Grünland",
     area: "Fläche",
     missingTitle: "Noch keine Feldformen",
     missingBody: "Der Connector schreibt die Umrisse nach dem nächsten Spielstart. Bis dahin bleibt die Karte leer.",
@@ -960,6 +960,7 @@ export const de = {
     layerName: {
       off: "Applikationskarte aus",
       fruit: "Frucht",
+      owner: "Besitz",
       soil: "Bodenart",
       nitrogen: "Stickstoff",
       ph: "pH-Wert",

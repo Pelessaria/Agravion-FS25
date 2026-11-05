@@ -2701,7 +2701,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   gap: 6px;
   width: max-content;
   max-width: 100%;
-  padding: 8px 16px 10px;
+  padding: 8px 16px 22px;
   border: 1px solid color-mix(in srgb, #e7d7b0 32%, transparent);
   border-radius: 12px;
   background: color-mix(in srgb, #141c19 55%, transparent);
@@ -2716,7 +2716,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-stats {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 0;
   width: max-content;
   max-width: 100%;
@@ -2739,8 +2739,15 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
-.fields-stats span { display: grid; color: var(--text-faint); font-size: 0.72rem; line-height: 1.15; }
-.fields-stats em { font-style: normal; color: var(--text-muted); }
+.fields-stats span { position: relative; color: var(--text-faint); font-size: 0.72rem; line-height: 1.15; }
+.fields-stats em {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 1px);
+  font-style: normal;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
 .fields-layout {
   display: block;
   min-height: 0;
@@ -2784,16 +2791,21 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   background: #141c18;
   overflow: hidden;
 }
+.fields-jump label {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  cursor: text;
+}
 .fields-jump span {
-  padding: 0 10px;
+  padding: 0 8px 0 10px;
   color: var(--text-muted);
   font-size: 0.82rem;
   white-space: nowrap;
 }
-.fields-jump-pipe { padding: 0 2px 0 0; color: var(--text-faint); }
 .fields-jump input {
-  width: 3.2ch;
-  flex: 0 0 3.2ch;
+  width: 0;
+  flex: 0 0 auto;
   height: 100%;
   border: 0;
   background: transparent;
@@ -2801,6 +2813,11 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   padding: 0;
   font: inherit;
   font-variant-numeric: tabular-nums;
+}
+.fields-jump input:focus,
+.fields-jump input:not(:placeholder-shown) {
+  width: 3.2ch;
+  margin-right: 2px;
 }
 .fields-jump button {
   display: grid;
@@ -2814,6 +2831,12 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .fields-jump button:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
 .fields-jump .icon { width: 15px; height: 15px; }
+.fields-freshness {
+  margin: 0 4px 0 auto;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
 .fields-map-frame { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .fields-viewport {
   position: relative;
@@ -2998,9 +3021,9 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   line-height: 1.35;
 }
 .layer-switch {
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px 12.5rem 28px;
   align-items: center;
-  gap: 2px;
   flex: 0 0 auto;
   height: 34px;
   margin: 0;
@@ -3011,9 +3034,11 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .layer-menu { position: relative; min-width: 0; }
 .layer-menu-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
+  width: 100%;
   height: 26px;
   margin: 0;
   padding: 0 8px;

@@ -5,6 +5,7 @@ import type { FieldSnapshot } from "./types"
 export type FieldLayerId =
   | "off"
   | "fruit"
+  | "owner"
   | "soil"
   | "nitrogen"
   | "ph"
@@ -75,6 +76,13 @@ const GROUND_COLOR: Record<number, string> = {
 }
 
 const NEUTRAL = "#5c6560"
+const UNOWNED = "#3c4742"
+const OWNER_COLORS = ["#4caf50", "#7aa2ff", "#e0a15a", "#c6e88a", "#d98ad4", "#5ec8c8", "#e6c23a", "#ff8f7a"]
+
+export function ownerColor(farmId: number | null, owned: boolean | null): string {
+  if (owned === false || farmId == null || farmId <= 0) return UNOWNED
+  return OWNER_COLORS[(Math.abs(farmId) - 1) % OWNER_COLORS.length]
+}
 
 export function precisionRasterLayer(layer: FieldLayerId) {
   return (
@@ -93,7 +101,7 @@ export function precisionRasterLayer(layer: FieldLayerId) {
 }
 
 export function layersFor(precisionFarming: boolean | null): FieldLayerId[] {
-  const shared: FieldLayerId[] = ["off", "fruit", "growth", "ground", "weed", "stones", "plow", "roller", "stubble"]
+  const shared: FieldLayerId[] = ["off", "fruit", "owner", "growth", "ground", "weed", "stones", "plow", "roller", "stubble"]
   if (precisionFarming === true) return [...shared, "soil", "nitrogen", "ph", "yield", "seed"]
   return [...shared, "spray", "lime"]
 }
@@ -164,6 +172,7 @@ export function nitrogenColor(value: number | null): string {
 
 export function paintColor(field: FieldSnapshot, layer: FieldLayerId): string {
   if (layer === "off" || layer === "fruit") return cropColor(field)
+  if (layer === "owner") return ownerColor(field.farmId, field.owned)
   if (layer === "soil") return field.soil != null ? (SOIL_COLOR[field.soil] ?? NEUTRAL) : NEUTRAL
   if (layer === "nitrogen") return nitrogenColor(field.nitrogen)
   if (layer === "ph") return phColor(field.ph)

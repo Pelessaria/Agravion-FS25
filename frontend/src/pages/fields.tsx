@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next"
 import { ChevronDown, ChevronLeft, ChevronRight, Minus, Plus, Search } from "lucide-react"
 import { apiWorkspaceFields } from "../api"
 import { cropIcon } from "../crop-icons"
-import { EmptyState, MissingWorkspace, PermissionBlock } from "../components/ui"
+import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { demoFields } from "../demo-fields"
 import { farmDisplayName } from "../farm-label"
 import {
@@ -28,6 +28,7 @@ import {
   layersFor,
   legendStops,
   matchesFieldQuery,
+  ownerColor,
   paintColor,
   phScaleStops,
   precisionRasterLayer,
@@ -156,7 +157,8 @@ export function FieldsPage() {
   const farm = workspace ? selectedFarm(workspace.id) : null
   const demo = useMemo(() => demoFields(), [])
   const [payload, setPayload] = useState<FieldsResponse | null>(null)
-  const [, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const stamp = useTimeLabel()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [onlyMine, setOnlyMine] = useState(false)
   const [showUnowned, setShowUnowned] = useState(false)
@@ -274,7 +276,10 @@ export function FieldsPage() {
     return result
   }, [fields, frame, visible])
   const selected = fields.find((field) => field.id === selectedId) ?? null
-  const owned = fields.filter((field) => field.owned).length
+  const ownedAll = fields.filter((field) => field.owned === true).length
+  const owned = farm
+    ? fields.filter((field) => field.farmId === farm.gameFarmId).length
+    : ownedAll
   const harvestFields = fields.filter((field) => field.crop === "harvestReady")
   const harvest = harvestFields.length
   const harvestGrass = harvestFields.filter(
@@ -305,8 +310,22 @@ export function FieldsPage() {
   ).entries()].sort((a, b) => a[1].localeCompare(b[1], i18n.language))
   const filterCount = activeQueryCount(fieldQuery, precisionFarming)
   const filterBadge = filterCount + (showTramlines ? 1 : 0) + (onlyMine ? 1 : 0) + (showUnowned ? 1 : 0)
+  const ownerLegend = [...new Set(
+    fields.map((field) => field.farmId).filter((id): id is number => id != null && id > 0),
+  )]
+    .sort((a, b) => a - b)
+    .map((id) => {
+      const known = workspace ? farmByGameId(workspace.id, id) : null
+      return {
+        color: ownerColor(id, true),
+        label: known ? farmDisplayName(known, t) : t("farm.stubName", { id }),
+      }
+    })
+  if (fields.some((field) => field.owned === false || field.farmId == null || field.farmId <= 0)) {
+    ownerLegend.push({ color: ownerColor(null, false), label: t("fields.ownedNo") })
+  }
   const legend = [
-    ...legendStops(activeLayer, t),
+    ...(activeLayer === "owner" ? ownerLegend : legendStops(activeLayer, t)),
     ...(showTramlines ? [{ color: "#f7f1e4", label: t("fields.layerName.tramline") }] : []),
   ]
   const cropFilters = ["harvestReady", "growing", "planted", "cut", "withered", "noCrop"]
@@ -347,6 +366,10 @@ export function FieldsPage() {
         <p>
           <strong>{owned.toLocaleString(i18n.language)}</strong>
           <span>{t("fields.owned")}</span>
+        </p>
+        <p>
+          <strong>{ownedAll.toLocaleString(i18n.language)}</strong>
+          <span>{t("fields.allFarms")}</span>
         </p>
         <p>
           <strong>{harvest.toLocaleString(i18n.language)}</strong>
@@ -410,19 +433,28 @@ export function FieldsPage() {
                   jumpToNumber()
                 }}
               >
-                <span>{t("fields.fieldShort")}</span>
-                <span className="fields-jump-pipe" aria-hidden="true">|</span>
-                <input
-                  inputMode="numeric"
-                  maxLength={3}
-                  value={query}
-                  aria-label={t("fields.fieldNumber")}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
+                <label>
+                  <span>{t("fields.fieldShort")}</span>
+                  <input
+                    inputMode="numeric"
+                    maxLength={3}
+                    placeholder=" "
+                    value={query}
+                    aria-label={t("fields.fieldNumber")}
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                </label>
                 <button type="submit" aria-label={t("fields.pick")}>
                   <Search className="icon" />
                 </button>
               </form>
+              <p className="fields-freshness">
+                {source?.stateAt
+                  ? t("fields.updated", { time: stamp(source.stateAt, t("unavailable")) })
+                  : loading
+                    ? t("fields.loading")
+                    : null}
+              </p>
             </div>
             {filtersOpen ? (
             <div className="fields-filters">
