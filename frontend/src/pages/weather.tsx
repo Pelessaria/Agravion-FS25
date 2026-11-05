@@ -1,19 +1,7 @@
-import type { ComponentType, ReactNode } from "react"
+import type { ReactNode } from "react"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
-import {
-  Cloud,
-  CloudFog,
-  CloudHail,
-  CloudRain,
-  CloudSun,
-  Droplets,
-  Gauge,
-  Snowflake,
-  Sun,
-  Tornado,
-  Wind,
-} from "lucide-react"
+import { Cloud, CloudFog, CloudRain, Droplets, Gauge, Snowflake, Wind } from "lucide-react"
 import { apiWorkspaceLiveMap, type LiveForecastDay, type LiveForecastHour, type LiveMapResponse } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { useStore } from "../store"
@@ -22,17 +10,17 @@ import { useWorkspaceRoute } from "../use-workspace"
 const PERIOD_TO_MONTH = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2]
 const KNOWN = new Set(["SUN", "CLEAR", "CLOUDY", "CLOUDS", "PARTLY_CLOUDY", "RAIN", "SNOW", "HAIL", "TWISTER", "FOG"])
 
-const SKY: Record<string, { icon: ComponentType<{ className?: string }>; tone: string }> = {
-  SUN: { icon: Sun, tone: "sun" },
-  CLEAR: { icon: Sun, tone: "sun" },
-  CLOUDY: { icon: Cloud, tone: "cloud" },
-  CLOUDS: { icon: Cloud, tone: "cloud" },
-  PARTLY_CLOUDY: { icon: CloudSun, tone: "sun" },
-  RAIN: { icon: CloudRain, tone: "rain" },
-  SNOW: { icon: Snowflake, tone: "snow" },
-  HAIL: { icon: CloudHail, tone: "hail" },
-  TWISTER: { icon: Tornado, tone: "cloud" },
-  FOG: { icon: CloudFog, tone: "fog" },
+const TONE: Record<string, string> = {
+  SUN: "sun",
+  CLEAR: "sun",
+  CLOUDY: "cloud",
+  CLOUDS: "cloud",
+  PARTLY_CLOUDY: "partly",
+  RAIN: "rain",
+  SNOW: "snow",
+  HAIL: "hail",
+  TWISTER: "storm",
+  FOG: "fog",
 }
 
 function clockLabel(value: number | null) {
@@ -220,18 +208,108 @@ export function WeatherPage() {
   )
 }
 
-function SkyMark({ raw, large }: { raw: string | null; large?: boolean }) {
+function toneOf(raw: string | null) {
   const key = weatherKey(raw)
-  const spec = (key && SKY[key]) || { icon: CloudSun, tone: "sun" }
-  const Icon = spec.icon
-  if (large) {
+  return (key && TONE[key]) || "cloud"
+}
+
+function SkyMark({ raw, large }: { raw: string | null; large?: boolean }) {
+  const tone = toneOf(raw)
+  return (
+    <span className={large ? `weather-sky is-${tone}` : `weather-art is-${tone}`}>
+      <WeatherSvg kind={weatherKey(raw)} />
+    </span>
+  )
+}
+
+function WeatherSvg({ kind }: { kind: string | null }) {
+  const cloud = "M20 42h26c6.2 0 11-4.4 11-10.2 0-5.2-4-9.4-9.2-10-1.2-6.4-7-11-13.6-11-5.6 0-10.4 3.4-12.2 8.2C15.2 19.6 10 24 10 29.6 10 36.2 14.6 42 20 42z"
+  if (kind === "SUN" || kind === "CLEAR") {
     return (
-      <div className={`weather-sky is-${spec.tone}`}>
-        <Icon />
-      </div>
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <g stroke="#f0a202" strokeWidth="3.4" strokeLinecap="round">
+          <path d="M32 6v8M32 50v8M6 32h8M50 32h8M13 13l6 6M45 45l6 6M51 13l-6 6M19 45l-6 6" />
+        </g>
+        <circle cx="32" cy="32" r="13" fill="#ffc83d" />
+        <circle cx="27" cy="28" r="5" fill="#ffe7a3" />
+      </svg>
     )
   }
-  return <Icon className="weather-mini" />
+  if (kind === "RAIN") {
+    return (
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <path d={cloud} fill="#d5e2ea" />
+        <path d={cloud} fill="#f7fbfd" transform="translate(0 -1)" />
+        <g fill="#3d9be0">
+          <path d="M22 46c2 4 2 6 0 9-2-3-2-5 0-9z" />
+          <path d="M32 47c2 4 2 6 0 9-2-3-2-5 0-9z" />
+          <path d="M42 46c2 4 2 6 0 9-2-3-2-5 0-9z" />
+        </g>
+      </svg>
+    )
+  }
+  if (kind === "SNOW") {
+    return (
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <path d={cloud} fill="#e7eef3" />
+        <g fill="#7eb6e6" stroke="#f7fbff" strokeWidth="1.2">
+          <circle cx="22" cy="50" r="2.4" />
+          <circle cx="32" cy="54" r="2.4" />
+          <circle cx="43" cy="49" r="2.4" />
+        </g>
+      </svg>
+    )
+  }
+  if (kind === "HAIL") {
+    return (
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <path d={cloud} fill="#d7e0e8" />
+        <g fill="#f4f8fb" stroke="#6aa4d8" strokeWidth="1.4">
+          <circle cx="22" cy="50" r="2.6" />
+          <circle cx="32" cy="54" r="2.6" />
+          <circle cx="42" cy="49" r="2.6" />
+        </g>
+      </svg>
+    )
+  }
+  if (kind === "FOG") {
+    return (
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <g fill="#c5d0d6">
+          <rect x="10" y="18" width="36" height="6" rx="3" />
+          <rect x="18" y="29" width="36" height="6" rx="3" fill="#e8eef1" />
+          <rect x="12" y="40" width="32" height="6" rx="3" />
+        </g>
+      </svg>
+    )
+  }
+  if (kind === "TWISTER") {
+    return (
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <ellipse cx="32" cy="16" rx="18" ry="6" fill="#c5ced4" />
+        <ellipse cx="30" cy="28" rx="13" ry="5" fill="#dfe6ea" />
+        <ellipse cx="34" cy="39" rx="8" ry="4" fill="#b7c3ca" />
+        <ellipse cx="31" cy="49" rx="4" ry="3" fill="#8ea0aa" />
+      </svg>
+    )
+  }
+  if (kind === "PARTLY_CLOUDY") {
+    return (
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <g stroke="#f0a202" strokeWidth="3" strokeLinecap="round">
+          <path d="M22 8v6M10 22h6M12 12l4 4" />
+        </g>
+        <circle cx="22" cy="22" r="8" fill="#ffc83d" />
+        <path d={cloud} fill="#f7fbfd" />
+      </svg>
+    )
+  }
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <path d={cloud} fill="#d5dee6" />
+      <path d={cloud} fill="#f4f7fa" transform="translate(-1 -1)" />
+    </svg>
+  )
 }
 
 function WindArrow({ degrees }: { degrees: number }) {
@@ -275,7 +353,7 @@ function Extra({ icon, label, value }: { icon: ReactNode; label: string; value: 
 function HourCard({ hour, label, now }: { hour: LiveForecastHour; label: string; now?: boolean }) {
   const when = clockLabel(hour.time)
   return (
-    <article className={now ? "weather-hour is-now" : "weather-hour"}>
+    <article className={now ? `weather-hour is-now is-${toneOf(hour.type)}` : `weather-hour is-${toneOf(hour.type)}`}>
       <time>{when ?? label}</time>
       <SkyMark raw={hour.type} />
       <strong>{hour.temperature != null ? `${hour.temperature.toFixed(0)}°` : "–"}</strong>
@@ -286,7 +364,7 @@ function HourCard({ hour, label, now }: { hour: LiveForecastHour; label: string;
 
 function DayCard({ day, label, dayLabel, today }: { day: LiveForecastDay; label: string; dayLabel: string; today?: boolean }) {
   return (
-    <article className={today ? "weather-day is-today" : "weather-day"}>
+    <article className={today ? `weather-day is-today is-${toneOf(day.type)}` : `weather-day is-${toneOf(day.type)}`}>
       <span>{dayLabel}</span>
       <SkyMark raw={day.type} />
       <strong>{day.high != null ? `${day.high.toFixed(0)}°` : "–"}</strong>

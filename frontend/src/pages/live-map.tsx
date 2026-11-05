@@ -292,7 +292,6 @@ export function LiveMapPage() {
           ))}
         </div>
       </header>
-      <div className="live-layout">
       <div className="live-stage">
         {loading && !payload ? <p className="live-wait">{t("live.loading")}</p> : null}
         {payload?.error === "failed" && payload.vehicles.length === 0 ? (
@@ -344,7 +343,6 @@ export function LiveMapPage() {
             </span>
           ) : null}
         </div>
-      </div>
       <aside className="live-side">
         <section className="panel live-objects">
           <header>
@@ -762,6 +760,11 @@ function LiveCanvas({
             <div className="fields-terrain" />
           )}
           <svg className="live-sheet" style={{ left: sheet.left, top: sheet.top, width: sheet.size, height: sheet.size }} viewBox="0 0 100 100">
+            <defs>
+              <clipPath id="live-icon-clip" clipPathUnits="objectBoundingBox">
+                <circle cx="0.5" cy="0.5" r="0.5" />
+              </clipPath>
+            </defs>
             {showFields
               ? shapes.map((points, index) => <polygon key={`shape-${index}`} className="live-field" points={points} />)
               : null}
@@ -769,17 +772,18 @@ function LiveCanvas({
               const on = marker.key === selected
               const rotation = marker.heading == null ? 0 : (-marker.heading * 180) / Math.PI
               const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
-              const mark = toMap(marker.icon ? (on ? 22 : 18) : on ? 16 : 13)
+              const mark = toMap(marker.icon ? (on ? 28 : 24) : on ? 20 : 16)
               return (
                 <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.role} is-on` : `live-marker is-${marker.role}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`rotate(${marker.icon ? 0 : rotation}) scale(${mark})`}>
-                    <circle r="0.92" className="live-marker-plate" style={marker.farmColor ? { fill: marker.farmColor } : undefined} />
+                    <circle r="1.08" className="live-marker-plate" />
                     {marker.icon ? (
-                      <image href={marker.icon} x="-0.72" y="-0.72" width="1.44" height="1.44" />
+                      <image href={marker.icon} x="-0.78" y="-0.78" width="1.56" height="1.56" clipPath="url(#live-icon-clip)" />
                     ) : (
                       <MarkerGlyph role={marker.role} />
                     )}
-                    <circle className={marker.farmColor ? "live-marker-ring is-farm" : "live-marker-ring"} r="1.02" style={marker.farmColor ? { stroke: marker.farmColor } : undefined} />
+                    <circle r="1.08" className="live-marker-rim" />
+                    {marker.farmColor ? <circle className="live-marker-farm" cx="0.74" cy="0.74" r="0.32" style={{ fill: marker.farmColor }} /> : null}
                   </g>
                   {marker.count && marker.count > 1 ? (
                     <g className="live-count" transform={`translate(${toMap(9)} ${toMap(-9)}) scale(${toMap(11)})`}>
