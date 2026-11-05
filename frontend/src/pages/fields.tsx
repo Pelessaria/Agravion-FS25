@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
-import { ChevronDown, ChevronLeft, ChevronRight, LocateFixed, Minus, Plus } from "lucide-react"
+import { ChevronDown, ChevronLeft, ChevronRight, Minus, Plus, Search } from "lucide-react"
 import { apiWorkspaceFields } from "../api"
 import { cropIcon } from "../crop-icons"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
@@ -29,6 +29,7 @@ import {
   legendStops,
   matchesFieldQuery,
   paintColor,
+  phScaleStops,
   precisionRasterLayer,
   type FieldLayerId,
   type FieldQuery,
@@ -275,7 +276,11 @@ export function FieldsPage() {
   }, [fields, frame, visible])
   const selected = fields.find((field) => field.id === selectedId) ?? null
   const owned = fields.filter((field) => field.owned).length
-  const harvest = fields.filter((field) => field.crop === "harvestReady").length
+  const harvestFields = fields.filter((field) => field.crop === "harvestReady")
+  const harvest = harvestFields.length
+  const harvestGrass = harvestFields.filter(
+    (field) => field.fruitName != null && GRASS_FRUIT.has(field.fruitName.toUpperCase()),
+  ).length
   const knownArea = fields.reduce((sum, field) => sum + (field.areaHa ?? 0), 0)
   const missingArea = fields.some((field) => field.areaHa == null)
 
@@ -359,6 +364,7 @@ export function FieldsPage() {
         <div className="stat-tile">
           <span>{t("fields.harvest")}</span>
           <strong>{harvest.toLocaleString(i18n.language)}</strong>
+          <em>{t("fields.harvestGrass", { count: harvestGrass })}</em>
         </div>
         <div className="stat-tile">
           <span>{t("fields.area")}</span>
@@ -407,131 +413,145 @@ export function FieldsPage() {
                 {filterBadge > 0 ? <em>{filterBadge}</em> : null}
                 <ChevronDown className="icon" />
               </button>
-              <label className="field fields-search">
-                <span className="sr-only">{t("fields.fieldNumber")}</span>
+              <form
+                className="fields-jump"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  jumpToNumber()
+                }}
+              >
+                <span>{t("fields.fieldShort")}</span>
+                <span className="fields-jump-pipe" aria-hidden="true">|</span>
+                <button type="submit" aria-label={t("fields.pick")}>
+                  <Search className="icon" />
+                </button>
                 <input
                   inputMode="numeric"
                   value={query}
-                  placeholder={t("fields.fieldNumber")}
+                  aria-label={t("fields.fieldNumber")}
                   onChange={(event) => setQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") jumpToNumber()
-                  }}
                 />
-              </label>
-              <button type="button" className="btn btn-secondary" onClick={jumpToNumber}>
-                <LocateFixed className="icon" />
-                {t("fields.pick")}
-              </button>
+              </form>
             </div>
             {filtersOpen ? (
             <div className="fields-filters">
-              {precisionFarming === true ? (
-                <button
-                  type="button"
-                  className={showTramlines ? "chip-check on" : "chip-check"}
-                  aria-pressed={showTramlines}
-                  onClick={() => setShowTramlines((value) => !value)}
-                >
-                  {t("fields.layerName.tramline")}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className={onlyMine ? "chip-check on" : "chip-check"}
-                aria-pressed={onlyMine}
-                disabled={!farm}
-                onClick={() => setOnlyMine((value) => !value)}
-              >
-                {t("fields.thisFarm")}
-              </button>
-              <button
-                type="button"
-                className={showUnowned ? "chip-check on" : "chip-check"}
-                aria-pressed={showUnowned}
-                onClick={() => setShowUnowned((value) => !value)}
-              >
-                {t("fields.showUnowned")}
-              </button>
-              <button
-                type="button"
-                className={fieldQuery.crop === "harvestReady" ? "chip-check on" : "chip-check"}
-                aria-pressed={fieldQuery.crop === "harvestReady"}
-                onClick={() => patchQuery({ crop: fieldQuery.crop === "harvestReady" ? "" : "harvestReady" })}
-              >
-                {t("fields.crop.harvestReady")}
-              </button>
-              <button
-                type="button"
-                className={fieldQuery.joined ? "chip-check on" : "chip-check"}
-                aria-pressed={fieldQuery.joined}
-                onClick={() => patchQuery({ joined: !fieldQuery.joined })}
-              >
-                {t("fields.filterJoined")}
-              </button>
-              <button
-                type="button"
-                className={fieldQuery.weeds ? "chip-check on" : "chip-check"}
-                aria-pressed={fieldQuery.weeds}
-                onClick={() => patchQuery({ weeds: !fieldQuery.weeds })}
-              >
-                {t("fields.filterWeeds")}
-              </button>
-              <button
-                type="button"
-                className={fieldQuery.stones ? "chip-check on" : "chip-check"}
-                aria-pressed={fieldQuery.stones}
-                onClick={() => patchQuery({ stones: !fieldQuery.stones })}
-              >
-                {t("fields.filterStones")}
-              </button>
-              {precisionFarming === true ? (
-                <>
+              <div className="fields-seg-row">
+                {precisionFarming === true ? (
+                  <div className="fields-seg">
+                    <button
+                      type="button"
+                      className={showTramlines ? "is-on" : ""}
+                      aria-pressed={showTramlines}
+                      onClick={() => setShowTramlines((value) => !value)}
+                    >
+                      {t("fields.layerName.tramline")}
+                    </button>
+                  </div>
+                ) : null}
+                <div className="fields-seg">
                   <button
                     type="button"
-                    className={fieldQuery.nitrogen === "low" ? "chip-check on" : "chip-check"}
-                    aria-pressed={fieldQuery.nitrogen === "low"}
-                    onClick={() => patchQuery({ nitrogen: fieldQuery.nitrogen === "low" ? "" : "low" })}
+                    className={onlyMine ? "is-on" : ""}
+                    aria-pressed={onlyMine}
+                    disabled={!farm}
+                    onClick={() => setOnlyMine((value) => !value)}
                   >
-                    {t("fields.filterNitrogenLow")}
+                    {t("fields.thisFarm")}
                   </button>
                   <button
                     type="button"
-                    className={fieldQuery.ph === "off" ? "chip-check on" : "chip-check"}
-                    aria-pressed={fieldQuery.ph === "off"}
-                    onClick={() => patchQuery({ ph: fieldQuery.ph === "off" ? "" : "off" })}
+                    className={showUnowned ? "is-on" : ""}
+                    aria-pressed={showUnowned}
+                    onClick={() => setShowUnowned((value) => !value)}
                   >
-                    {t("fields.filterPhOff")}
+                    {t("fields.showUnowned")}
+                  </button>
+                </div>
+                <div className="fields-seg">
+                  <button
+                    type="button"
+                    className={fieldQuery.crop === "harvestReady" ? "is-on" : ""}
+                    aria-pressed={fieldQuery.crop === "harvestReady"}
+                    onClick={() => patchQuery({ crop: fieldQuery.crop === "harvestReady" ? "" : "harvestReady" })}
+                  >
+                    {t("fields.crop.harvestReady")}
                   </button>
                   <button
                     type="button"
-                    className={fieldQuery.scan === "no" ? "chip-check on" : "chip-check"}
-                    aria-pressed={fieldQuery.scan === "no"}
-                    onClick={() => patchQuery({ scan: fieldQuery.scan === "no" ? "" : "no" })}
+                    className={fieldQuery.joined ? "is-on" : ""}
+                    aria-pressed={fieldQuery.joined}
+                    onClick={() => patchQuery({ joined: !fieldQuery.joined })}
                   >
-                    {t("fields.filterUnscanned")}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className={fieldQuery.spray === "open" ? "chip-check on" : "chip-check"}
-                    aria-pressed={fieldQuery.spray === "open"}
-                    onClick={() => patchQuery({ spray: fieldQuery.spray === "open" ? "" : "open" })}
-                  >
-                    {t("fields.filterSprayOpen")}
+                    {t("fields.filterJoined")}
                   </button>
                   <button
                     type="button"
-                    className={fieldQuery.lime === "open" ? "chip-check on" : "chip-check"}
-                    aria-pressed={fieldQuery.lime === "open"}
-                    onClick={() => patchQuery({ lime: fieldQuery.lime === "open" ? "" : "open" })}
+                    className={fieldQuery.weeds ? "is-on" : ""}
+                    aria-pressed={fieldQuery.weeds}
+                    onClick={() => patchQuery({ weeds: !fieldQuery.weeds })}
                   >
-                    {t("fields.filterLimeOpen")}
+                    {t("fields.filterWeeds")}
                   </button>
-                </>
-              )}
+                  <button
+                    type="button"
+                    className={fieldQuery.stones ? "is-on" : ""}
+                    aria-pressed={fieldQuery.stones}
+                    onClick={() => patchQuery({ stones: !fieldQuery.stones })}
+                  >
+                    {t("fields.filterStones")}
+                  </button>
+                </div>
+                <div className="fields-seg">
+                  {precisionFarming === true ? (
+                    <>
+                      <button
+                        type="button"
+                        className={fieldQuery.nitrogen === "low" ? "is-on" : ""}
+                        aria-pressed={fieldQuery.nitrogen === "low"}
+                        onClick={() => patchQuery({ nitrogen: fieldQuery.nitrogen === "low" ? "" : "low" })}
+                      >
+                        {t("fields.filterNitrogenLow")}
+                      </button>
+                      <button
+                        type="button"
+                        className={fieldQuery.ph === "off" ? "is-on" : ""}
+                        aria-pressed={fieldQuery.ph === "off"}
+                        onClick={() => patchQuery({ ph: fieldQuery.ph === "off" ? "" : "off" })}
+                      >
+                        {t("fields.filterPhOff")}
+                      </button>
+                      <button
+                        type="button"
+                        className={fieldQuery.scan === "no" ? "is-on" : ""}
+                        aria-pressed={fieldQuery.scan === "no"}
+                        onClick={() => patchQuery({ scan: fieldQuery.scan === "no" ? "" : "no" })}
+                      >
+                        {t("fields.filterUnscanned")}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className={fieldQuery.spray === "open" ? "is-on" : ""}
+                        aria-pressed={fieldQuery.spray === "open"}
+                        onClick={() => patchQuery({ spray: fieldQuery.spray === "open" ? "" : "open" })}
+                      >
+                        {t("fields.filterSprayOpen")}
+                      </button>
+                      <button
+                        type="button"
+                        className={fieldQuery.lime === "open" ? "is-on" : ""}
+                        aria-pressed={fieldQuery.lime === "open"}
+                        onClick={() => patchQuery({ lime: fieldQuery.lime === "open" ? "" : "open" })}
+                      >
+                        {t("fields.filterLimeOpen")}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="fields-seg-row">
               <FilterMenu
                 label={t("fields.filterFruit")}
                 value={fieldQuery.fruit}
@@ -572,8 +592,10 @@ export function FieldsPage() {
                   {t("fields.filterReset")}
                 </button>
               ) : null}
+              </div>
             </div>
             ) : null}
+            {activeLayer === "ph" ? <PhScale language={i18n.language} /> : null}
             {legend.length > 0 ? (
               <div className="layer-legend" aria-label={t("fields.legend")}>
                 {legend.map((stop) => (
@@ -707,6 +729,33 @@ function FilterMenu({
           ))}
         </ul>
       ) : null}
+    </div>
+  )
+}
+
+function PhScale({ language }: { language: string }) {
+  const stops = phScaleStops()
+  const min = stops[0][0]
+  const max = stops[stops.length - 1][0]
+  const gradient = stops
+    .map(([value, color]) => `${color} ${((value - min) / (max - min)) * 100}%`)
+    .join(", ")
+  const marks = [4.5, 6.5, 8]
+  const text = (value: number) =>
+    value.toLocaleString(language, { minimumFractionDigits: value % 1 === 0 ? 0 : 1, maximumFractionDigits: 1 })
+  return (
+    <div className="layer-scale" aria-label="pH">
+      <span>pH</span>
+      <div>
+        <i style={{ background: `linear-gradient(90deg, ${gradient})` }} />
+        <ol>
+          {marks.map((value) => (
+            <li key={value} style={{ left: `${((value - min) / (max - min)) * 100}%` }}>
+              {text(value)}
+            </li>
+          ))}
+        </ol>
+      </div>
     </div>
   )
 }

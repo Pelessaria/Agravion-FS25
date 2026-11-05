@@ -148,6 +148,10 @@ const NITROGEN_STOPS: Array<[number, string]> = [
   [220, "#1a2420"],
 ]
 
+export function phScaleStops(): Array<[number, string]> {
+  return PH_STOPS
+}
+
 export function phColor(value: number | null): string {
   if (value == null || value <= 0) return "#141414"
   return ramp(value, PH_STOPS)
@@ -189,12 +193,7 @@ export function legendStops(layer: FieldLayerId, t: TFunction): { color: string;
       label: `${value} kg/ha`,
     }))
   }
-  if (layer === "ph") {
-    return PH_STOPS.filter((_, index) => index % 2 === 0).map(([value, color]) => ({
-      color,
-      label: value.toFixed(2),
-    }))
-  }
+  if (layer === "ph") return []
   if (layer === "yield") {
     return YIELD_STOPS.map(([value, color]) => ({ color, label: `${value}%` }))
   }
