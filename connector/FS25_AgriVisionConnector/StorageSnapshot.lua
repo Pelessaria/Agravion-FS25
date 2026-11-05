@@ -399,7 +399,10 @@ local function addBales(bins, placeable, sourceIndex, connector)
     if farmId == nil then
         return
     end
-    local infos = safeMethod(placeable, "getObjectStorageObjectInfos")
+    local infos = safeMethod(placeable, "getObjectInfos")
+    if type(infos) ~= "table" then
+        infos = safeMethod(placeable, "getObjectStorageObjectInfos")
+    end
     if type(infos) ~= "table" then
         infos = spec.objectInfos
     end
@@ -409,17 +412,37 @@ local function addBales(bins, placeable, sourceIndex, connector)
     local fills = {}
     local total = 0
     local bales = 0
+    local function pushFill(fillType, title, volume, count, form, size)
+        if count <= 0 then
+            return
+        end
+        bales = bales + count
+        fills[#fills + 1] = {
+            fillType = fillType,
+            title = title,
+            level = volume,
+            count = count,
+            form = form,
+            size = size,
+        }
+    end
     for key, info in pairs(infos) do
         if type(info) == "table" then
             local representative = nil
             if type(info.objects) == "table" then
-                representative = info.objects[1]
+                for _, object in pairs(info.objects) do
+                    if type(object) == "table" then
+                        representative = object
+                        break
+                    end
+                end
             end
-            local counted = representative ~= nil and isBale(representative, spec)
-            if not counted and representative == nil and spec.supportsBales == true and spec.supportsPallets ~= true then
+            -- Dedicated servers often keep the count without spawning the bale.
+            local counted = representative == nil or isBale(representative, spec)
+            if representative ~= nil and not isBale(representative, spec) and spec.supportsBales == true and spec.supportsPallets ~= true then
                 counted = true
             end
-            if counted then
+            if counted and spec.supportsBales == true then
                 local count = num(info.numObjects)
                 if count == nil and type(info.objects) == "table" then
                     count = #info.objects
@@ -441,17 +464,44 @@ local function addBales(bins, placeable, sourceIndex, connector)
                         total = total + each * count
                     end
                     local form, size = baleForm(representative)
-                    bales = bales + count
-                    fills[#fills + 1] = {
-                        fillType = fillType,
-                        title = title,
-                        level = volume,
-                        count = count,
-                        form = form,
-                        size = size,
-                    }
+                    if form == nil then
+                        form, size = baleForm(info)
+                    end
+                    pushFill(fillType, title, volume, count, form, size)
                 end
             end
+        end
+    end
+    if #fills == 0 and type(spec.storedObjects) == "table" then
+        local groups = {}
+        for _, object in pairs(spec.storedObjects) do
+            if type(object) == "table" and (isBale(object, spec) or spec.supportsPallets ~= true) then
+                local fillType, title = nil, nil
+                local fillTypeId = objectFillType(object)
+                if fillTypeId ~= nil then
+                    fillType, title = fillInfo(fillTypeId)
+                end
+                local form, size = baleForm(object)
+                local groupKey = table.concat({
+                    tostring(fillType or title or ""),
+                    tostring(form or ""),
+                    tostring(size or ""),
+                }, "|")
+                local group = groups[groupKey]
+                if group == nil then
+                    group = { fillType = fillType, title = title, level = 0, count = 0, form = form, size = size }
+                    groups[groupKey] = group
+                end
+                group.count = group.count + 1
+                local each = objectFillLevel(object)
+                if each ~= nil then
+                    group.level = group.level + each
+                    total = total + each
+                end
+            end
+        end
+        for _, group in pairs(groups) do
+            pushFill(group.fillType, group.title, round(group.level), group.count, group.form, group.size)
         end
     end
     table.sort(fills, function(a, b)

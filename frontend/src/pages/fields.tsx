@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
-import { ChevronLeft, ChevronRight, LocateFixed, Minus, Plus } from "lucide-react"
+import { ChevronDown, ChevronLeft, ChevronRight, LocateFixed, Minus, Plus } from "lucide-react"
 import { apiWorkspaceFields } from "../api"
 import { cropIcon } from "../crop-icons"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
@@ -163,8 +163,9 @@ export function FieldsPage() {
   const [query, setQuery] = useState("")
   const [focusToken, setFocusToken] = useState(0)
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
-  const [layer, setLayer] = useState<FieldLayerId>("off")
-  const [showTramlines, setShowTramlines] = useState(true)
+  const [layer, setLayer] = useState<FieldLayerId>("fruit")
+  const [showTramlines, setShowTramlines] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [fieldQuery, setFieldQuery] = useState<FieldQuery>(EMPTY_FIELD_QUERY)
 
   useEffect(() => {
@@ -299,6 +300,7 @@ export function FieldsPage() {
       .map((field) => [field.fruitName as string, field.fruitTitle || field.fruitName || ""]),
   ).entries()].sort((a, b) => a[1].localeCompare(b[1], i18n.language))
   const filterCount = activeQueryCount(fieldQuery, precisionFarming)
+  const filterBadge = filterCount + (showTramlines ? 1 : 0) + (onlyMine ? 1 : 0) + (showUnowned ? 1 : 0)
   const legend = [
     ...legendStops(activeLayer, t),
     ...(showTramlines ? [{ color: "#f7f1e4", label: t("fields.layerName.tramline") }] : []),
@@ -395,16 +397,16 @@ export function FieldsPage() {
                   <ChevronRight className="icon" />
                 </button>
               </div>
-              {precisionFarming === true ? (
-                <button
-                  type="button"
-                  className={showTramlines ? "chip-check on" : "chip-check"}
-                  aria-pressed={showTramlines}
-                  onClick={() => setShowTramlines((value) => !value)}
-                >
-                  {t("fields.layerName.tramline")}
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className={filtersOpen ? "chip-check on fields-filter-toggle" : "chip-check fields-filter-toggle"}
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((value) => !value)}
+              >
+                {t("fields.filters")}
+                {filterBadge > 0 ? <em>{filterBadge}</em> : null}
+                <ChevronDown className="icon" />
+              </button>
               <label className="field fields-search">
                 <span className="sr-only">{t("fields.fieldNumber")}</span>
                 <input
@@ -422,7 +424,18 @@ export function FieldsPage() {
                 {t("fields.pick")}
               </button>
             </div>
+            {filtersOpen ? (
             <div className="fields-filters">
+              {precisionFarming === true ? (
+                <button
+                  type="button"
+                  className={showTramlines ? "chip-check on" : "chip-check"}
+                  aria-pressed={showTramlines}
+                  onClick={() => setShowTramlines((value) => !value)}
+                >
+                  {t("fields.layerName.tramline")}
+                </button>
+              ) : null}
               <button
                 type="button"
                 className={onlyMine ? "chip-check on" : "chip-check"}
@@ -560,6 +573,7 @@ export function FieldsPage() {
                 </button>
               ) : null}
             </div>
+            ) : null}
             {legend.length > 0 ? (
               <div className="layer-legend" aria-label={t("fields.legend")}>
                 {legend.map((stop) => (

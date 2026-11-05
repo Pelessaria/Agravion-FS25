@@ -318,6 +318,10 @@ export function StoragePage() {
               <span>{t("stock.freeSpace")}</span>
               <strong>{hasFree ? bulk(freeLiters, language) : t("unavailable")}</strong>
             </div>
+            <div className="stat-tile">
+              <span>{t("stock.bales")}</span>
+              <strong>{baleRows.reduce((sum, row) => sum + row.count, 0).toLocaleString(language)}</strong>
+            </div>
           </div>
 
           <div className="stock-overview">
@@ -395,12 +399,54 @@ function GoodsPanel({
         <p className="hint">{empty}</p>
       ) : (
         <>
-          <div className="stock-mix" aria-hidden="true">
-            {rows.map((row) => {
-              const value = mode === "bale" ? Math.max(row.count, 0) : row.level
-              if (value <= 0 || total <= 0) return null
-              return <i key={row.key} style={{ width: `${(value / total) * 100}%`, background: row.color }} />
-            })}
+          <div className="stock-chart">
+            <div
+              className="stock-donut"
+              style={{
+                background: `conic-gradient(${rows
+                  .map((row) => {
+                    const value = mode === "bale" ? Math.max(row.count, 0) : row.level
+                    return { color: row.color, value }
+                  })
+                  .filter((part) => part.value > 0 && total > 0)
+                  .reduce<{ cursor: number; stops: string[] }>(
+                    (state, part) => {
+                      const start = state.cursor
+                      const next = state.cursor + (part.value / total) * 100
+                      state.stops.push(`${part.color} ${start}% ${next}%`)
+                      state.cursor = next
+                      return state
+                    },
+                    { cursor: 0, stops: [] },
+                  )
+                  .stops.join(", ")})`,
+              }}
+              aria-hidden="true"
+            >
+              <div>
+                <strong>{summary}</strong>
+              </div>
+            </div>
+            <ul className="stock-legend">
+              {rows.map((row) => {
+                const value = mode === "bale" ? Math.max(row.count, 0) : row.level
+                const share = total > 0 ? Math.round((value / total) * 100) : 0
+                const amount =
+                  mode === "bale" && row.count > 0
+                    ? row.count === 1
+                      ? t("stock.bales_one")
+                      : t("stock.bales_other", { count: row.count })
+                    : bulk(row.level, language)
+                return (
+                  <li key={row.key}>
+                    <i style={{ background: row.color }} />
+                    <span>{row.title}</span>
+                    <strong>{amount}</strong>
+                    <em>{share}%</em>
+                  </li>
+                )
+              })}
+            </ul>
           </div>
           <ul className="stock-types">
             {rows.map((row) => {

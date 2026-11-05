@@ -948,6 +948,7 @@ export const en = {
       11: "November",
       12: "December",
     },
+    filters: "Filters",
     layer: "Application map",
     layerPrev: "Previous map",
     layerNext: "Next map",

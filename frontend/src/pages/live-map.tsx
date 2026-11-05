@@ -580,7 +580,7 @@ function LiveCanvas({
   const { t } = useTranslation()
   const viewportRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const savedView = useRef(readMapView(viewUserId, viewScope))
+  const savedView = useRef(readMapView(viewUserId, viewScope, 0.35))
   const cam = useRef<MapCamera>(savedView.current ?? { x: 0, y: 0, k: 1 })
   const drag = useRef<{ x: number; y: number; cx: number; cy: number; moved: boolean } | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -610,7 +610,7 @@ function LiveCanvas({
 
   function zoomAt(next: number, px: number, py: number) {
     const prev = cam.current.k
-    const clamped = Math.min(10, Math.max(1, next))
+    const clamped = Math.min(10, Math.max(0.35, next))
     const ratio = clamped / prev
     commit({
       k: clamped,

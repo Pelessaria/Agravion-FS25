@@ -36,7 +36,7 @@ function storageKey(userId: string, scope: string) {
   return `agrivision.mapView.${userId}.${scope}`
 }
 
-export function readMapView(userId: string | null, scope: string): MapCamera | null {
+export function readMapView(userId: string | null, scope: string, minK = 1): MapCamera | null {
   if (!userId) return null
   try {
     const raw = localStorage.getItem(storageKey(userId, scope))
@@ -44,7 +44,7 @@ export function readMapView(userId: string | null, scope: string): MapCamera | n
     const parsed = JSON.parse(raw) as Partial<MapCamera>
     if (typeof parsed.x !== "number" || typeof parsed.y !== "number" || typeof parsed.k !== "number") return null
     if (![parsed.x, parsed.y, parsed.k].every(Number.isFinite)) return null
-    return { x: parsed.x, y: parsed.y, k: Math.min(10, Math.max(1, parsed.k)) }
+    return { x: parsed.x, y: parsed.y, k: Math.min(10, Math.max(minK, parsed.k)) }
   } catch {
     return null
   }
