@@ -102,7 +102,7 @@ final class ConnectorDeployService
     }
 
     /**
-     * @return array{ok: bool, error: string|null, remotePath: string|null, bytes: int|null, version: string|null}
+     * @return array{ok: bool, error: string|null, remotePath: string|null, bytes: int|null, version: string|null, restarted: bool, note: string|null}
      */
     public function deploy(Workspace $workspace, ?string $modsPathHint = null): array
     {
@@ -111,6 +111,9 @@ final class ConnectorDeployService
             return $this->fail('Dateizugang nicht konfiguriert.');
         }
 
+        set_time_limit(0);
+        $console = new DedicatedServerConsole;
+        $stoppedByUs = false;
         try {
             $local = $this->packagePath();
             $bytes = filesize($local);
@@ -118,19 +121,37 @@ final class ConnectorDeployService
                 return $this->fail('Connector-Paket ist leer oder unlesbar.');
             }
 
+            try {
+                $stoppedByUs = $console->stopIfRunning($workspace);
+            } catch (Throwable $e) {
+                return $this->fail($e->getMessage());
+            }
+            if ($stoppedByUs) {
+                // The web UI flips before Windows releases the zip handle.
+                sleep(5);
+            }
+
             $client = new HostFileClient($access);
             $modsDir = self::knownModsDirectory($access, $modsPathHint);
             $remote = rtrim($modsDir, '/').'/'.self::MOD_ZIP;
             $last = null;
-            for ($attempt = 0; $attempt < 2; $attempt++) {
+            for ($attempt = 0; $attempt < 4; $attempt++) {
                 try {
                     $client->writeFile($remote, $local);
                     $version = $this->packageVersion();
                     if (is_string($version) && $version !== '') {
                         try {
-                            (new DedicatedServerConsole)->stampModFile($workspace, self::MOD_ZIP, $version, (int) $bytes);
+                            $console->stampModFile($workspace, self::MOD_ZIP, $version, (int) $bytes);
                         } catch (Throwable) {
                             // The file is on the host. The next hello read still corrects the cache.
+                        }
+                    }
+                    $note = null;
+                    if ($stoppedByUs) {
+                        try {
+                            $console->run($workspace, 'start');
+                        } catch (Throwable $e) {
+                            $note = 'Die Datei liegt auf dem Server. Der Dedicated Server ließ sich danach nicht starten: '.$e->getMessage();
                         }
                     }
 
@@ -140,19 +161,48 @@ final class ConnectorDeployService
                         'remotePath' => $remote,
                         'bytes' => (int) $bytes,
                         'version' => $version,
+                        'restarted' => $stoppedByUs && $note === null,
+                        'note' => $note,
                     ];
                 } catch (Throwable $e) {
                     $last = $e;
-                    if ($attempt === 0) {
-                        usleep(2_000_000);
+                    if ($attempt < 3 && $this->fileStillLocked($e)) {
+                        sleep(4);
+                        continue;
                     }
+                    break;
                 }
             }
 
-            return $this->fail(HostConnectionError::format($last ?? new RuntimeException('Upload fehlgeschlagen.'), 'Connector-Deploy'));
+            if ($stoppedByUs) {
+                try {
+                    $console->run($workspace, 'start');
+                } catch (Throwable) {
+                    // The upload already failed. Leave the start error out of the message.
+                }
+            }
+
+            $message = HostConnectionError::format($last ?? new RuntimeException('Upload fehlgeschlagen.'), 'Connector-Deploy');
+            if ($last !== null && $this->fileStillLocked($last)) {
+                $message = 'Der Dedicated Server hält mods/'.self::MOD_ZIP.' offen. Windows gibt die Datei erst frei, wenn der Prozess aus ist. '.$message;
+            }
+
+            return $this->fail($message);
         } catch (Throwable $e) {
             return $this->fail(HostConnectionError::format($e, 'Connector-Deploy'));
         }
+    }
+
+    private function fileStillLocked(Throwable $error): bool
+    {
+        $text = strtolower($error->getMessage());
+
+        return str_contains($text, 'timed out')
+            || str_contains($text, '0 bytes')
+            || str_contains($text, '550')
+            || str_contains($text, 'being used')
+            || str_contains($text, 'permission')
+            || str_contains($text, 'locked');
     }
 
     /**
@@ -234,7 +284,7 @@ final class ConnectorDeployService
     }
 
     /**
-     * @return array{ok: bool, error: string|null, remotePath: string|null, bytes: int|null, version: string|null}
+     * @return array{ok: bool, error: string|null, remotePath: string|null, bytes: int|null, version: string|null, restarted: bool, note: string|null}
      */
     private function fail(string $error): array
     {
@@ -244,6 +294,8 @@ final class ConnectorDeployService
             'remotePath' => null,
             'bytes' => null,
             'version' => $this->packageVersion(),
+            'restarted' => false,
+            'note' => null,
         ];
     }
 }

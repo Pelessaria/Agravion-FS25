@@ -427,6 +427,8 @@ export async function apiDeployConnector(
   remotePath?: string | null
   bytes?: number | null
   version?: string | null
+  restarted?: boolean
+  note?: string | null
 }> {
   return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/connector/deploy`, {
     method: "POST",

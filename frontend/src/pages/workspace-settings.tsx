@@ -766,7 +766,10 @@ export function WorkspaceSettingsPage() {
                     }
                     store.pushToast(
                       "ok",
-                      t("wsettings.connectorDeployOk", { path: result.remotePath ?? "mods/" }),
+                      result.note
+                        ?? (result.restarted
+                          ? t("wsettings.connectorDeployRestarted", { path: result.remotePath ?? "mods/" })
+                          : t("wsettings.connectorDeployOk", { path: result.remotePath ?? "mods/" })),
                     )
                     setDialog(null)
                   })

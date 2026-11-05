@@ -167,6 +167,43 @@ final class DedicatedServerConsole
     }
 
     /**
+     * Farming Simulator keeps mods/*.zip open while the process is up.
+     * An FTP overwrite then sits until the connection times out with 0 bytes.
+     * Returns true when this call stopped a running server.
+     */
+    public function stopIfRunning(Workspace $workspace): bool
+    {
+        if (! $workspace->consoleConfigured()) {
+            return false;
+        }
+        [$client, $base, $home] = $this->open($workspace);
+        if (($home['running'] ?? null) === false) {
+            return false;
+        }
+        $pages = $this->withPages($client, $base, $home, []);
+        $stop = $this->findAction($pages, 'stop');
+        if ($stop === null) {
+            if (($home['running'] ?? null) === true) {
+                throw new RuntimeException('Der Dedicated Server läuft, die Oberfläche zeigt aber keinen Stopp.');
+            }
+
+            return false;
+        }
+        $this->submit($client, $base, $stop);
+        $this->rememberRunning($workspace, $client, $base, false);
+        if (($this->cached($workspace)['running'] ?? null) === false) {
+            return true;
+        }
+        [$client, $base, $home] = $this->open($workspace);
+        $this->rememberRunning($workspace, $client, $base, false);
+        if (($this->cached($workspace)['running'] ?? null) !== false && ($home['running'] ?? null) !== false) {
+            throw new RuntimeException('Der Dedicated Server ließ sich nicht anhalten. Die Mod-Datei bleibt gesperrt.');
+        }
+
+        return true;
+    }
+
+    /**
      * @param  array<string, mixed>  $values
      * @return array{ok: true}
      */
