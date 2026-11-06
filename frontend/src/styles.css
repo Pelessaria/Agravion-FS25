@@ -2802,9 +2802,10 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   min-height: var(--fields-stat-stack);
 }
 .fields-stats:has(.has-note) .fields-stat-icon {
-  width: var(--fields-stat-stack);
-  height: var(--fields-stat-stack);
+  width: calc(var(--fields-stat-stack) * 0.72);
+  height: calc(var(--fields-stat-stack) * 0.72);
   transform: none;
+  align-self: center;
 }
 .fields-stats:has(.has-note) strong {
   font-size: var(--fields-stat-stack);
