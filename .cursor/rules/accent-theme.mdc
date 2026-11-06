@@ -1,0 +1,40 @@
+---
+description: Brand accent theming — use CSS tokens so Settings presets/custom colors apply
+globs: frontend/src/**/*.{css,tsx,ts}
+alwaysApply: false
+---
+
+# Accent / Brand Theming
+
+UI chrome that follows the user’s accent preference **must** use the theme tokens — never hardcode brand reds/greens for chrome.
+
+## Tokens (themable)
+
+| Token | Role |
+| --- | --- |
+| `--accent` | Primary brand accent |
+| `--accent-2` | Lighter accent (text / soft highlights) |
+| `--accent-bright` | Mid step for gradients |
+| `--accent-ink` | Foreground on solid accent fills |
+| `--brand` | Primary gradient (`bright → accent`) |
+
+Applied at runtime by `frontend/src/accent-theme.ts` from Settings → Allgemein → Akzentfarbe (`localStorage` key `agravion.accentTheme`).
+
+## Do
+
+- Style brand chrome with `var(--accent)`, `var(--accent-2)`, `var(--accent-bright)`, `var(--accent-ink)`, `var(--brand)`.
+- Mix neutrals for dark washes: `color-mix(in srgb, var(--accent) 20%, #121416)` — not red-tinted hexes like `#1a0c0e`.
+- Add new brand UI (nav active, focus rings, primary CTAs, selection chrome, progress fills tied to brand) only through these tokens.
+
+## Do not theme (semantic status)
+
+Keep fixed green / warning / danger for state meaning:
+
+- `--ok`, `--ok-2`, `--online` — positive status (Online, Aktiv, Ja, Starten / `btn-ok`, ready)
+- `--warning`, `--danger`, `--offline`
+
+Crop/map/fuel/weather domain colors stay domain-specific.
+
+## Custom & presets
+
+Presets and custom hex live in `accent-theme.ts`. Extending presets means adding an entry there **and** i18n labels under `settings.accentPreset*`.
