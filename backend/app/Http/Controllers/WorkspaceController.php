@@ -6,6 +6,7 @@ use App\Models\Workspace;
 use App\Services\Fs25\ConnectorDeployService;
 use App\Services\Fs25\ConnectorSnapshotService;
 use App\Services\Fs25\HostAccessService;
+use App\Services\Fs25\HostFileClient;
 use App\Services\Fs25\ModIconCacheService;
 use App\Services\Fs25\PrecisionLayerService;
 use App\Services\Fs25\RequiredModsService;
@@ -346,6 +347,90 @@ class WorkspaceController extends Controller
         $row = $this->findWorkspace($workspace);
 
         return response()->json($mods->status($row, $request->boolean('fresh')));
+    }
+
+    /**
+     * One-shot probe result: can the connector copy basegame brand logos from dataS?
+     */
+    public function brandsProbe(string $workspace): JsonResponse
+    {
+        $row = $this->findWorkspace($workspace);
+        $access = $row->hostAccess;
+        if ($access === null) {
+            return response()->json(['ok' => false, 'error' => 'Host access missing.'], 422);
+        }
+        $modSettings = trim(str_replace('\\', '/', (string) ($access->remote_mod_settings_path ?? '')), '/');
+        if ($modSettings === '') {
+            return response()->json(['ok' => false, 'error' => 'modSettings path missing.'], 422);
+        }
+        $path = $modSettings.'/FS25_AgravionConnector/state/brands_probe.xml';
+        try {
+            $xml = (new HostFileClient($access))->read($path, 8);
+        } catch (Throwable $e) {
+            return response()->json([
+                'ok' => false,
+                'error' => $e->getMessage(),
+                'path' => $path,
+            ], 404);
+        }
+        if (! is_string($xml) || $xml === '') {
+            return response()->json(['ok' => false, 'error' => 'Empty brands_probe.xml', 'path' => $path], 404);
+        }
+
+        $attrs = [];
+        if (preg_match('/<brandsProbe\b([^>]*)>/i', $xml, $m) === 1) {
+            preg_match_all('/(\w+)="([^"]*)"/', $m[1], $pairs, PREG_SET_ORDER);
+            foreach ($pairs as $pair) {
+                $attrs[$pair[1]] = html_entity_decode($pair[2], ENT_QUOTES | ENT_XML1);
+            }
+        }
+        $brands = [];
+        if (preg_match_all('/<brand\b([^>]*)\/>/i', $xml, $rows) > 0) {
+            foreach ($rows[1] as $rowAttrs) {
+                $item = [];
+                preg_match_all('/(\w+)="([^"]*)"/', $rowAttrs, $pairs, PREG_SET_ORDER);
+                foreach ($pairs as $pair) {
+                    $item[$pair[1]] = html_entity_decode($pair[2], ENT_QUOTES | ENT_XML1);
+                }
+                $brands[] = $item;
+            }
+        }
+        $base = array_values(array_filter($brands, fn (array $b): bool => ($b['isMod'] ?? '') === 'false'));
+        $copied = array_values(array_filter($base, fn (array $b): bool => ($b['copied'] ?? '') === 'true'));
+        $failed = array_values(array_filter($base, fn (array $b): bool => ($b['copied'] ?? '') !== 'true'));
+        $presentNotCopied = array_values(array_filter(
+            $failed,
+            fn (array $b): bool => ($b['present'] ?? '') === 'true'
+        ));
+
+        return response()->json([
+            'ok' => true,
+            'path' => $path,
+            'summary' => $attrs,
+            'baseCopied' => count($copied),
+            'baseFailed' => count($failed),
+            'basePresentNotCopied' => count($presentNotCopied),
+            'copiedSamples' => array_slice(array_map(fn (array $b): array => [
+                'name' => $b['name'] ?? '',
+                'title' => $b['title'] ?? '',
+                'src' => $b['src'] ?? '',
+                'dest' => $b['dest'] ?? '',
+            ], $copied), 0, 12),
+            'failedSamples' => array_slice(array_map(fn (array $b): array => [
+                'name' => $b['name'] ?? '',
+                'title' => $b['title'] ?? '',
+                'present' => $b['present'] ?? '',
+                'image' => $b['image'] ?? '',
+                'overview' => $b['overview'] ?? '',
+                'src' => $b['src'] ?? '',
+            ], $failed), 0, 12),
+            'presentNotCopiedSamples' => array_slice(array_map(fn (array $b): array => [
+                'name' => $b['name'] ?? '',
+                'src' => $b['src'] ?? '',
+                'image' => $b['image'] ?? '',
+                'overview' => $b['overview'] ?? '',
+            ], $presentNotCopied), 0, 12),
+        ]);
     }
 
     public function connectorIcon(
