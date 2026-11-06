@@ -3,12 +3,12 @@
 use Illuminate\Support\Facades\Route;
 
 /*
-| AgriVision UI (Vite build) lives in public/ as agrivision.html + /assets/*.
+| Agravion UI (Vite build) lives in public/ as agravion.html + /assets/*.
 | Laravel API stays under /api; health under /up.
 */
 
 Route::get('/{any?}', function () {
-    $spa = public_path('agrivision.html');
+    $spa = public_path('agravion.html');
     if (is_file($spa)) {
         // Never let browsers keep a stale shell that points at old /assets/*.js hashes.
         return response()->file($spa, [

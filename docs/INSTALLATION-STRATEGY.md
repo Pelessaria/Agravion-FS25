@@ -71,7 +71,7 @@ Führend: In-App-Update aus dem öffentlichen GitHub-Repository (Zipball des kon
 
 - `.env`, `storage/` und das lokale `vendor/` bleiben erhalten.
 - Migrationen laufen nach dem Overlay automatisch.
-- Die UI liegt unter Einstellungen → Update; CLI: `php artisan agrivision:update`.
+- Die UI liegt unter Einstellungen → Update; CLI: `php artisan agravion:update`.
 - Realm-Admin-Auth am Endpoint folgt mit dem Installer; bis dahin ist `confirm=true` Pflicht.
 
 Alternativ bleibt ein manuelles Release-ZIP möglich (ohne `.env` / `storage/installed.lock` zu überschreiben). Vor größeren Updates: Datenbankexport — siehe [BACKUP-RESTORE.md](BACKUP-RESTORE.md).

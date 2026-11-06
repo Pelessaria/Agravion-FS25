@@ -28,7 +28,7 @@ FieldSnapshot.STATE_BUDGET = 48
 FieldSnapshot.MAX_POINTS = 160
 
 local function log(msg)
-    print("AgriVisionConnector: " .. tostring(msg))
+    print("AgravionConnector: " .. tostring(msg))
 end
 
 -- Giants: avoid pcall on the hot path. Nil-check, then call directly.
@@ -964,7 +964,7 @@ local function openFruitXml(path)
     if path == nil or path == "" or loadXMLFile == nil then
         return nil
     end
-    local ok, xmlId = pcall(loadXMLFile, "AgriVisionFruit", path)
+    local ok, xmlId = pcall(loadXMLFile, "AgravionFruit", path)
     if not ok or xmlId == nil or xmlId == 0 then
         return nil
     end
@@ -1669,7 +1669,7 @@ local function overviewSource()
     if cfg == nil or loadXMLFile == nil or getXMLString == nil then
         return fallback
     end
-    local xmlId = safeCall(loadXMLFile, "AgriVisionMap", base .. cfg)
+    local xmlId = safeCall(loadXMLFile, "AgravionMap", base .. cfg)
     if xmlId == nil or xmlId == 0 then
         return fallback
     end

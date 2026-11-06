@@ -175,7 +175,7 @@ class DedicatedServerFeedClient
             $response = Http::timeout($this->timeoutSeconds)
                 ->accept('*/*')
                 ->withHeaders([
-                    'User-Agent' => 'AgriVisionFeedClient/0.1',
+                    'User-Agent' => 'AgravionFeedClient/0.1',
                 ])
                 ->get($url, $query);
         } catch (ConnectionException $e) {

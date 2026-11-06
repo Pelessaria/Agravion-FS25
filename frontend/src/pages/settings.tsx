@@ -131,7 +131,7 @@ export function SettingsPage() {
   const [schedule, setSchedule] = useState<ScheduleStatus | null>(null)
   const [demoInstalledSha] = useState<string | null>(() => {
     try {
-      return localStorage.getItem("agrivision.installedSha")
+      return localStorage.getItem("agravion.installedSha")
     } catch {
       return null
     }
@@ -224,7 +224,7 @@ export function SettingsPage() {
     }
     if (updateStatus?.remoteSha) {
       try {
-        localStorage.setItem("agrivision.installedSha", updateStatus.remoteSha)
+        localStorage.setItem("agravion.installedSha", updateStatus.remoteSha)
       } catch {
         /* ignore */
       }
@@ -636,7 +636,7 @@ export function SettingsPage() {
             <div className="update-meta-row">
               <span className="faint">{t("settings.updateRepo")}</span>
               <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer">
-                {updateStatus?.repo ?? "Pelessaria/AgriVision-FS25"}
+                {updateStatus?.repo ?? "Pelessaria/Agravion-FS25"}
               </a>
             </div>
             <div className="update-meta-row">

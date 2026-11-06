@@ -22,4 +22,4 @@ Giants advises against wrapping script calls in `pcall` / `xpcall`. Protected ca
 
 ## Boundary exception
 
-`AgriVisionConnector` may keep a single `pcall` around `FieldSnapshot.writeIfDue` / `StorageSnapshot.writeIfDue` / `LiveSnapshot.writeIfDue` so a snapshot failure is logged and the next tick continues. That is the outer fence, not a substitute for clean reads inside the snapshot code.
+`AgravionConnector` may keep a single `pcall` around `FieldSnapshot.writeIfDue` / `StorageSnapshot.writeIfDue` / `LiveSnapshot.writeIfDue` so a snapshot failure is logged and the next tick continues. That is the outer fence, not a substitute for clean reads inside the snapshot code.

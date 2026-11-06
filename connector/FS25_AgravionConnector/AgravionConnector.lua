@@ -1,7 +1,7 @@
 --[[
-  AgriVision Connector v0.1 — dedicated-server snapshot writer.
+  Agravion Connector v0.1 — dedicated-server snapshot writer.
 
-  Primary transport: files under modSettings/FS25_AgriVisionConnector/
+  Primary transport: files under modSettings/FS25_AgravionConnector/
   HTTPS from Lua is NOT required and not used here (sandbox / performance open).
 
   Contract: docs/CONNECTOR-CONTRACT.md
@@ -10,18 +10,18 @@
   Farm balance / name reads are guarded; missing values are omitted (UI: unavailable).
 ]]
 
-AgriVisionConnector = {}
-AgriVisionConnector.MOD_NAME = "FS25_AgriVisionConnector"
-AgriVisionConnector.VERSION = "0.1.25.0"
-AgriVisionConnector.SCHEMA = "1"
-AgriVisionConnector.TICK_MS = 5000
-AgriVisionConnector.HELLO_EVERY_MS = 60000
-AgriVisionConnector.FULL_VEHICLE_EVERY_MS = 60000
-AgriVisionConnector.WAIT_LOG_EVERY_MS = 30000
-AgriVisionConnector.ICON_RETRY_EVERY_MS = 600000
+AgravionConnector = {}
+AgravionConnector.MOD_NAME = "FS25_AgravionConnector"
+AgravionConnector.VERSION = "0.1.25.0"
+AgravionConnector.SCHEMA = "1"
+AgravionConnector.TICK_MS = 5000
+AgravionConnector.HELLO_EVERY_MS = 60000
+AgravionConnector.FULL_VEHICLE_EVERY_MS = 60000
+AgravionConnector.WAIT_LOG_EVERY_MS = 30000
+AgravionConnector.ICON_RETRY_EVERY_MS = 600000
 
 local function log(msg)
-    print(string.format("AgriVisionConnector: %s", tostring(msg)))
+    print(string.format("AgravionConnector: %s", tostring(msg)))
 end
 
 local function utcNow()
@@ -38,7 +38,7 @@ local function ensureDir(path)
     end
 end
 
-function AgriVisionConnector:init()
+function AgravionConnector:init()
     if g_server == nil then
         log("not a server — idle")
         self.active = false
@@ -99,12 +99,12 @@ function AgriVisionConnector:init()
     self:writeHello()
 end
 
-function AgriVisionConnector:nextGeneration()
+function AgravionConnector:nextGeneration()
     self.generation = self.generation + 1
     return self.generation
 end
 
-function AgriVisionConnector:xmlEscape(value)
+function AgravionConnector:xmlEscape(value)
     if value == nil then
         return ""
     end
@@ -116,7 +116,7 @@ function AgriVisionConnector:xmlEscape(value)
     return s
 end
 
-function AgriVisionConnector:writeTextFile(path, body)
+function AgravionConnector:writeTextFile(path, body)
     -- Dedicated-server sandbox: io.open works, os.* is often nil (crash: os.remove).
     if io == nil or io.open == nil then
         log("no io.open — hello/vehicles not written")
@@ -132,7 +132,7 @@ function AgriVisionConnector:writeTextFile(path, body)
     return true
 end
 
-function AgriVisionConnector:collectFarmsXml()
+function AgravionConnector:collectFarmsXml()
     local parts = { "<farms>" }
     if g_farmManager ~= nil and g_farmManager.getFarms ~= nil then
         local farms = g_farmManager:getFarms()
@@ -160,7 +160,7 @@ function AgriVisionConnector:collectFarmsXml()
     return table.concat(parts, "\n")
 end
 
-function AgriVisionConnector:writeHello()
+function AgravionConnector:writeHello()
     local gen = self:nextGeneration()
     local gameTime = 0
     if g_currentMission ~= nil and g_currentMission.environment ~= nil and g_currentMission.environment.dayTime ~= nil then
@@ -168,9 +168,9 @@ function AgriVisionConnector:writeHello()
     end
     local body = string.format(
         [[<?xml version="1.0" encoding="utf-8"?>
-<agrivisionConnector version="%s" schema="%s" generation="%s" writtenAtUtc="%s" gameTimeMs="%s">
+<agravionConnector version="%s" schema="%s" generation="%s" writtenAtUtc="%s" gameTimeMs="%s">
 %s
-</agrivisionConnector>
+</agravionConnector>
 ]],
         self:xmlEscape(self.VERSION),
         self.SCHEMA,
@@ -182,7 +182,7 @@ function AgriVisionConnector:writeHello()
     self:writeTextFile(self.baseDir .. "hello.xml", body)
 end
 
-function AgriVisionConnector:vehicleWorldPos(vehicle)
+function AgravionConnector:vehicleWorldPos(vehicle)
     if vehicle == nil or getWorldTranslation == nil then
         return nil, nil, nil
     end
@@ -196,7 +196,7 @@ function AgriVisionConnector:vehicleWorldPos(vehicle)
     return getWorldTranslation(node)
 end
 
-function AgriVisionConnector:collectVehiclesFullXml()
+function AgravionConnector:collectVehiclesFullXml()
     local parts = {}
     local identityParts = {}
     self.pendingStoreIcons = {}
@@ -333,7 +333,7 @@ function AgriVisionConnector:collectVehiclesFullXml()
     return table.concat(parts, ""), table.concat(identityParts, "\n")
 end
 
-function AgriVisionConnector:writeVehiclesFull()
+function AgravionConnector:writeVehiclesFull()
     local vehiclesXml, fingerprint = self:collectVehiclesFullXml()
     local pendingCount = 0
     for _ in pairs(self.pendingStoreIcons or {}) do
@@ -360,7 +360,7 @@ function AgriVisionConnector:writeVehiclesFull()
     self.lastFullVehiclesAt = g_time or 0
 end
 
-function AgriVisionConnector:modKeyFromFilename(filename)
+function AgravionConnector:modKeyFromFilename(filename)
     if filename == nil or filename == "" then
         return nil
     end
@@ -380,7 +380,7 @@ function AgriVisionConnector:modKeyFromFilename(filename)
 end
 
 --- Stable key for vehicle store image (type-level, shared by duplicates).
-function AgriVisionConnector:storeKeyFromFilename(filename)
+function AgravionConnector:storeKeyFromFilename(filename)
     if filename == nil or filename == "" then
         return nil
     end
@@ -400,7 +400,7 @@ end
 --- Expand a store-image path into Engine-resolvable variants (folder, zip, dds).
 --- Dedicated hosts often ship mods as .zip only; PNG folder paths fail while
 --- ModName.zip/…/store_x.dds succeeds via copyFile.
-function AgriVisionConnector:buildStoreImageCandidates(raw)
+function AgravionConnector:buildStoreImageCandidates(raw)
     local out = {}
     local seen = {}
     local function add(path)
@@ -530,7 +530,7 @@ function AgriVisionConnector:buildStoreImageCandidates(raw)
     return out
 end
 
-function AgriVisionConnector:resolveStoreImagePath(raw, presentOnly)
+function AgravionConnector:resolveStoreImagePath(raw, presentOnly)
     local candidates = self:buildStoreImageCandidates(raw)
     if #candidates == 0 then
         return nil
@@ -552,7 +552,7 @@ function AgriVisionConnector:resolveStoreImagePath(raw, presentOnly)
     return candidates[1]
 end
 
-function AgriVisionConnector:tryCopyStoreIcon(storeKey, rawSrc)
+function AgravionConnector:tryCopyStoreIcon(storeKey, rawSrc)
     local candidates = self:buildStoreImageCandidates(rawSrc)
     if #candidates == 0 then
         return false, nil, nil
@@ -583,11 +583,11 @@ function AgriVisionConnector:tryCopyStoreIcon(storeKey, rawSrc)
     return false, nil, nil
 end
 
-function AgriVisionConnector:finiteNumber(value)
+function AgravionConnector:finiteNumber(value)
     return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
 end
 
-function AgriVisionConnector:fillTypeName(vehicle, index, rawType)
+function AgravionConnector:fillTypeName(vehicle, index, rawType)
     if type(rawType) == "string" and rawType ~= "" then
         return string.upper(rawType)
     end
@@ -645,7 +645,7 @@ function AgriVisionConnector:fillTypeName(vehicle, index, rawType)
 end
 
 --- Diesel / electric / methane summed as fuel. DEF only when a real tank exists.
-function AgriVisionConnector:vehicleFluids(vehicle)
+function AgravionConnector:vehicleFluids(vehicle)
     if vehicle == nil then
         return nil, nil, nil, nil
     end
@@ -706,7 +706,7 @@ function AgriVisionConnector:vehicleFluids(vehicle)
 end
 
 --- Damage as percent 0–100. Nil when the vehicle has no wearable spec.
-function AgriVisionConnector:vehicleWear(vehicle)
+function AgravionConnector:vehicleWear(vehicle)
     if vehicle == nil then
         return nil
     end
@@ -733,7 +733,7 @@ function AgriVisionConnector:vehicleWear(vehicle)
     return math.floor(damage * 100 + 0.5)
 end
 
-function AgriVisionConnector:vehiclePlate(vehicle)
+function AgravionConnector:vehiclePlate(vehicle)
     if vehicle == nil then
         return nil
     end
@@ -785,7 +785,7 @@ function AgriVisionConnector:vehiclePlate(vehicle)
     return nil
 end
 
-function AgriVisionConnector:vehicleShopCategory(vehicle, filename)
+function AgravionConnector:vehicleShopCategory(vehicle, filename)
     local typeName = nil
     if vehicle ~= nil and type(vehicle.typeName) == "string" and vehicle.typeName ~= "" then
         typeName = vehicle.typeName
@@ -821,7 +821,7 @@ function AgriVisionConnector:vehicleShopCategory(vehicle, filename)
     return typeName
 end
 
-function AgriVisionConnector:vehicleBrand(vehicle, filename)
+function AgravionConnector:vehicleBrand(vehicle, filename)
     local storeItem = nil
     if vehicle ~= nil and vehicle.storeItem ~= nil then
         storeItem = vehicle.storeItem
@@ -867,7 +867,7 @@ function AgriVisionConnector:vehicleBrand(vehicle, filename)
     return nil
 end
 
-function AgriVisionConnector:vehicleStoreImage(vehicle, filename)
+function AgravionConnector:vehicleStoreImage(vehicle, filename)
     local candidates = {}
     if vehicle ~= nil and vehicle.getImageFilename ~= nil then
         local ok, image = pcall(function()
@@ -902,7 +902,7 @@ end
 
 -- Placeables often have no getImageFilename on a dedicated server. The store
 -- picture lives in placeable.storeData.image, next to the XML.
-function AgriVisionConnector:placeableStoreImage(placeable, filename)
+function AgravionConnector:placeableStoreImage(placeable, filename)
     local seeds = {}
     local function add(value)
         if value ~= nil and tostring(value) ~= "" then
@@ -975,7 +975,7 @@ function AgriVisionConnector:placeableStoreImage(placeable, filename)
     return nil
 end
 
-function AgriVisionConnector:missionVehicles()
+function AgravionConnector:missionVehicles()
     if g_currentMission == nil then
         return nil
     end
@@ -1000,7 +1000,7 @@ function AgriVisionConnector:missionVehicles()
     return nil
 end
 
-function AgriVisionConnector:countVehicles(vehiclesTable)
+function AgravionConnector:countVehicles(vehiclesTable)
     if vehiclesTable == nil then
         return 0
     end
@@ -1013,11 +1013,11 @@ function AgriVisionConnector:countVehicles(vehiclesTable)
     return n
 end
 
-function AgriVisionConnector:missionHasVehicles()
+function AgravionConnector:missionHasVehicles()
     return self:countVehicles(self:missionVehicles()) > 0
 end
 
-function AgriVisionConnector:missionReadyHint()
+function AgravionConnector:missionReadyHint()
     if g_currentMission == nil then
         return "g_currentMission=nil"
     end
@@ -1031,7 +1031,7 @@ end
 
 --- Dedicated FS25 sandbox: io.open only allows write mode ('w'). Never use io read
 --- for existence or binary copy (Farmhand / GIANTS rule). Use Engine file APIs.
-function AgriVisionConnector:engineFileExists(path)
+function AgravionConnector:engineFileExists(path)
     if path == nil or path == "" or fileExists == nil then
         return false
     end
@@ -1039,7 +1039,7 @@ function AgriVisionConnector:engineFileExists(path)
     return ok and exists == true
 end
 
-function AgriVisionConnector:engineFileSize(path)
+function AgravionConnector:engineFileSize(path)
     if path == nil or path == "" or getFileSize == nil then
         return nil
     end
@@ -1050,14 +1050,14 @@ function AgriVisionConnector:engineFileSize(path)
     return nil
 end
 
-function AgriVisionConnector:deletePath(path)
+function AgravionConnector:deletePath(path)
     if path == nil or path == "" or deleteFile == nil then
         return
     end
     pcall(deleteFile, path)
 end
 
-function AgriVisionConnector:fileLooksPresent(path)
+function AgravionConnector:fileLooksPresent(path)
     if not self:engineFileExists(path) then
         return false
     end
@@ -1068,7 +1068,7 @@ function AgriVisionConnector:fileLooksPresent(path)
     return true
 end
 
-function AgriVisionConnector:copyIconFile(src, dest)
+function AgravionConnector:copyIconFile(src, dest)
     if src == nil or dest == nil or src == "" or dest == "" then
         return false
     end
@@ -1102,7 +1102,7 @@ function AgriVisionConnector:copyIconFile(src, dest)
     return true
 end
 
-function AgriVisionConnector:iconExtFromPath(path)
+function AgravionConnector:iconExtFromPath(path)
     local lower = string.lower(tostring(path or ""))
     if string.find(lower, "%.dds") then
         return "dds"
@@ -1115,7 +1115,7 @@ end
 
 --- Vehicle and placeable store icons for the current mission. Mod-pack icons are deferred.
 --- forceWrite: rewrite the manifest even when nothing new was copied (fleet changed).
-function AgriVisionConnector:writeStoreIconsManifest(forceWrite)
+function AgravionConnector:writeStoreIconsManifest(forceWrite)
     ensureDir(self.storeIconsDir)
     local rows = {}
     local copiedCount = 0
@@ -1222,7 +1222,7 @@ function AgriVisionConnector:writeStoreIconsManifest(forceWrite)
     end
 end
 
-function AgriVisionConnector:processCommands()
+function AgravionConnector:processCommands()
     local path = self.baseDir .. "command.xml"
     -- Dedicated sandbox: never io.open read. Engine XML API only (Farmhand pattern).
     if XMLFile == nil or XMLFile.loadIfExists == nil then
@@ -1283,7 +1283,7 @@ function AgriVisionConnector:processCommands()
     self:deletePath(path)
 end
 
-function AgriVisionConnector:tick(dt)
+function AgravionConnector:tick(dt)
     if not self.active then
         return
     end
@@ -1355,7 +1355,7 @@ function AgriVisionConnector:tick(dt)
     end
 end
 
-function AgriVisionConnector:installMissionHook()
+function AgravionConnector:installMissionHook()
     if self.missionHookInstalled then
         return
     end
@@ -1363,7 +1363,7 @@ function AgriVisionConnector:installMissionHook()
         return
     end
     FSBaseMission.update = Utils.appendedFunction(FSBaseMission.update, function(_, dt)
-        AgriVisionConnector:tick(dt)
+        AgravionConnector:tick(dt)
     end)
     self.missionHookInstalled = true
     log("FSBaseMission.update hook installed")
@@ -1371,14 +1371,14 @@ end
 
 -- addModEventListener calls listener:update(dt). Also keep FSBaseMission hook as backup
 -- (dedicated servers have been observed to skip mod listeners after load).
-function AgriVisionConnector:update(dt)
+function AgravionConnector:update(dt)
     self:installMissionHook()
     self:tick(dt)
 end
 
 -- Strong self-reference so the listener table cannot be GC'd.
-AgriVisionConnector._listener = AgriVisionConnector
-addModEventListener(AgriVisionConnector)
-AgriVisionConnector:installMissionHook()
-AgriVisionConnector:init()
-log("listener registered (missionHook=" .. tostring(AgriVisionConnector.missionHookInstalled == true) .. ")")
+AgravionConnector._listener = AgravionConnector
+addModEventListener(AgravionConnector)
+AgravionConnector:installMissionHook()
+AgravionConnector:init()
+log("listener registered (missionHook=" .. tostring(AgravionConnector.missionHookInstalled == true) .. ")")

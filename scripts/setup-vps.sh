@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# AgriVision VPS install script (testing / advanced self-hosting)
+# Agravion VPS install script (testing / advanced self-hosting)
 # No Docker. Provisions OS packages, app code, .env, optional DB + Nginx.
 #
 # Example behind Nginx Proxy Manager:
-#   curl -fsSL https://raw.githubusercontent.com/Pelessaria/AgriVision-FS25/main/scripts/setup-vps.sh -o setup-vps.sh
+#   curl -fsSL https://raw.githubusercontent.com/Pelessaria/Agravion-FS25/main/scripts/setup-vps.sh -o setup-vps.sh
 #   chmod +x setup-vps.sh
-#   sudo ./setup-vps.sh --target /var/www/agrivision \
+#   sudo ./setup-vps.sh --target /var/www/agravion \
 #     --with-db --with-nginx --behind-proxy --listen-port 8080 --migrate \
 #     --db-password 'secret' \
-#     --app-url https://agrivision.pelessaria.de \
-#     --server-name agrivision.pelessaria.de
+#     --app-url https://agravion.pelessaria.de \
+#     --server-name agravion.pelessaria.de
 #
 # NPM Proxy Host: http://VPS_IP:8080  +  SSL for the domain (Force SSL on)
 
 set -euo pipefail
 
 OWNER="Pelessaria"
-REPO="AgriVision-FS25"
+REPO="Agravion-FS25"
 BRANCH="main"
 TARGET=""
 SKIP_DOWNLOAD=0
@@ -29,16 +29,16 @@ BEHIND_PROXY=0
 LISTEN_PORT="80"
 DB_HOST="127.0.0.1"
 DB_PORT="3306"
-DB_NAME="agrivision"
-DB_USER="agrivision"
+DB_NAME="agravion"
+DB_USER="agravion"
 DB_PASSWORD=""
 DB_NAME_EXPLICIT=0
 DB_USER_EXPLICIT=0
 LISTEN_PORT_EXPLICIT=0
 DB_CONNECTION="mariadb"
 APP_URL=""
-APP_NAME="AgriVision"
-ADMIN_EMAIL="admin@agrivision.local"
+APP_NAME="Agravion"
+ADMIN_EMAIL="admin@agravion.local"
 ADMIN_USERNAME="admin"
 ADMIN_PASSWORD=""
 PHP_BIN=""
@@ -46,7 +46,7 @@ SERVER_NAME="_"
 
 usage() {
   cat <<'EOF'
-AgriVision VPS install (no Docker)
+Agravion VPS install (no Docker)
 
 Usage:
   sudo ./scripts/setup-vps.sh [options]
@@ -55,7 +55,7 @@ By default the script installs PHP 8.3+, extensions, curl, unzip, git
 (and optionally MariaDB + Nginx) via the system package manager.
 
 Options:
-  --target DIR          Install into DIR (default: /var/www/agrivision)
+  --target DIR          Install into DIR (default: /var/www/agravion)
                         A second customer is a second --target, with its own
                         database, Nginx site and scheduler cron.
   --skip-download       Use existing tree (git clone already present)
@@ -64,17 +64,17 @@ Options:
   --with-nginx          Install Nginx, write site config, reload
   --behind-proxy        Trust X-Forwarded-* (Nginx Proxy Manager / TLS at proxy)
   --listen-port PORT    Nginx listen port (default: 80; use 8080 behind NPM)
-  --server-name NAME    Nginx server_name (e.g. agrivision.pelessaria.de)
+  --server-name NAME    Nginx server_name (e.g. agravion.pelessaria.de)
   --branch NAME         Git branch (default: main)
   --db-host HOST        Database host (default: 127.0.0.1)
   --db-port PORT        Database port (default: 3306)
-  --db-name NAME        Database name (default: agrivision)
-  --db-user USER        Database user (default: agrivision)
+  --db-name NAME        Database name (default: agravion)
+  --db-user USER        Database user (default: agravion)
   --db-password PASS    Database password (required with --with-db or --migrate)
   --db-connection NAME  mysql or mariadb (default: mariadb)
-  --app-url URL         Public URL, e.g. https://agrivision.pelessaria.de
-  --app-name NAME       APP_NAME (default: AgriVision)
-  --admin-email EMAIL   Admin login email (default: admin@agrivision.local)
+  --app-url URL         Public URL, e.g. https://agravion.pelessaria.de
+  --app-name NAME       APP_NAME (default: Agravion)
+  --admin-email EMAIL   Admin login email (default: admin@agravion.local)
   --admin-username NAME Admin username (default: admin)
   --admin-password PASS Admin login password (generated if omitted with --migrate)
   --migrate             Run php artisan migrate --force (+ ensure admin user)
@@ -91,7 +91,7 @@ instance_slug() {
   base="$(basename "$1")"
   base="$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]/-/g' -e 's/-\+/-/g' -e 's/^-//' -e 's/-$//')"
   if [[ -z "$base" ]]; then
-    base="agrivision"
+    base="agravion"
   fi
   printf '%.40s' "$base"
 }
@@ -420,10 +420,10 @@ write_nginx_config() {
   local public_dir="${BACKEND}/public"
   local sock
   sock="$(detect_fpm_sock)"
-  local conf="/etc/nginx/sites-available/agrivision-${SITE_SLUG}"
-  local conf_d="/etc/nginx/conf.d/agrivision-${SITE_SLUG}.conf"
+  local conf="/etc/nginx/sites-available/agravion-${SITE_SLUG}"
+  local conf_d="/etc/nginx/conf.d/agravion-${SITE_SLUG}.conf"
 
-  log "Writing Nginx site agrivision-${SITE_SLUG} (root ${public_dir}, port ${LISTEN_PORT})"
+  log "Writing Nginx site agravion-${SITE_SLUG} (root ${public_dir}, port ${LISTEN_PORT})"
 
   local listen_extra=""
   if [[ "$LISTEN_PORT" == "80" && "$SERVER_NAME" == "_" && "$BEHIND_PROXY" -eq 0 ]]; then
@@ -484,7 +484,7 @@ NGINX
   if [[ -d /etc/nginx/sites-available ]]; then
     printf '%s\n' "$body" | run_root tee "$conf" >/dev/null
     run_root rm -f /etc/nginx/sites-enabled/default
-    run_root ln -sfn "$conf" "/etc/nginx/sites-enabled/agrivision-${SITE_SLUG}"
+    run_root ln -sfn "$conf" "/etc/nginx/sites-enabled/agravion-${SITE_SLUG}"
   else
     printf '%s\n' "$body" | run_root tee "$conf_d" >/dev/null
   fi
@@ -577,16 +577,16 @@ if [[ -n "$TARGET" ]]; then
 elif [[ -f "${DEFAULT_ROOT}/backend/artisan" ]]; then
   ROOT="$DEFAULT_ROOT"
 else
-  ROOT="/var/www/agrivision"
+  ROOT="/var/www/agravion"
 fi
 
 BACKEND="${ROOT}/backend"
 SITE_SLUG="$(instance_slug "$ROOT")"
 
-if [[ "$DB_NAME_EXPLICIT" -eq 0 && "$SITE_SLUG" != "agrivision" ]]; then
-  DB_NAME="agrivision_$(printf '%s' "$SITE_SLUG" | tr '-' '_')"
+if [[ "$DB_NAME_EXPLICIT" -eq 0 && "$SITE_SLUG" != "agravion" ]]; then
+  DB_NAME="agravion_$(printf '%s' "$SITE_SLUG" | tr '-' '_')"
 fi
-if [[ "$DB_USER_EXPLICIT" -eq 0 && "$SITE_SLUG" != "agrivision" ]]; then
+if [[ "$DB_USER_EXPLICIT" -eq 0 && "$SITE_SLUG" != "agravion" ]]; then
   DB_USER="$DB_NAME"
 fi
 
@@ -604,7 +604,7 @@ if [[ "$APP_URL" == https://* ]]; then
 fi
 
 if [[ "$BEHIND_PROXY" -eq 1 && "$LISTEN_PORT_EXPLICIT" -eq 0 && "$WITH_NGINX" -eq 1 ]]; then
-  if [[ "$SITE_SLUG" == "agrivision" ]]; then
+  if [[ "$SITE_SLUG" == "agravion" ]]; then
     LISTEN_PORT="8080"
   else
     port_sum="$(printf '%s' "$SITE_SLUG" | cksum | awk '{print $1}')"
@@ -624,7 +624,7 @@ if [[ "$WITH_DB" -eq 1 || "$MIGRATE" -eq 1 ]]; then
   fi
 fi
 
-log "AgriVision install -> ${ROOT}"
+log "Agravion install -> ${ROOT}"
 resolve_php_bin
 provision_packages
 setup_database
@@ -735,7 +735,7 @@ deploy_frontend() {
     [[ -f "${dist}/${f}" ]] && cp -a "${dist}/${f}" "${pub}/${f}"
   done
   # Do not overwrite Laravel public/index.php
-  cp -a "${dist}/index.html" "${pub}/agrivision.html"
+  cp -a "${dist}/index.html" "${pub}/agravion.html"
   return 0
 }
 
@@ -769,7 +769,7 @@ if [[ "$MIGRATE" -eq 1 ]]; then
     ADMIN_PASSWORD="$(openssl rand -base64 18 | tr -d '/+=' | head -c 16)"
     ADMIN_PASSWORD_SHOWN="$ADMIN_PASSWORD"
   fi
-  "$PHP_BIN" artisan agrivision:admin \
+  "$PHP_BIN" artisan agravion:admin \
     --email="$ADMIN_EMAIL" \
     --username="$ADMIN_USERNAME" \
     --password="$ADMIN_PASSWORD" \
@@ -792,7 +792,7 @@ fi
 
 log "Per-instance scheduler cron (${SITE_SLUG})"
 mkdir -p storage/logs storage/framework
-"$PHP_BIN" artisan agrivision:install-schedule
+"$PHP_BIN" artisan agravion:install-schedule
 if id -u "${web_user:-www-data}" >/dev/null 2>&1; then
   run_root chown -R "${web_user:-www-data}:${web_user:-www-data}" "${BACKEND}/storage" "${BACKEND}/bootstrap/cache" bin 2>/dev/null || true
 fi
@@ -814,7 +814,7 @@ fi
 cat <<EOF
 
 --------------------------------------------------
-AgriVision install finished
+Agravion install finished
 --------------------------------------------------
 Root:     ${ROOT}
 Backend:  ${BACKEND}
@@ -826,7 +826,7 @@ EOF
 
 if [[ "$WITH_NGINX" -eq 1 ]]; then
   cat <<EOF
-Nginx:    site agrivision-${SITE_SLUG} -> ${BACKEND}/public
+Nginx:    site agravion-${SITE_SLUG} -> ${BACKEND}/public
 Listen:   ${LISTEN_PORT}
 Database: ${DB_NAME}
 Open:     ${APP_URL}
@@ -861,7 +861,7 @@ else
   cat <<EOF
   Create/reset admin:
     cd ${BACKEND}
-    ${PHP_BIN} artisan agrivision:admin --email=you@example.com --username=admin --password='YourSecret'
+    ${PHP_BIN} artisan agravion:admin --email=you@example.com --username=admin --password='YourSecret'
 EOF
 fi
 
@@ -870,8 +870,8 @@ cat <<EOF
 Updates later (always from backend/):
   cd ${BACKEND}
   ${PHP_BIN} artisan migrate --force
-  ${PHP_BIN} artisan agrivision:update --check
-  ${PHP_BIN} artisan agrivision:update --apply
+  ${PHP_BIN} artisan agravion:update --check
+  ${PHP_BIN} artisan agravion:update --apply
 
 If in-app Update says Permission denied:
   chown -R ${web_user:-www-data}:${web_user:-www-data} ${BACKEND}

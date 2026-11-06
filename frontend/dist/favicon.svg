@@ -1,38 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="AgriVision">
-  <defs>
-    <linearGradient id="f-left" x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="0.55" stop-color="#F7FAFC"/>
-      <stop offset="1" stop-color="#D5DEE6"/>
-    </linearGradient>
-    <linearGradient id="f-right" x1="0.4" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#E7EEF3"/>
-      <stop offset="0.48" stop-color="#B7C2CC"/>
-      <stop offset="1" stop-color="#8B97A3"/>
-    </linearGradient>
-    <linearGradient id="f-bar" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#F3F7FA"/>
-      <stop offset="0.35" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#D7E0E7"/>
-    </linearGradient>
-    <linearGradient id="f-leaf" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#1B5E20"/>
-      <stop offset="0.45" stop-color="#4CAF50"/>
-      <stop offset="1" stop-color="#C6E88A"/>
-    </linearGradient>
-    <linearGradient id="f-leaf2" x1="0" y1="0.2" x2="1" y2="0.8">
-      <stop offset="0" stop-color="#4CAF50"/>
-      <stop offset="1" stop-color="#C6E88A"/>
-    </linearGradient></defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Agravion">
   <rect width="64" height="64" rx="14" fill="#111418"/>
-     <g transform="translate(4 10.28) scale(0.21)"><g transform="translate(13.68 -9.63)">
-    <polygon points="118 17.63 -5.68 183.64 37.68 212.36 118 91.08" fill="url(#f-left)"/>
-    <polygon points="118 17.63 -5.68 183.64 3.86 189.96 118 29.38" fill="#FFFFFF" opacity="0.34"/>
-    <polygon points="118 17.63 118 91.08 198.32 212.36 241.68 183.64" fill="url(#f-right)"/>
-    <polygon points="79.44 149.3 64.99 171.12 186.48 159.29 164.06 138.24" fill="url(#f-bar)"/>
-    <path d="M164 151.08 C191.98 153.31 209.07 125.91 218 93.08 C188.14 106.42 172.34 135.02 164 151.08 Z" fill="url(#f-leaf)"/>
-    <path d="M176 161.08 C190.22 175.15 211.17 167.51 230 153.08 C208.12 146.94 187.36 155.84 176 161.08 Z" fill="url(#f-leaf2)"/>
-    <path d="M175.88 138.32 Q191.85 125.04 203.96 108.16" fill="none" stroke="#1B5E20" stroke-opacity="0.35" stroke-width="1.7" stroke-linecap="round"/>
-    <path d="M187.88 159.32 Q202.2 159.14 215.96 155.16" fill="none" stroke="#1B5E20" stroke-opacity="0.28" stroke-width="1.5" stroke-linecap="round"/></g></g>
+  <g transform="translate(6 6) scale(0.048)">
+
+  <defs
+     id="defs1" />
+  <g
+     id="layer1"
+     transform="translate(-55.354576,862.96015)">
+    <g
+       id="g7"
+       transform="translate(59.972605,56.444832)">
+      <path
+         style="font-size:1411.11px;font-family:'Saira Stencil One';-inkscape-font-specification:'Saira Stencil One';stroke-width:0.264583;fill:#ffffff;fill-opacity:1"
+         d="m 364.38766,-862.96015 h 23.98887 L 499.85422,-476.31601 337.57657,107.88352 H 55.354576 Z M 681.88741,-64.271896 H 446.23204 l 59.26662,-217.310934 h 112.8888 L 451.87648,-862.96015 H 710.10961 L 1019.1427,107.88352 H 731.27626 Z"
+         id="text1"
+         aria-label="A" />
+      <path
+         style="opacity:1;fill:#a52e35;fill-opacity:1;stroke-width:0.264583"
+         d="M 681.88913,-64.265844 H 446.22701 l 59.26772,-217.321096 h 112.88594 z"
+         id="path4" />
+    </g>
+  </g>
+
+  </g>
 </svg>

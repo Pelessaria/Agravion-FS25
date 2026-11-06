@@ -29,12 +29,12 @@ final class InstanceSchedule
 
     public static function marker(): string
     {
-        return '# agrivision:'.self::token();
+        return '# agravion:'.self::token();
     }
 
     public static function cronDPath(): string
     {
-        return '/etc/cron.d/agrivision-'.self::token();
+        return '/etc/cron.d/agravion-'.self::token();
     }
 
     public static function cronDBody(string $user, string $php, string $artisan, string $log): string
@@ -63,7 +63,7 @@ final class InstanceSchedule
             }
             $normalized = str_replace('\\', '/', $existingLine);
             $ownsThisInstall = str_contains($normalized, $artisanPath)
-                && (str_contains($normalized, 'schedule:run') || str_contains($normalized, 'agrivision:sync-store-icons'));
+                && (str_contains($normalized, 'schedule:run') || str_contains($normalized, 'agravion:sync-store-icons'));
             if ($ownsThisInstall) {
                 continue;
             }
@@ -187,7 +187,7 @@ final class InstanceSchedule
         try {
             $result = self::install();
         } catch (\Throwable $e) {
-            Log::warning('AgriVision scheduler cron was not installed', ['detail' => $e->getMessage()]);
+            Log::warning('Agravion scheduler cron was not installed', ['detail' => $e->getMessage()]);
 
             return;
         }
@@ -201,7 +201,7 @@ final class InstanceSchedule
 
         File::ensureDirectoryExists(dirname($fail));
         File::put($fail, $result['detail']);
-        Log::warning('AgriVision scheduler cron was not installed', ['detail' => $result['detail']]);
+        Log::warning('Agravion scheduler cron was not installed', ['detail' => $result['detail']]);
     }
 
     /**
@@ -228,7 +228,7 @@ final class InstanceSchedule
     private static function installUserCrontab(string $php, string $artisan, string $log): array
     {
         if (self::shellDisabled()) {
-            return ['ok' => false, 'detail' => 'shell_exec is disabled; install the scheduler as root via agrivision:install-schedule'];
+            return ['ok' => false, 'detail' => 'shell_exec is disabled; install the scheduler as root via agravion:install-schedule'];
         }
 
         $line = '* * * * * '.self::quote($php).' '.self::quote($artisan)

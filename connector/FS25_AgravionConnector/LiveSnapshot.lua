@@ -14,7 +14,7 @@ LiveSnapshot = {}
 LiveSnapshot.EVERY_MS = 15000
 
 local function log(msg)
-    print("AgriVisionConnector: " .. tostring(msg))
+    print("AgravionConnector: " .. tostring(msg))
 end
 
 -- Giants: avoid pcall on the hot path. Nil-check, then call directly.

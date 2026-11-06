@@ -9,17 +9,17 @@ use Illuminate\Support\Str;
 
 class EnsureAdminCommand extends Command
 {
-    protected $signature = 'agrivision:admin
-        {--email= : Admin email (default: admin@agrivision.local)}
+    protected $signature = 'agravion:admin
+        {--email= : Admin email (default: admin@agravion.local)}
         {--username= : Admin username (default: from email local-part)}
         {--password= : Admin password (generated if omitted)}
         {--name= : Display name (default: Admin)}';
 
-    protected $description = 'Create or reset the global AgriVision admin login.';
+    protected $description = 'Create or reset the global Agravion admin login.';
 
     public function handle(): int
     {
-        $email = strtolower(trim((string) ($this->option('email') ?: 'admin@agrivision.local')));
+        $email = strtolower(trim((string) ($this->option('email') ?: 'admin@agravion.local')));
         $name = trim((string) ($this->option('name') ?: 'Admin'));
         $password = (string) ($this->option('password') ?: '');
         $generated = false;

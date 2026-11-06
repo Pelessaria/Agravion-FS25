@@ -33,7 +33,7 @@ export function clampCamera(cam: MapCamera, view: { w: number; h: number }, shee
 }
 
 function storageKey(userId: string, scope: string) {
-  return `agrivision.mapView.${userId}.${scope}`
+  return `agravion.mapView.${userId}.${scope}`
 }
 
 export function readMapView(userId: string | null, scope: string, minK = 1): MapCamera | null {

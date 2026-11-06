@@ -2,13 +2,13 @@
 
 **Status:** Arbeitsvertrag für Mod + Backend. Noch keine Laufzeit-Implementierung im Dashboard.  
 **Stand:** 14. Oktober 2026  
-**Transport-Primärweg:** Dateien unter `modSettings/FS25_AgriVisionConnector/` (vom Backend per Dateizugang geholt).  
+**Transport-Primärweg:** Dateien unter `modSettings/FS25_AgravionConnector/` (vom Backend per Dateizugang geholt).  
 **HTTPS aus Lua:** optionaler Probe-Pfad, kein Pflichttransport (Performance und Sandbox offen).
 
 ## 1. Ordnerlayout im Spielprofil
 
 ```text
-modSettings/FS25_AgriVisionConnector/
+modSettings/FS25_AgravionConnector/
   hello.xml                 # v0: Lebenszeichen + Höfe
   state/vehicles_full.xml   # voller Fahrzeugbestand (Initial / nach Save-Reload)
   state/vehicles_delta.xml  # optionale Positions-/Fill-Deltas
@@ -51,12 +51,12 @@ Fehlende optionale Felder = Dashboard zeigt „nicht verfügbar“, nie erfunden
 ### 4.1 `hello.xml`
 
 ```xml
-<agrivisionConnector version="0.1.0" schema="1" generation="1" writtenAtUtc="2026-10-14T10:00:00Z" gameTimeMs="0">
+<agravionConnector version="0.1.0" schema="1" generation="1" writtenAtUtc="2026-10-14T10:00:00Z" gameTimeMs="0">
   <farms>
     <farm id="1" name="Hof 1" money="1245000" />
     <farm id="2" name="Hof 2" />
   </farms>
-</agrivisionConnector>
+</agravionConnector>
 ```
 
 - `money` nur setzen, wenn der Mod eine Zahl lesen konnte (0 ist gültig).
@@ -90,7 +90,7 @@ Fehlende optionale Felder = Dashboard zeigt „nicht verfügbar“, nie erfunden
 </iconsManifest>
 ```
 
-Backend: Manifest ist Quelle der Wahrheit für Store-Icons. Cron aktualisiert den lokalen Cache unter `storage/app/connector/<workspace>/` (State-XML + Icons). Page-Loads öffnen kein FTP. DDS→PNG: DXT1/3/5 in PHP, **BC7 (DXGI 98/99)** über `bin/dds2rgba` (siehe [INSTALLATION.md](INSTALLATION.md)). Diagnose: `php artisan agrivision:icon-status`, Statusdatei `icons/.status.json`.
+Backend: Manifest ist Quelle der Wahrheit für Store-Icons. Cron aktualisiert den lokalen Cache unter `storage/app/connector/<workspace>/` (State-XML + Icons). Page-Loads öffnen kein FTP. DDS→PNG: DXT1/3/5 in PHP, **BC7 (DXGI 98/99)** über `bin/dds2rgba` (siehe [INSTALLATION.md](INSTALLATION.md)). Diagnose: `php artisan agravion:icon-status`, Statusdatei `icons/.status.json`.
 
 ### 4.4 `command.xml` / `command_result.xml` (v0)
 

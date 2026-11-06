@@ -20,15 +20,15 @@ final class InstanceScheduleTest extends TestCase
     public function test_merge_replaces_only_this_install(): void
     {
         $artisan = '/var/www/hof-nord/backend/artisan';
-        $marker = '# agrivision:aaa111aaa111';
+        $marker = '# agravion:aaa111aaa111';
         $line = '* * * * * /usr/bin/php '.$artisan.' schedule:run >> /var/www/hof-nord/backend/storage/logs/schedule.log 2>&1 '.$marker;
-        $other = '* * * * * /usr/bin/php /var/www/hof-sued/backend/artisan schedule:run >> /var/www/hof-sued/backend/storage/logs/schedule.log 2>&1 # agrivision:bbb222bbb222';
-        $stale = '*/5 * * * * /usr/bin/php '.$artisan.' agrivision:sync-store-icons >> /tmp/old.log 2>&1';
+        $other = '* * * * * /usr/bin/php /var/www/hof-sued/backend/artisan schedule:run >> /var/www/hof-sued/backend/storage/logs/schedule.log 2>&1 # agravion:bbb222bbb222';
+        $stale = '*/5 * * * * /usr/bin/php '.$artisan.' agravion:sync-store-icons >> /tmp/old.log 2>&1';
         $unrelated = '15 3 * * * /usr/bin/certbot renew';
 
         $merged = InstanceSchedule::mergeCrontab($other."\n".$stale."\n".$line."\n".$unrelated."\n", $line, $artisan, $marker);
 
-        $this->assertSame(1, substr_count($merged, '# agrivision:bbb222bbb222'));
+        $this->assertSame(1, substr_count($merged, '# agravion:bbb222bbb222'));
         $this->assertSame(1, substr_count($merged, $marker));
         $this->assertStringContainsString('certbot renew', $merged);
         $this->assertStringNotContainsString('sync-store-icons', $merged);

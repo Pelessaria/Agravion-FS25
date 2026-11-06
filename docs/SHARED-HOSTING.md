@@ -85,7 +85,7 @@ Composer wird auf dem Webspace nicht ausgeführt.
 - „Jetzt synchronisieren“ und ein offener Workspace lösen einen begrenzten Dateiabruf aus.
 - Aufräumen alter Payloads läuft höchstens alle paar Stunden, gesteuert durch eine Zeile in der Datenbank, die parallele Requests aussperrt.
 - Auf einem VPS legt `scripts/setup-vps.sh` je Installation eine eigene Datei unter `/etc/cron.d/` an (`schedule:run` jede Minute). Eine weitere Kundeninstallation ist ein weiteres `--target` und überschreibt die erste nicht.
-- Wer auf Shared Hosting Cron hat, kann zusätzlich `php artisan schedule:run` jede Minute eintragen, oder einmal `php artisan agrivision:install-schedule` ausführen. Auf STRATO-Neuverträgen ist Cron derzeit kein Planungsbestandteil; dort zieht der Icon-Abgleich beim nächsten Dashboard-Aufruf nach.
+- Wer auf Shared Hosting Cron hat, kann zusätzlich `php artisan schedule:run` jede Minute eintragen, oder einmal `php artisan agravion:install-schedule` ausführen. Auf STRATO-Neuverträgen ist Cron derzeit kein Planungsbestandteil; dort zieht der Icon-Abgleich beim nächsten Dashboard-Aufruf nach.
 - Store-Icons in FS25 sind oft **BC7-DDS**. Die Umwandlung nach PNG braucht das Binary `backend/bin/dds2rgba` (gcc beim Install). Auf reinem Shared Hosting ohne Compiler und ohne auslieferbares Binary bleiben viele Icons im Cache als DDS und die Equipment-Liste zeigt Platzhalter. Für vollständige Icons ist ein VPS mit `build-essential` der unterstützte Weg ([INSTALLATION.md](INSTALLATION.md)).
 
 ## 8. Bekannte Grenzen

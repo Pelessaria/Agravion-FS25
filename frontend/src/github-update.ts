@@ -1,8 +1,8 @@
 import { apiFetch, ApiError } from "./api"
 
-/** Public GitHub source of truth for AgriVision installs and in-app updates. */
+/** Public GitHub source of truth for Agravion installs and in-app updates. */
 export const GITHUB_OWNER = "Pelessaria"
-export const GITHUB_REPO = "AgriVision-FS25"
+export const GITHUB_REPO = "Agravion-FS25"
 export const GITHUB_BRANCH = "main"
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`
 
@@ -42,7 +42,7 @@ async function fetchGithubHead(): Promise<{
     {
       headers: {
         Accept: "application/vnd.github+json",
-        "User-Agent": "AgriVision-UI",
+        "User-Agent": "Agravion-UI",
       },
     },
   )

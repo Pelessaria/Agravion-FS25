@@ -9,14 +9,14 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Pull AgriVision connector files from host modSettings into a local cache.
+ * Pull Agravion connector files from host modSettings into a local cache.
  *
  * Dashboard page loads never open FTP. Cron refreshes vehicles_full.xml and
  * icons_manifest.xml, then RETR missing store icons. Never gate downloads on FTP LIST.
  */
 final class ConnectorSnapshotService
 {
-    public const MOD_FOLDER = 'FS25_AgriVisionConnector';
+    public const MOD_FOLDER = 'FS25_AgravionConnector';
 
     /** Seconds between automatic checks once every icon is already a PNG. */
     public const ICON_SYNC_INTERVAL_SEC = 300;
@@ -526,7 +526,7 @@ final class ConnectorSnapshotService
 
         $state = $this->refreshLocalState($workspace);
         if ($state['skipped'] === 'connect_failed' || $state['skipped'] === 'state_failed') {
-            Log::warning('AgriVision connector state refresh failed', [
+            Log::warning('Agravion connector state refresh failed', [
                 'workspace' => $workspace->public_id,
                 'skipped' => $state['skipped'],
                 'detail' => $state['detail'],
@@ -583,7 +583,7 @@ final class ConnectorSnapshotService
         try {
             $client = new HostFileClient($access);
         } catch (Throwable $e) {
-            Log::warning('AgriVision icon sync connect failed', [
+            Log::warning('Agravion icon sync connect failed', [
                 'workspace' => $workspace->public_id,
                 'error' => $e->getMessage(),
             ]);
@@ -731,7 +731,7 @@ final class ConnectorSnapshotService
         $errors = 0;
         $firstError = null;
 
-        Log::info('AgriVision icon sync starting RETR', [
+        Log::info('Agravion icon sync starting RETR', [
             'workspace' => $workspace->public_id,
             'listed' => $listed,
             'missing' => count($work),
@@ -804,7 +804,7 @@ final class ConnectorSnapshotService
                 $cooldown[$job['key']] = time() + self::CONVERT_COOLDOWN_SEC;
                 $this->writeConvertCooldown($dir, $cooldown);
                 $firstError ??= $e->getMessage().' @ '.$job['remote'];
-                Log::warning('AgriVision icon RETR failed', [
+                Log::warning('Agravion icon RETR failed', [
                     'workspace' => $workspace->public_id,
                     'remote' => $job['remote'],
                     'error' => $e->getMessage(),
@@ -864,7 +864,7 @@ final class ConnectorSnapshotService
         ];
         $this->writeIconStatus($workspace, $payload);
 
-        Log::info('AgriVision icon sync pass', [
+        Log::info('Agravion icon sync pass', [
             'workspace' => $workspace->public_id,
             'listed' => $result['listed'],
             'downloaded' => $result['downloaded'],
@@ -1193,7 +1193,7 @@ final class ConnectorSnapshotService
                 return;
             }
         } catch (Throwable $e) {
-            Log::warning('AgriVision PDA map: '.$e->getMessage());
+            Log::warning('Agravion PDA map: '.$e->getMessage());
             File::ensureDirectoryExists($dir);
             File::put($marker, $e->getMessage());
 

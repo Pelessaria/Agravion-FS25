@@ -54,7 +54,7 @@ final class HostFileClient
         if (! $tcp['ok']) {
             throw new RuntimeException(
                 "Kein TCP-Connect ({$this->protocol} {$this->host}:{$this->port}). {$tcp['detail']} "
-                .'AgriVision-VM → Ziel prüfen (DNS, Routing, ausgehende Firewall).'
+                .'Agravion-VM → Ziel prüfen (DNS, Routing, ausgehende Firewall).'
             );
         }
 

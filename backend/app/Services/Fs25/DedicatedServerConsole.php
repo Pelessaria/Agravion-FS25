@@ -451,7 +451,7 @@ final class DedicatedServerConsole
         set_time_limit(0);
         $zipUrl = is_string($direct) && $direct !== '' ? $direct : null;
         if ($zipUrl === null) {
-            $page = Http::withHeaders(['User-Agent' => 'AgriVision'])
+            $page = Http::withHeaders(['User-Agent' => 'Agravion'])
                 ->withOptions(['allow_redirects' => false])
                 ->timeout(20)
                 ->get($pageUrl);
@@ -1590,7 +1590,7 @@ final class DedicatedServerConsole
             if (! ModHubCatalog::isAllowedUpdateUrl($current)) {
                 throw new RuntimeException('Die ModHub-Datei hat eine unerwartete Adresse.');
             }
-            $response = Http::withHeaders(['User-Agent' => 'AgriVision'])
+            $response = Http::withHeaders(['User-Agent' => 'Agravion'])
                 ->withOptions(['allow_redirects' => false])
                 ->timeout(30)
                 ->head($current);
@@ -1626,7 +1626,7 @@ final class DedicatedServerConsole
         $max = 800 * 1024 * 1024;
         try {
             $response = Http::withHeaders([
-                'User-Agent' => 'AgriVision',
+                'User-Agent' => 'Agravion',
                 'Referer' => $pageUrl,
             ])->withOptions([
                 'sink' => $tmp,

@@ -1,8 +1,8 @@
-# AgriVision (FS25 Management Platform)
+# Agravion (FS25 Management Platform)
 
 **Status:** Phase 3 gestartet — React-Prototyp, Laravel-Backend-Grundgerüst, Connector v0, Feed-Client.  
 **Stand:** 14. Oktober 2026  
-**Produktname in der UI:** AgriVision
+**Produktname in der UI:** Agravion
 
 Der Ordnername dieses Arbeitsverzeichnisses ist kein Produktname. Anzeigename, Texte und spätere Domain bleiben Konfiguration.
 
@@ -36,21 +36,21 @@ npm install
 npm run dev
 ```
 
-Lokal (Vite-Demo ohne Laravel): beliebige gültige E-Mail und Passwort mit mindestens 8 Zeichen (`wrong-password` = Fehler). Auf dem Server: Login mit dem Admin-Konto aus dem Installer; die UI kommt aus `frontend/dist` → `public/agrivision.html`.
+Lokal (Vite-Demo ohne Laravel): beliebige gültige E-Mail und Passwort mit mindestens 8 Zeichen (`wrong-password` = Fehler). Auf dem Server: Login mit dem Admin-Konto aus dem Installer; die UI kommt aus `frontend/dist` → `public/agravion.html`.
 
 ## VPS-Installation (Test / hinter NPM)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Pelessaria/AgriVision-FS25/main/scripts/setup-vps.sh -o setup-vps.sh
+curl -fsSL https://raw.githubusercontent.com/Pelessaria/Agravion-FS25/main/scripts/setup-vps.sh -o setup-vps.sh
 chmod +x setup-vps.sh
-sudo ./setup-vps.sh --target /var/www/agrivision \
+sudo ./setup-vps.sh --target /var/www/agravion \
   --with-db --with-nginx --behind-proxy --listen-port 8080 --migrate \
   --db-password 'secret' \
-  --app-url https://agrivision.pelessaria.de
+  --app-url https://agravion.pelessaria.de
 ```
 
 Details: [docs/INSTALLATION.md](docs/INSTALLATION.md), [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md).  
-Repo: https://github.com/Pelessaria/AgriVision-FS25
+Repo: https://github.com/Pelessaria/Agravion-FS25
 
 ## Dokumente
 

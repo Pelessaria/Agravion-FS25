@@ -478,7 +478,7 @@ export async function downloadConnectorPackage(): Promise<void> {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement("a")
   anchor.href = url
-  anchor.download = "FS25_AgriVisionConnector.zip"
+  anchor.download = "FS25_AgravionConnector.zip"
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()

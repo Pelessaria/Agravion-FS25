@@ -180,7 +180,7 @@ export function Shell() {
           <BrandMark />
           <div>
             <strong className="brand-word">
-              Agri<span>Vision</span>
+              Agra<span>vion</span>
             </strong>
             <small>{t("shell.product")}</small>
           </div>

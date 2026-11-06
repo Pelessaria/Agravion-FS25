@@ -13,7 +13,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::command('agrivision:sync-store-icons {--daemon : Keep pulling icons until the process is stopped}', function (ConnectorSnapshotService $icons) {
+Artisan::command('agravion:sync-store-icons {--daemon : Keep pulling icons until the process is stopped}', function (ConnectorSnapshotService $icons) {
     if ($this->option('daemon')) {
         \App\Services\Fs25\IconSyncDaemon::writePid();
         $this->info('icon daemon '.getmypid());
@@ -87,7 +87,7 @@ Schedule::call(function () {
     ->name('precision-layers')
     ->withoutOverlapping(8);
 
-Schedule::command('agrivision:sync-store-icons')
+Schedule::command('agravion:sync-store-icons')
     ->everyFiveMinutes()
     ->withoutOverlapping(20)
     ->appendOutputTo(storage_path('logs/icon-sync.log'));
@@ -110,14 +110,14 @@ Schedule::call(fn () => InstanceSchedule::touchHeartbeat())
     ->everyMinute()
     ->name('scheduler-heartbeat');
 
-Artisan::command('agrivision:install-schedule', function () {
+Artisan::command('agravion:install-schedule', function () {
     $result = \App\Services\InstanceSchedule::install();
     $this->line($result['detail']);
 
     return $result['ok'] ? 0 : 1;
 })->purpose('Install this directory\'s scheduler cron without touching other installations');
 
-Artisan::command('agrivision:schedule-status', function () {
+Artisan::command('agravion:schedule-status', function () {
     $status = \App\Services\InstanceSchedule::status();
     $this->line(sprintf(
         'state=%s installed=%s daemon=%s last=%s',
@@ -130,7 +130,7 @@ Artisan::command('agrivision:schedule-status', function () {
     return $status['active'] ? 0 : 1;
 })->purpose('Report whether this install\'s scheduler cron is installed and running');
 
-Artisan::command('agrivision:icon-status', function (ConnectorSnapshotService $icons) {
+Artisan::command('agravion:icon-status', function (ConnectorSnapshotService $icons) {
     $cache = new \App\Services\Fs25\ModIconCacheService;
     $this->line('dds2rgba='.(\App\Services\Fs25\DdsToPng::externalToolAvailable() ? 'yes' : 'no'));
     $exit = 0;
@@ -175,7 +175,7 @@ Artisan::command('agrivision:icon-status', function (ConnectorSnapshotService $i
                 $exit = 1;
             }
         } elseif ($manifest > 0 && $png === 0) {
-            $this->warn('  no .status.json yet — wait for cron or run php artisan agrivision:sync-store-icons');
+            $this->warn('  no .status.json yet — wait for cron or run php artisan agravion:sync-store-icons');
             $exit = 1;
         }
     }

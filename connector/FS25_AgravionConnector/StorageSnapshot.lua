@@ -13,7 +13,7 @@ StorageSnapshot = {}
 StorageSnapshot.EVERY_MS = 60000
 
 local function log(msg)
-    print("AgriVisionConnector: " .. tostring(msg))
+    print("AgravionConnector: " .. tostring(msg))
 end
 
 -- Giants: avoid pcall on the hot path. Nil-check, then call directly.

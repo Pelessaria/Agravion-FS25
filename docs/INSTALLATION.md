@@ -7,16 +7,16 @@ Updates: [UPDATES.md](UPDATES.md). Reverse Proxy: [REVERSE-PROXY.md](REVERSE-PRO
 
 ## VPS hinter Nginx Proxy Manager
 
-Beispiel-Domain: `https://agrivision.pelessaria.de`
+Beispiel-Domain: `https://agravion.pelessaria.de`
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Pelessaria/AgriVision-FS25/main/scripts/setup-vps.sh -o setup-vps.sh
+curl -fsSL https://raw.githubusercontent.com/Pelessaria/Agravion-FS25/main/scripts/setup-vps.sh -o setup-vps.sh
 chmod +x setup-vps.sh
-sudo ./setup-vps.sh --target /var/www/agrivision \
+sudo ./setup-vps.sh --target /var/www/agravion \
   --with-db --with-nginx --behind-proxy --listen-port 8080 --migrate \
   --db-password 'secret' \
-  --app-url https://agrivision.pelessaria.de \
-  --server-name agrivision.pelessaria.de
+  --app-url https://agravion.pelessaria.de \
+  --server-name agravion.pelessaria.de
 ```
 
 NPM Proxy Host: `http://VPS_IP:8080`, SSL + Force SSL für die Domain.
@@ -31,7 +31,7 @@ sudo ./setup-vps.sh --target /var/www/hof-nord \
   --server-name hof-nord.example
 ```
 
-Der Scheduler liegt danach in `/etc/cron.d/agrivision-<kennung>` und gilt nur für dieses Verzeichnis.
+Der Scheduler liegt danach in `/etc/cron.d/agravion-<kennung>` und gilt nur für dieses Verzeichnis.
 
 ### Store-Icons (DDS → PNG)
 
@@ -46,33 +46,33 @@ sudo apt install -y build-essential
 Fehlt `bin/dds2rgba` nach dem Update:
 
 ```bash
-cd /var/www/agrivision/backend
+cd /var/www/agravion/backend
 gcc -O2 -o bin/dds2rgba tools/dds2rgba/main.c
 chmod 755 bin/dds2rgba
-php artisan agrivision:sync-store-icons
-php artisan agrivision:icon-status
+php artisan agravion:sync-store-icons
+php artisan agravion:icon-status
 ```
 
-Diagnose: `php artisan agrivision:schedule-status` (Cron), `php artisan agrivision:icon-status` (Cache: PNG vs. DDS-only, Formate). Log-Zeilen `AgriVision icon sync pass` in `storage/logs/laravel.log` bzw. `storage/logs/icon-sync.log`.
+Diagnose: `php artisan agravion:schedule-status` (Cron), `php artisan agravion:icon-status` (Cache: PNG vs. DDS-only, Formate). Log-Zeilen `Agravion icon sync pass` in `storage/logs/laravel.log` bzw. `storage/logs/icon-sync.log`.
 
 > Nicht `cdn.jsdelivr.net/.../install.sh` verwenden — dort kann eine veraltete Datei ohne `--with-db` gecacht sein. Kanonisch ist `setup-vps.sh` über raw.githubusercontent.com.
 
 ## Ohne Proxy (direkt)
 
 ```bash
-sudo ./setup-vps.sh --target /var/www/agrivision --with-db --migrate \
+sudo ./setup-vps.sh --target /var/www/agravion --with-db --migrate \
   --db-password 'secret'
-cd /var/www/agrivision/backend && php artisan serve --host=0.0.0.0 --port=8000
+cd /var/www/agravion/backend && php artisan serve --host=0.0.0.0 --port=8000
 ```
 
 ## Aus Clone
 
 ```bash
-git clone https://github.com/Pelessaria/AgriVision-FS25.git
-cd AgriVision-FS25
+git clone https://github.com/Pelessaria/Agravion-FS25.git
+cd Agravion-FS25
 sudo ./scripts/setup-vps.sh --skip-download --with-db --with-nginx --behind-proxy --migrate \
   --db-password 'secret' \
-  --app-url https://agrivision.pelessaria.de
+  --app-url https://agravion.pelessaria.de
 ```
 
 `sudo` braucht es für Pakete, MariaDB und Nginx. Nur App ohne Systempakete: `--skip-packages`.

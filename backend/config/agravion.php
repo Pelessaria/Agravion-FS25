@@ -6,7 +6,7 @@ return [
     | Product version (installed build)
     |--------------------------------------------------------------------------
     */
-    'version' => env('AGRIVISION_VERSION', '0.3.0'),
+    'version' => env('AGRAVION_VERSION', env('AGRIVISION_VERSION', '0.3.0')),
 
     /*
     |--------------------------------------------------------------------------
@@ -15,17 +15,21 @@ return [
     |
     | The installer and in-app updater pull from this repository.
     | Optional token raises API rate limits; public repos work without it.
+    | AGRIVISION_* env names remain as fallbacks during the rebrand.
     |
     */
     'github' => [
-        'owner' => env('AGRIVISION_GITHUB_OWNER', 'Pelessaria'),
-        'repo' => env('AGRIVISION_GITHUB_REPO', 'AgriVision-FS25'),
-        'branch' => env('AGRIVISION_GITHUB_BRANCH', 'main'),
-        'token' => env('AGRIVISION_GITHUB_TOKEN'),
+        'owner' => env('AGRAVION_GITHUB_OWNER', env('AGRIVISION_GITHUB_OWNER', 'Pelessaria')),
+        'repo' => env('AGRAVION_GITHUB_REPO', env('AGRIVISION_GITHUB_REPO', 'Agravion-FS25')),
+        'branch' => env('AGRAVION_GITHUB_BRANCH', env('AGRIVISION_GITHUB_BRANCH', 'main')),
+        'token' => env('AGRAVION_GITHUB_TOKEN', env('AGRIVISION_GITHUB_TOKEN')),
     ],
 
     'updates' => [
-        'enabled' => filter_var(env('AGRIVISION_UPDATES_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'enabled' => filter_var(
+            env('AGRAVION_UPDATES_ENABLED', env('AGRIVISION_UPDATES_ENABLED', true)),
+            FILTER_VALIDATE_BOOL
+        ),
         /** Relative to storage/app */
         'work_dir' => 'updates',
         /** Paths under the Laravel root that must never be overwritten */

@@ -1,6 +1,6 @@
-# AgriVision FS25 Connector
+# Agravion FS25 Connector
 
-Lua-Mod, der Snapshots unter `modSettings/FS25_AgriVisionConnector/` schreibt.  
+Lua-Mod, der Snapshots unter `modSettings/FS25_AgravionConnector/` schreibt.  
 Datenvertrag: [docs/CONNECTOR-CONTRACT.md](../docs/CONNECTOR-CONTRACT.md).
 
 ## Transport
@@ -17,14 +17,14 @@ cd connector
 
 Erzeugt:
 
-- `dist/FS25_AgriVisionConnector.zip` (Dateien an der ZIP-Wurzel)
-- Kopie nach `backend/resources/connector/` (für AgriVision-Update + UI-Deploy)
+- `dist/FS25_AgravionConnector.zip` (Dateien an der ZIP-Wurzel)
+- Kopie nach `backend/resources/connector/` (für Agravion-Update + UI-Deploy)
 
 Im Dashboard (Workspace → Connector → Paket): ZIP herunterladen **oder** per gespeichertem SFTP/FTPS/FTP in den `mods/`-Ordner des Spielservers legen.
 
 1. Vor dem produktiven Deploy: `descVersion` in `modDesc.xml` aus der Spiel-`log.txt` setzen.
 2. ZIP auf den Dedicated Server legen (UI-Deploy oder manuell) und in der Modliste aktivieren.
-3. Probe: [PROBE.md](PROBE.md). Ping-Beispiel: `examples/command-ping.xml` → als `command.xml` nach `modSettings/FS25_AgriVisionConnector/` kopieren.
+3. Probe: [PROBE.md](PROBE.md). Ping-Beispiel: `examples/command-ping.xml` → als `command.xml` nach `modSettings/FS25_AgravionConnector/` kopieren.
 
 Im Mehrspieler lädt FS25 keine entpackten Ordner-Mods.
 

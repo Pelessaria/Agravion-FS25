@@ -194,7 +194,7 @@ final class DdsToPng
         if (! self::externalToolAvailable()) {
             if (! self::$loggedMissingBc7Tool) {
                 self::$loggedMissingBc7Tool = true;
-                Log::warning('AgriVision DDS BC7 needs bin/dds2rgba (apt install build-essential, then gcc -O2 -o bin/dds2rgba tools/dds2rgba/main.c)');
+                Log::warning('Agravion DDS BC7 needs bin/dds2rgba (apt install build-essential, then gcc -O2 -o bin/dds2rgba tools/dds2rgba/main.c)');
             }
 
             return null;

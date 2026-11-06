@@ -20,7 +20,7 @@ final class GithubUpdateService
 {
     private const STATE_FILE = 'update-state.json';
 
-    private const LOG_FILE = 'agrivision-update.log';
+    private const LOG_FILE = 'agravion-update.log';
 
     /**
      * @return array{
@@ -43,9 +43,9 @@ final class GithubUpdateService
     public function status(): array
     {
         $state = $this->readState();
-        $owner = (string) config('agrivision.github.owner');
-        $repo = (string) config('agrivision.github.repo');
-        $branch = (string) config('agrivision.github.branch');
+        $owner = (string) config('agravion.github.owner');
+        $repo = (string) config('agravion.github.repo');
+        $branch = (string) config('agravion.github.branch');
 
         $remote = null;
         try {
@@ -58,8 +58,8 @@ final class GithubUpdateService
         $remoteSha = $remote['sha'] ?? null;
 
         return [
-            'enabled' => (bool) config('agrivision.updates.enabled'),
-            'installedVersion' => (string) config('agrivision.version'),
+            'enabled' => (bool) config('agravion.updates.enabled'),
+            'installedVersion' => (string) config('agravion.version'),
             'installedSha' => $installedSha,
             'installedAt' => $state['installedAt'] ?? null,
             'repo' => $owner.'/'.$repo,
@@ -114,7 +114,7 @@ final class GithubUpdateService
      */
     public function apply(?string $confirmSha = null, bool $force = false): array
     {
-        if (! config('agrivision.updates.enabled')) {
+        if (! config('agravion.updates.enabled')) {
             throw new RuntimeException('Updates are disabled on this installation.');
         }
 
@@ -122,9 +122,9 @@ final class GithubUpdateService
             throw new RuntimeException('PHP ZipArchive extension is required for updates.');
         }
 
-        $owner = (string) config('agrivision.github.owner');
-        $repo = (string) config('agrivision.github.repo');
-        $branch = (string) config('agrivision.github.branch');
+        $owner = (string) config('agravion.github.owner');
+        $repo = (string) config('agravion.github.repo');
+        $branch = (string) config('agravion.github.branch');
         $head = $this->fetchBranchHead($owner, $repo, $branch);
         $toSha = $head['sha'];
 
@@ -271,7 +271,7 @@ final class GithubUpdateService
     }
 
     /**
-     * Re-copy frontend/dist → public/agrivision.html + assets even when Git SHA already matches.
+     * Re-copy frontend/dist → public/agravion.html + assets even when Git SHA already matches.
      *
      * @return array{ok: bool, fromSha: string|null, toSha: string, filesWritten: int, migrationsRan: bool, message: string}
      */
@@ -317,7 +317,7 @@ final class GithubUpdateService
      */
     private function downloadAndExtract(string $owner, string $repo, string $toSha): array
     {
-        $work = storage_path('app/'.trim((string) config('agrivision.updates.work_dir'), '/'));
+        $work = storage_path('app/'.trim((string) config('agravion.updates.work_dir'), '/'));
         File::ensureDirectoryExists($work);
         $zipPath = $work.'/source.zip';
         $extractPath = $work.'/extract';
@@ -344,7 +344,7 @@ final class GithubUpdateService
     }
 
     /**
-     * Place Vite build at public/agrivision.html + public/assets (never overwrite public/index.php).
+     * Place Vite build at public/agravion.html + public/assets (never overwrite public/index.php).
      */
     private function deploySpa(string $distPath): int
     {
@@ -364,8 +364,8 @@ final class GithubUpdateService
 
         $index = $distPath.DIRECTORY_SEPARATOR.'index.html';
         if (File::exists($index)) {
-            File::copy($index, public_path('agrivision.html'));
-            @chmod(public_path('agrivision.html'), 0644);
+            File::copy($index, public_path('agravion.html'));
+            @chmod(public_path('agravion.html'), 0644);
             $written++;
         }
 
@@ -448,11 +448,11 @@ final class GithubUpdateService
         $request = Http::timeout(120)
             ->acceptJson()
             ->withHeaders([
-                'User-Agent' => 'AgriVision-Updater/0.3',
+                'User-Agent' => 'Agravion-Updater/0.3',
                 'X-GitHub-Api-Version' => '2022-11-28',
             ]);
 
-        $token = config('agrivision.github.token');
+        $token = config('agravion.github.token');
         if (is_string($token) && $token !== '') {
             $request = $request->withToken($token);
         }
@@ -519,7 +519,7 @@ final class GithubUpdateService
     {
         File::ensureDirectoryExists($destination);
         $written = 0;
-        $skip = array_map('strtolower', (array) config('agrivision.updates.skip_zip_segments', []));
+        $skip = array_map('strtolower', (array) config('agravion.updates.skip_zip_segments', []));
 
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS),
@@ -590,13 +590,13 @@ final class GithubUpdateService
             .'As root run: chown -R www-data:www-data '.escapeshellarg($backend)
             .' && chmod 640 '.escapeshellarg($backend.'/.env')
             .' && cd '.escapeshellarg($backend)
-            .' && sudo -u www-data php artisan agrivision:update --apply';
+            .' && sudo -u www-data php artisan agravion:update --apply';
     }
 
     private function isPreservedRelative(string $relative): bool
     {
         $relative = strtolower(str_replace('\\', '/', $relative));
-        foreach ((array) config('agrivision.updates.preserve', []) as $preserve) {
+        foreach ((array) config('agravion.updates.preserve', []) as $preserve) {
             $preserve = strtolower(trim(str_replace('\\', '/', (string) $preserve), '/'));
             if ($preserve === '') {
                 continue;

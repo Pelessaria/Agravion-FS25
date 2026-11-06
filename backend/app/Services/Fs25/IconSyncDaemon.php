@@ -72,7 +72,7 @@ final class IconSyncDaemon
                 }
             }
         } catch (\Throwable $e) {
-            Log::warning('AgriVision icon sync stopped', ['error' => $e->getMessage()]);
+            Log::warning('Agravion icon sync stopped', ['error' => $e->getMessage()]);
         }
     }
 }

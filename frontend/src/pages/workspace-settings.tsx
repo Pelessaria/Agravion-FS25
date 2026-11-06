@@ -100,14 +100,14 @@ export function WorkspaceSettingsPage() {
             available: false,
             error: "meta",
             version: null,
-            fileName: "FS25_AgriVisionConnector.zip",
+            fileName: "FS25_AgravionConnector.zip",
           })
         }
       })
     void apiRequiredMods(workspaceId)
       .then((mods) => {
         if (cancelled || !mods) return
-        setConnectorMod(mods.mods.find((item) => item.id === "FS25_AgriVisionConnector") ?? null)
+        setConnectorMod(mods.mods.find((item) => item.id === "FS25_AgravionConnector") ?? null)
       })
       .catch(() => {
         if (!cancelled) setConnectorMod(null)

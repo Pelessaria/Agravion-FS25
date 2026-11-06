@@ -12,9 +12,9 @@ use Throwable;
  */
 final class ConnectorDeployService
 {
-    public const MOD_ZIP = 'FS25_AgriVisionConnector.zip';
+    public const MOD_ZIP = 'FS25_AgravionConnector.zip';
 
-    public const MOD_NAME = 'FS25_AgriVisionConnector';
+    public const MOD_NAME = 'FS25_AgravionConnector';
 
     public function packagePath(): string
     {
@@ -269,9 +269,9 @@ final class ConnectorDeployService
     private function modDescPath(): ?string
     {
         $candidates = [
-            base_path('../connector/FS25_AgriVisionConnector/modDesc.xml'),
-            base_path('connector/FS25_AgriVisionConnector/modDesc.xml'),
-            dirname(base_path()).'/connector/FS25_AgriVisionConnector/modDesc.xml',
+            base_path('../connector/FS25_AgravionConnector/modDesc.xml'),
+            base_path('connector/FS25_AgravionConnector/modDesc.xml'),
+            dirname(base_path()).'/connector/FS25_AgravionConnector/modDesc.xml',
         ];
         foreach ($candidates as $path) {
             $real = realpath($path);

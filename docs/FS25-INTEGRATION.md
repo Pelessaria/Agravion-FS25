@@ -141,12 +141,12 @@ FS25-Oberflächen sind GUI-XML und Lua der GIANTS-Engine. FarmTablet und Coursep
 
 ## 2. Geplanter Connector, Version 0
 
-Quellen liegen unter `connector/FS25_AgriVisionConnector/`. Verbindlicher Dateivertrag: [CONNECTOR-CONTRACT.md](CONNECTOR-CONTRACT.md).
+Quellen liegen unter `connector/FS25_AgravionConnector/`. Verbindlicher Dateivertrag: [CONNECTOR-CONTRACT.md](CONNECTOR-CONTRACT.md).
 
 Der erste Mod tut nur dies:
 
 1. Er startet auf dem Server (`g_server ~= nil`) und bricht bei Fehlern in seinem eigenen Takt ab, ohne den Dedicated Server anzuhalten.
-2. Er legt `modSettings/FS25_AgriVisionConnector/` an.
+2. Er legt `modSettings/FS25_AgravionConnector/` an.
 3. Er schreibt `hello.xml`, wenn der Schreibtest gelingt. Inhalt: Mod-Version, Spielzeit, UTC-Zeit des Schreibens, Liste der Farm-IDs. Je Hof stehen Name und Kontostand nur dann darin, wenn der Aufruf eine Zahl liefert. Eine gemeldete 0 bleibt 0. Liefert der Aufruf nichts, fehlt der Wert und das Dashboard zeigt „nicht verfügbar“.
 4. Er schreibt atomar, soweit die Engine das hergibt: temporäre Datei, dann der sichtbare Name. **Offen**, ob Umbenennen erlaubt ist. Fallback: eine Generation-Nummer in der Datei.
 5. **Fahrzeuge:** Full-Load nach Start und in grobem Intervall (`state/vehicles_full.xml`). Laufend später Delta; nach Save-Reload wieder Full-Load. Iteratoren werden erst nach Dedicated-Server-Probe finalisiert — bis dahin bleibt der Savegame-Feed die Meta-Quelle.

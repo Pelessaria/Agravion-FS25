@@ -7,7 +7,7 @@ export const defaultMailSettings: MailSettings = {
   username: "",
   password: "",
   fromEmail: "",
-  fromName: "AgriVision",
+  fromName: "Agravion",
 }
 
 export function normalizeMailSettings(raw: unknown): MailSettings {
@@ -25,6 +25,6 @@ export function normalizeMailSettings(raw: unknown): MailSettings {
     username: typeof value.username === "string" ? value.username : "",
     password: typeof value.password === "string" ? value.password : "",
     fromEmail: typeof value.fromEmail === "string" ? value.fromEmail : "",
-    fromName: typeof value.fromName === "string" ? value.fromName : "AgriVision",
+    fromName: typeof value.fromName === "string" ? value.fromName : "Agravion",
   }
 }

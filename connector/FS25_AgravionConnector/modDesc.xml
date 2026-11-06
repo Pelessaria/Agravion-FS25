@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
 <modDesc descVersion="114">
-    <author>AgriVision</author>
+    <author>Agravion</author>
     <version>0.1.25.0</version>
     <title>
-        <en>AgriVision Connector</en>
-        <de>AgriVision Connector</de>
+        <en>Agravion Connector</en>
+        <de>Agravion Connector</de>
     </title>
     <description>
         <en>Writes farm, vehicle, and field snapshots for the dashboard under modSettings. No credentials. No money commands in v0.</en>
@@ -16,6 +16,6 @@
         <sourceFile filename="FieldSnapshot.lua" />
         <sourceFile filename="StorageSnapshot.lua" />
         <sourceFile filename="LiveSnapshot.lua" />
-        <sourceFile filename="AgriVisionConnector.lua" />
+        <sourceFile filename="AgravionConnector.lua" />
     </extraSourceFiles>
 </modDesc>

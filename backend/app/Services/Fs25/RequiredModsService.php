@@ -25,15 +25,15 @@ final class RequiredModsService
     {
         return [
             [
-                'id' => 'FS25_AgriVisionConnector',
-                'title' => 'AgriVision Connector',
+                'id' => 'FS25_AgravionConnector',
+                'title' => 'Agravion Connector',
                 'zipName' => ConnectorDeployService::MOD_ZIP,
                 'folderName' => ConnectorDeployService::MOD_NAME,
                 'matchNames' => [
-                    'agrivision connector',
-                    'fs25_agrivisionconnector',
-                    'fs25_agrivisionconnector.zip',
-                    'agrivisionconnector',
+                    'agravion connector',
+                    'fs25_agravionconnector',
+                    'fs25_agravionconnector.zip',
+                    'agravionconnector',
                 ],
                 'required' => true,
                 'deployable' => true,
@@ -82,7 +82,7 @@ final class RequiredModsService
                 $runningVersion = is_string($loadedVersion) && $loadedVersion !== '' ? $loadedVersion : $runningVersion;
             }
 
-            if ($item['id'] === 'FS25_AgriVisionConnector' && is_string($runningVersion) && $runningVersion !== '') {
+            if ($item['id'] === 'FS25_AgravionConnector' && is_string($runningVersion) && $runningVersion !== '') {
                 if ($workspace->connector_version !== $runningVersion) {
                     $workspace->connector_version = $runningVersion;
                     $workspace->save();
@@ -316,7 +316,7 @@ final class RequiredModsService
         $cached = $this->cachedMods($workspace);
         $row = null;
         foreach ($this->catalog() as $item) {
-            if ($item['id'] !== 'FS25_AgriVisionConnector') {
+            if ($item['id'] !== 'FS25_AgravionConnector') {
                 continue;
             }
             $row = $this->cachedMatch($item, $cached);
@@ -393,11 +393,11 @@ final class RequiredModsService
             return null;
         }
         try {
-            $xml = (new HostFileClient($access))->read($modSettings.'/FS25_AgriVisionConnector/hello.xml', 4);
+            $xml = (new HostFileClient($access))->read($modSettings.'/FS25_AgravionConnector/hello.xml', 4);
         } catch (Throwable) {
             return null;
         }
-        if (! is_string($xml) || preg_match('/<agrivisionConnector\b[^>]*\bversion="([^"]+)"/i', $xml, $match) !== 1) {
+        if (! is_string($xml) || preg_match('/<agravionConnector\b[^>]*\bversion="([^"]+)"/i', $xml, $match) !== 1) {
             return null;
         }
         $version = trim($match[1]);

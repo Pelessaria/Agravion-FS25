@@ -4,7 +4,7 @@
  */
 
 export const CONNECTOR_SCHEMA = "1"
-export const CONNECTOR_MOD_NAME = "FS25_AgriVisionConnector"
+export const CONNECTOR_MOD_NAME = "FS25_AgravionConnector"
 
 export type ConnectorFarmSnapshot = {
   gameFarmId: number

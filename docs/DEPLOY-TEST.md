@@ -1,6 +1,6 @@
 # Deploy-Test (Backend + Datenbank)
 
-Kurzleitfaden für AgriVision auf **Webspace / lokalem PHP + MySQL oder MariaDB**. Kein Docker. Keine Feed-Codes oder Passwörter in dieses Dokument schreiben.
+Kurzleitfaden für Agravion auf **Webspace / lokalem PHP + MySQL oder MariaDB**. Kein Docker. Keine Feed-Codes oder Passwörter in dieses Dokument schreiben.
 
 ## 1. Voraussetzungen
 
@@ -15,7 +15,7 @@ Siehe [SHARED-HOSTING.md](SHARED-HOSTING.md) und [UPDATES.md](UPDATES.md).
 
 ```bash
 ./scripts/install.sh --skip-download --migrate \
-  --db-host 127.0.0.1 --db-name agrivision --db-user agrivision --db-password '…' \
+  --db-host 127.0.0.1 --db-name agravion --db-user agravion --db-password '…' \
   --app-url http://127.0.0.1:8000
 ```
 
@@ -36,13 +36,13 @@ php artisan fs25:feed-fetch --url="https://HOST:PORT/feed/dedicated-server-stats
 2. `.env` auf dem Server anlegen (nicht aus dem Repo). `APP_KEY`, DB-Zugangsdaten, optional `FS25_FEED_*`.
 3. Migrationen: Web-Installer oder `php artisan migrate --force`.
 4. Frontend-Build liegt im Release unter dem vom Installer vorgesehenen Pfad (bzw. `public/app` nach Update).
-5. Updates danach über Einstellungen → Update oder `php artisan agrivision:update --apply`.
+5. Updates danach über Einstellungen → Update oder `php artisan agravion:update --apply`.
 
 Rechte: `storage/` und `bootstrap/cache/` schreibbar für den PHP-User. Outbound HTTPS zum GitHub-API für Updates.
 
 ## 5. Connector-Mod (parallel)
 
-Siehe `connector/PROBE.md`. ZIP: `connector/dist/FS25_AgriVisionConnector.zip`.
+Siehe `connector/PROBE.md`. ZIP: `connector/dist/FS25_AgravionConnector.zip`.
 
 ## 6. Smoke-Checkliste
 
@@ -50,7 +50,7 @@ Siehe `connector/PROBE.md`. ZIP: `connector/dist/FS25_AgriVisionConnector.zip`.
 | --- | --- |
 | 1 | `php artisan migrate` ohne Fehler |
 | 2 | `php artisan fs25:feed-fetch …` liefert `linkState=online` |
-| 3 | `php artisan agrivision:update --check` erreicht GitHub |
+| 3 | `php artisan agravion:update --check` erreicht GitHub |
 | 4 | `GET /api/system/update` antwortet JSON |
 | 5 | Connector-Probe auf dem Spielserver |
 

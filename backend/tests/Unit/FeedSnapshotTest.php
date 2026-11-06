@@ -133,7 +133,7 @@ class FeedSnapshotTest extends TestCase
             'server' => ['name' => 'Demo', 'version' => '1.24.0.0'],
             'slots' => ['capacity' => 8, 'used' => 0, 'players' => []],
             'mods' => [
-                ['name' => 'FS25_AgriVisionConnector', 'author' => 'AgriVision', 'version' => '0.1.1.1', 'title' => 'AgriVision Connector'],
+                ['name' => 'FS25_AgravionConnector', 'author' => 'Agravion', 'version' => '0.1.1.1', 'title' => 'Agravion Connector'],
                 ['name' => 'FS25_Courseplay', 'author' => 'CP', 'version' => '8.1.0.3', 'title' => 'CoursePlay'],
             ],
         ];
@@ -148,7 +148,7 @@ class FeedSnapshotTest extends TestCase
         );
 
         $this->assertSame(2, $snapshot->modCount);
-        $this->assertSame('FS25_AgriVisionConnector', $snapshot->mods[0]['name']);
-        $this->assertSame('AgriVision Connector', $snapshot->mods[0]['title']);
+        $this->assertSame('FS25_AgravionConnector', $snapshot->mods[0]['name']);
+        $this->assertSame('Agravion Connector', $snapshot->mods[0]['title']);
     }
 }

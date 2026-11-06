@@ -8,13 +8,13 @@ use Throwable;
 
 class SystemUpdateCommand extends Command
 {
-    protected $signature = 'agrivision:update
+    protected $signature = 'agravion:update
         {--check : Only check GitHub for a newer commit}
         {--apply : Download zipball and overlay application files}
         {--force : Re-overlay backend even when already on the latest SHA}
         {--sha= : Expected remote SHA (optional safety check)}';
 
-    protected $description = 'Check or apply AgriVision updates from the public GitHub repository (shared-hosting safe).';
+    protected $description = 'Check or apply Agravion updates from the public GitHub repository (shared-hosting safe).';
 
     public function handle(GithubUpdateService $updates): int
     {

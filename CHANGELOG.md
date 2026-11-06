@@ -6,10 +6,10 @@ Dieses Protokoll folgt [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Hinzugefügt
 
-- Laravel-Backend mit Feed-Client (`fs25:feed-fetch`), Workspace-Migration und In-App-Updater aus GitHub (`agrivision:update`, `/api/system/update`).
+- Laravel-Backend mit Feed-Client (`fs25:feed-fetch`), Workspace-Migration und In-App-Updater aus GitHub (`agravion:update`, `/api/system/update`).
 - Einstellungen → Update in der UI; Docs `UPDATES.md`, Deploy ohne Docker.
 - Connector-Mod v0 inkl. Probe-Paket.
-- Phase-2-Prototyp in `frontend/` (AgriVision-UI).
+- Phase-2-Prototyp in `frontend/` (Agravion-UI).
 
 ### Geändert
 

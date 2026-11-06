@@ -4,7 +4,7 @@ namespace App\Services\Fs25;
 
 /**
  * Stable vehicle store-icon key from config filename (type-level, not uniqueId).
- * Mirrors connector AgriVisionConnector:storeKeyFromFilename.
+ * Mirrors connector AgravionConnector:storeKeyFromFilename.
  */
 final class StoreKey
 {
