@@ -999,7 +999,7 @@ export function LiveMapPage() {
           </button>
         )}
       </aside>
-      <PageStats>
+      <PageStats label={t("modules.map")}>
         <ContextStat symbol={<Tractor className="icon" />} value={String(vehicleCount)} label={t("live.vehicles")} />
         <ContextPipe />
         <ContextStat symbol={<Wrench className="icon" />} value={String(implementCount)} label={t("live.implements")} />

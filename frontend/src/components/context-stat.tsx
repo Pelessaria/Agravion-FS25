@@ -53,7 +53,7 @@ export function PageStatsProvider({ children }: { children: ReactNode }) {
   return <PageStatsContext.Provider value={value}>{children}</PageStatsContext.Provider>
 }
 
-export function PageStats({ children }: { children: ReactNode }) {
+export function PageStats({ label, children }: { label: string; children: ReactNode }) {
   const api = useContext(PageStatsContext)
   const setActive = api?.setActive
   useEffect(() => {
@@ -62,7 +62,13 @@ export function PageStats({ children }: { children: ReactNode }) {
     return () => setActive(false)
   }, [setActive])
   if (!api?.slot) return null
-  return createPortal(<div className="context-extra-row">{children}</div>, api.slot)
+  return createPortal(
+    <div className="context-extra-block">
+      <p className="context-extra-label">{label}</p>
+      <div className="context-extra-row">{children}</div>
+    </div>,
+    api.slot,
+  )
 }
 
 export function ContextExtra({ open }: { open: boolean }) {

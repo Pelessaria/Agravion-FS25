@@ -406,7 +406,7 @@ export function FieldsPage() {
 
   return (
     <section className="fields-page">
-      <PageStats>
+      <PageStats label={t("modules.fields")}>
         <ContextStat symbol={<MapIcon className="icon" />} value={fields.length.toLocaleString(i18n.language)} label={t("fields.count")} />
         <ContextPipe />
         <ContextStat symbol={<Home className="icon" />} value={owned.toLocaleString(i18n.language)} label={t("fields.owned")} />

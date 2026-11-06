@@ -283,7 +283,7 @@ export function StoragePage() {
   return (
     <section className="stock-page">
       {emptyKind || (loading && !payload) ? null : (
-        <PageStats>
+        <PageStats label={t("modules.storage")}>
           <ContextStat symbol={<Warehouse className="icon" />} value={own.length.toLocaleString(language)} label={t("stock.placeCount")} />
           <ContextPipe />
           <ContextStat symbol={<Layers className="icon" />} value={bulkRows.length.toLocaleString(language)} label={t("stock.goodCount")} />

@@ -131,7 +131,7 @@ export function WeatherPage() {
 
   return (
     <div className="page weather-page">
-      <PageStats>
+      <PageStats label={t("modules.weather")}>
         <ContextStat
           symbol={<Clock3 className="icon" />}
           value={payload?.writtenAt ? stamp(payload.writtenAt, t("unavailable")) : loading ? "…" : t("unavailable")}

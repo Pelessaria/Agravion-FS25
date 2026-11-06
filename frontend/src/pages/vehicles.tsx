@@ -161,7 +161,7 @@ export function VehiclesPage() {
 
   return (
     <section className="equipment-page">
-      <PageStats>
+      <PageStats label={t("modules.equipment")}>
         <ContextStat symbol={<Tractor className="icon" />} value={rows.length.toLocaleString(i18n.language)} label={t("vehicles.fleet")} />
         <ContextPipe />
         <ContextStat
