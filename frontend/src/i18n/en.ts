@@ -1077,6 +1077,8 @@ export const en = {
     ownFarm: "Current farm only",
     allFarms: "All farms",
     ai: "AI",
+    occupied: "Occupied",
+    attachments: "Attached",
     cluster: "{{count}} vehicles",
     clusterHint: "Choose an entry to move there.",
     moving: "Moving",

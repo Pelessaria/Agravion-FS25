@@ -78,6 +78,7 @@ final class ConnectorLiveParser
                 'ai' => ((string) ($node['ai'] ?? '')) === '1',
                 'driver' => self::text($node['driver'] ?? null),
                 'controlled' => ((string) ($node['controlled'] ?? '')) === '1',
+                'attachments' => self::text($node['attachments'] ?? null),
             ];
         }
         foreach ($root->player as $node) {

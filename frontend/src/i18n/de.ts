@@ -1075,6 +1075,8 @@ export const de = {
     ownFarm: "Nur aktueller Hof",
     allFarms: "Alle Höfe",
     ai: "KI",
+    occupied: "Besetzt",
+    attachments: "Angehängt",
     cluster: "{{count}} Fahrzeuge",
     clusterHint: "Eintrag wählen, um hinzufahren.",
     moving: "Unterwegs",

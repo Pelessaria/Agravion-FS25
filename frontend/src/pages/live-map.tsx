@@ -34,6 +34,8 @@ type Marker = {
   label: string
   icon: string | null
   active: boolean
+  occupied: boolean
+  attachments: string | null
   priority: number
   busy: string | null
   count?: number
@@ -51,6 +53,15 @@ function rolePriority(role: MarkerRole) {
 
 function vehicleActive(vehicle: LiveVehicle) {
   return vehicle.ai || Boolean(vehicle.driver) || vehicle.controlled === true
+}
+
+function vehicleOccupied(vehicle: LiveVehicle) {
+  return Boolean(vehicle.driver) || vehicle.controlled === true
+}
+
+/** Giants yaw → SVG degrees. Map Y grows with world +Z (south), arrow tip is -Y (north). */
+function headingToSvgDegrees(heading: number) {
+  return 180 - (heading * 180) / Math.PI
 }
 
 function markerRole(kind: MarkerKind, category: string | null): MarkerRole {
@@ -569,7 +580,16 @@ export function LiveMapPage() {
             {selectedVehicle ? (
               <div className="live-card">
                 <strong>{selectedVehicle.name || selectedVehicle.id}</strong>
-                <p>{selectedVehicle.ai ? t("live.ai") : selectedVehicle.driver}</p>
+                <p>
+                  {selectedVehicle.ai
+                    ? t("live.ai")
+                    : selectedVehicle.driver || (selectedVehicle.controlled ? t("live.occupied") : t("live.parked"))}
+                </p>
+                {selectedVehicle.attachments ? (
+                  <p>
+                    {t("live.attachments")}: {selectedVehicle.attachments}
+                  </p>
+                ) : null}
                 {fleetMatch(selectedVehicle.id) ? (
                   <Link to={`/w/${workspace.id}/equipment/${encodeURIComponent(fleetMatch(selectedVehicle.id)!.id)}`}>{t("modules.equipment")}</Link>
                 ) : null}
@@ -842,18 +862,22 @@ function LiveCanvas({
     const next: Marker[] = []
     for (const vehicle of vehicles) {
       const point = projectPoint(vehicle.x, vehicle.z, frame)
+      const occupied = vehicleOccupied(vehicle)
+      const role = vehicleRole(vehicle)
       next.push({
         key: `v:${vehicle.id}`,
         x: point.x,
         y: point.y,
         heading: vehicle.heading,
         kind: "vehicle",
-        role: vehicleRole(vehicle),
+        role,
         farmColor: placeColor(vehicle.farmId),
         label: vehicle.name || vehicle.id,
         icon: vehicleIcon(vehicle),
         active: vehicleActive(vehicle),
-        priority: rolePriority(vehicleRole(vehicle)),
+        occupied,
+        attachments: vehicle.attachments?.trim() || null,
+        priority: occupied ? 100 : rolePriority(role),
         busy: vehicle.ai ? "ai" : vehicle.driver || (vehicle.controlled ? "moving" : null),
       })
     }
@@ -870,6 +894,8 @@ function LiveCanvas({
         label: player.name || player.id,
         icon: null,
         active: false,
+        occupied: false,
+        attachments: null,
         priority: rolePriority("player"),
         busy: null,
       })
@@ -887,6 +913,8 @@ function LiveCanvas({
         label: place.name || place.type || place.id,
         icon: null,
         active: false,
+        occupied: false,
+        attachments: null,
         priority: rolePriority("building"),
         busy: null,
       })
@@ -904,6 +932,8 @@ function LiveCanvas({
         label: pin.name,
         icon: null,
         active: false,
+        occupied: false,
+        attachments: null,
         priority: 50,
         busy: null,
       })
@@ -912,8 +942,9 @@ function LiveCanvas({
   }, [frame, pin, placeColor, places, players, vehicleIcon, vehicleRole, vehicles])
 
   const draw = useMemo(() => {
-    const kept = markers.filter((marker) => marker.key === selected || marker.kind === "pin")
-    const pool = markers.filter((marker) => marker.key !== selected && marker.kind !== "pin")
+    // Occupied (player-driven) vehicles stay unclustered and draw on top.
+    const kept = markers.filter((marker) => marker.key === selected || marker.kind === "pin" || marker.occupied)
+    const pool = markers.filter((marker) => marker.key !== selected && marker.kind !== "pin" && !marker.occupied)
     const used = new Array(pool.length).fill(false)
     const placed: Marker[] = [...kept]
     const stageOf = (marker: Marker) => ({
@@ -942,6 +973,7 @@ function LiveCanvas({
           count: group.length,
           members: group,
           active: false,
+          occupied: false,
           priority: Math.max(...group.map((item) => item.priority)),
         })
       } else {
@@ -1148,18 +1180,33 @@ function LiveCanvas({
               : null}
             {draw.map((marker) => {
               const on = marker.key === selected
-              // Giants yaw (FNT: MathUtil.getYRotationFromDirection) → SVG degrees.
-              // Arrow path points to -Y (map north); no sign flip — the old `-heading` inverted travel.
-              const rotation = marker.heading == null ? 0 : (marker.heading * 180) / Math.PI
+              const rotation = marker.heading == null ? 0 : headingToSvgDegrees(marker.heading)
               const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
               const piled = (marker.count ?? 0) > 1
               const implement = marker.role === "tool" || marker.role === "trailer" || marker.role === "pallet"
-              const base = piled ? 36 : implement ? 22 : marker.role === "building" || marker.role === "player" ? 20 : marker.active ? 32 : 28
-              const mark = toMap(on ? base + 4 : base)
+              const base = piled
+                ? 36
+                : implement
+                  ? 22
+                  : marker.role === "building" || marker.role === "player"
+                    ? 20
+                    : marker.occupied
+                      ? 34
+                      : marker.active
+                        ? 32
+                        : 28
+              const mark = toMap(on || marker.occupied ? base + 4 : base)
               const ring = marker.farmColor || (marker.role === "player" ? "#f4f1e8" : "#8e9890")
               const showArrow = showsHeading(marker.role, marker.active, marker.heading, piled)
               const icon = marker.icon && !brokenIcons.has(marker.icon) ? marker.icon : null
-              const stateClass = [on ? "is-on" : "", marker.active ? "is-active" : "is-idle", `is-${marker.role}`].filter(Boolean).join(" ")
+              const stateClass = [
+                on ? "is-on" : "",
+                marker.occupied ? "is-occupied" : marker.active ? "is-active" : "is-idle",
+                `is-${marker.role}`,
+              ]
+                .filter(Boolean)
+                .join(" ")
+              const showCaption = (on || marker.occupied) && Boolean(marker.label || marker.attachments || marker.busy)
               return (
                 <g key={marker.key} data-marker={marker.key} className={`live-marker ${stateClass}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`scale(${mark})`}>
@@ -1194,11 +1241,21 @@ function LiveCanvas({
                       </text>
                     </g>
                   ) : null}
-                  {on && marker.label ? (
-                    <g className="live-caption" transform={`translate(0 ${-toMap(22)}) scale(${toMap(12)})`}>
+                  {showCaption ? (
+                    <g className="live-caption" transform={`translate(0 ${-toMap(22)}) scale(${toMap(11)})`}>
                       <text textAnchor="middle" y="0">
                         {marker.label}
                       </text>
+                      {marker.busy && marker.busy !== "ai" && marker.busy !== "moving" ? (
+                        <text className="live-caption-sub" textAnchor="middle" y="1.25">
+                          {marker.busy}
+                        </text>
+                      ) : null}
+                      {marker.attachments ? (
+                        <text className="live-caption-sub" textAnchor="middle" y={marker.busy && marker.busy !== "ai" && marker.busy !== "moving" ? 2.4 : 1.25}>
+                          {marker.attachments}
+                        </text>
+                      ) : null}
                     </g>
                   ) : null}
                 </g>

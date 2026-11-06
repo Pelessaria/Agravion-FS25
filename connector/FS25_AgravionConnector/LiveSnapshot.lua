@@ -118,6 +118,43 @@ local function isPallet(vehicle)
     return false
 end
 
+-- Directly attached implements (name list for the live map caption).
+local function attachmentNames(vehicle)
+    local names = {}
+    local seen = {}
+    local function add(object)
+        if object == nil then
+            return
+        end
+        local name = safeMethod(object, "getName")
+        if type(name) ~= "string" or name == "" or seen[name] then
+            return
+        end
+        seen[name] = true
+        names[#names + 1] = name
+    end
+    local list = safeMethod(vehicle, "getAttachedImplements")
+    if type(list) == "table" then
+        for _, entry in pairs(list) do
+            if type(entry) == "table" then
+                add(entry.object)
+            end
+        end
+    end
+    local spec = vehicle ~= nil and vehicle.spec_attacherJoints or nil
+    if spec ~= nil and type(spec.attachedImplements) == "table" then
+        for _, entry in pairs(spec.attachedImplements) do
+            if type(entry) == "table" then
+                add(entry.object)
+            end
+        end
+    end
+    if #names == 0 then
+        return nil
+    end
+    return table.concat(names, " · ")
+end
+
 local function farmIdOf(object)
     local value = safeMethod(object, "getOwnerFarmId")
     if value == nil and object ~= nil then
@@ -180,8 +217,9 @@ local function appendVehicles(connector, parts, fingerprint)
                 driver = connection.nickname or connection.userName
             end
             local ai = safeMethod(vehicle, "getIsAIActive") == true
+            local attachments = attachmentNames(vehicle)
             parts[#parts + 1] = string.format(
-                "<vehicle%s%s%s%s%s%s%s%s%s />",
+                "<vehicle%s%s%s%s%s%s%s%s%s%s />",
                 attr(connector, "id", id),
                 attr(connector, "name", name),
                 attr(connector, "farmId", farmIdOf(vehicle)),
@@ -190,7 +228,8 @@ local function appendVehicles(connector, parts, fingerprint)
                 attr(connector, "heading", heading ~= nil and round(heading, 3) or nil),
                 attr(connector, "ai", ai and "1" or nil),
                 attr(connector, "driver", driver),
-                attr(connector, "controlled", controlled and "1" or nil)
+                attr(connector, "controlled", controlled and "1" or nil),
+                attr(connector, "attachments", attachments)
             )
             fingerprint[#fingerprint + 1] = string.format(
                 "v:%s:%s:%s:%s",

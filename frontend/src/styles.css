@@ -4551,6 +4551,15 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-marker .live-marker-rim { fill: none; stroke: rgba(255, 255, 255, 0.55); stroke-width: 0.08; }
 .live-marker.is-idle { opacity: 0.78; }
 .live-marker.is-active .live-marker-ring { stroke-width: 0.14; }
+.live-marker.is-occupied { opacity: 1; }
+.live-marker.is-occupied .live-marker-ring {
+  stroke-width: 0.16;
+  animation: live-ring-pulse 1.15s ease-in-out infinite;
+}
+@keyframes live-ring-pulse {
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: 0.28; }
+}
 .live-heading {
   fill: #f5f7f7;
   stroke: #101418;
@@ -4815,6 +4824,11 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   stroke: rgba(8, 12, 10, 0.92);
   stroke-width: 0.45px;
   pointer-events: none;
+}
+.live-caption-sub {
+  fill: #d5dde0 !important;
+  font-size: 0.92px !important;
+  font-weight: 500 !important;
 }
 @media (max-width: 980px) {
   .live-page { height: auto; }

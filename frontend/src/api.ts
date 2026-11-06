@@ -229,6 +229,7 @@ export type LiveVehicle = {
   ai: boolean
   driver: string | null
   controlled?: boolean
+  attachments?: string | null
 }
 
 export type LivePlayer = {

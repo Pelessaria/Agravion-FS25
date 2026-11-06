@@ -454,6 +454,8 @@ final class ConnectorSnapshotService
                 'heading' => null,
                 'ai' => false,
                 'driver' => null,
+                'controlled' => false,
+                'attachments' => null,
             ];
         }
         $path = $this->localVehiclesPath($workspace);
