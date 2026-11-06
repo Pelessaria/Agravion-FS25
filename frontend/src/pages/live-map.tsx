@@ -630,13 +630,13 @@ export function LiveMapPage() {
                 <ChevronRight className="icon" />
               </button>
             </div>
-            <section className="live-sheet">
-              <div className="live-sheet-id">
+            <section className="live-inspect-body">
+              <div className="live-card-id">
                 <div>
                   {focusFleet?.brandIconUrl ? (
-                    <img className="live-sheet-brand" src={focusFleet.brandIconUrl} alt={vehicleBrand(focusFleet) ?? ""} />
+                    <img className="live-card-brand" src={focusFleet.brandIconUrl} alt={vehicleBrand(focusFleet) ?? ""} />
                   ) : focusFleet && vehicleBrand(focusFleet) ? (
-                    <p className="live-sheet-brand-name">{vehicleBrand(focusFleet)}</p>
+                    <p className="live-card-brand-name">{vehicleBrand(focusFleet)}</p>
                   ) : null}
                   <strong>
                     {focusFleet ? (
@@ -662,7 +662,7 @@ export function LiveMapPage() {
               </div>
               {focusFleet ? <VehicleGauges vehicle={focusFleet} language={i18n.language} label={(key) => t(key)} /> : null}
               {focusFleet ? (
-                <dl className="live-sheet-facts">
+                <dl className="live-card-facts">
                   <div>
                     <dt>{t("vehicles.hours")}</dt>
                     <dd>

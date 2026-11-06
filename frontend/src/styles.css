@@ -4959,21 +4959,21 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   background: color-mix(in srgb, #12171b 92%, transparent);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
 }
-.live-sheet {
+.live-inspect-body {
   display: grid;
   gap: 12px;
   margin-top: 8px;
   padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
-.live-sheet-id strong { display: block; font-size: 1.05rem; line-height: 1.2; }
-.live-sheet-id strong a { color: inherit; text-decoration: none; }
-.live-sheet-id strong a:hover { color: #e4b84a; }
-.live-sheet-id span { display: flex; gap: 6px; align-items: center; margin-top: 3px; color: var(--text-faint); font-size: 0.75rem; }
-.live-sheet-id i { font-style: normal; opacity: 0.6; }
-.live-sheet-id .is-driver { color: #e4b84a; font-style: normal; }
-.live-sheet-brand { display: block; height: 16px; max-width: 88px; object-fit: contain; margin-bottom: 6px; }
-.live-sheet-brand-name {
+.live-card-id strong { display: block; font-size: 1.05rem; line-height: 1.2; }
+.live-card-id strong a { color: inherit; text-decoration: none; }
+.live-card-id strong a:hover { color: #e4b84a; }
+.live-card-id span { display: flex; gap: 6px; align-items: center; margin-top: 3px; color: var(--text-faint); font-size: 0.75rem; }
+.live-card-id i { font-style: normal; opacity: 0.6; }
+.live-card-id .is-driver { color: #e4b84a; font-style: normal; }
+.live-card-brand { display: block; height: 16px; max-width: 88px; object-fit: contain; margin-bottom: 6px; }
+.live-card-brand-name {
   margin: 0 0 4px;
   color: var(--text-faint);
   font-size: 0.68rem;
@@ -4981,20 +4981,20 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.live-sheet-facts {
+.live-card-facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px 16px;
   margin: 0;
 }
-.live-sheet-facts dt {
+.live-card-facts dt {
   color: var(--text-faint);
   font-size: 0.62rem;
   font-weight: 650;
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
-.live-sheet-facts dd { margin: 2px 0 0; font-size: 0.88rem; }
+.live-card-facts dd { margin: 2px 0 0; font-size: 0.88rem; }
 .live-inspect .status-list { margin-top: 0; padding-top: 0; border-top: 0; gap: 10px; }
 .live-train { display: flex; align-items: flex-end; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
 .live-train-slot { display: flex; align-items: flex-end; gap: 8px; }
