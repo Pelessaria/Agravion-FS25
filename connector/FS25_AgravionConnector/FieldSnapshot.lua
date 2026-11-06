@@ -4,13 +4,14 @@
   Geometry (polygon outlines) is collected once per field set and written to
   state/fields_geometry.xml. Joined-field groups are measured again whenever
   field state is written, because plowing between parcels changes the join
-  without moving the outlines.   Farmlands hidden from the buy screen and not
+  without moving the outlines. Farmlands hidden from the buy screen and not
   owned by a player farm are omitted: maps use those for mission and scenery
-  ground, and their polygons are not fields the player can buy. A parcel that
-  was built over keeps only the ground that is still a field: the outline is
-  traced from the field density map, and a building inside the parcel is sent
-  as a hole. The map polygon stays in memory so a later demolition can grow
-  the outline back. The field is omitted only when no field ground remains.
+  ground, and their polygons are not fields the player can buy. Where a
+  placeable has painted over a field, the map outline stays and only that
+  built edge is cut away. The check runs with the first geometry pass and
+  then about every ten minutes, not on every state sweep. The original
+  polygon stays in memory so a later demolition can grow the outline back.
+  The field is omitted only when no field ground remains.
   Crop / ground / Precision Farming state is swept
   in small batches and written about once a minute to state/fields_state.xml.
 
@@ -26,6 +27,9 @@
 FieldSnapshot = {}
 
 FieldSnapshot.STATE_EVERY_MS = 60000
+-- Re-check built-over ground on this cadence. The density read is too heavy
+-- to repeat with every field-state sweep.
+FieldSnapshot.FIT_EVERY_MS = 600000
 FieldSnapshot.GEOMETRY_BUDGET = 20
 FieldSnapshot.STATE_BUDGET_PF = 12
 FieldSnapshot.STATE_BUDGET = 48
@@ -1775,9 +1779,9 @@ local function fieldGroundRatio(points)
     local step = math.max(8, span / 16)
     local yes, checked, unknown = 0, 0, 0
     local z = minZ + step * 0.5
-    while z < maxZ and checked + unknown < 96 do
+    while z < maxZ and checked + unknown < 48 do
         local x = minX + step * 0.5
-        while x < maxX and checked + unknown < 96 do
+        while x < maxX and checked + unknown < 48 do
             if pointInside(points, x, z) then
                 local on = onFieldGround(x, z)
                 if on == nil then
@@ -1826,6 +1830,256 @@ local function smoothLoop(loop, step)
     return outline
 end
 
+local function simplifyOpen(points, epsilon)
+    local count = #points
+    if count < 3 then
+        return points
+    end
+    local keep = {}
+    local function mark(first, last)
+        local maxDist = 0
+        local index = first
+        local cursor = first + 1
+        while cursor < last do
+            local dist = segmentDistance(points[cursor], points[first].x, points[first].z, points[last].x, points[last].z)
+            if dist > maxDist then
+                maxDist = dist
+                index = cursor
+            end
+            cursor = cursor + 1
+        end
+        if maxDist > epsilon and index ~= first and index ~= last then
+            mark(first, index)
+            mark(index, last)
+        else
+            keep[first] = true
+            keep[last] = true
+        end
+    end
+    mark(1, count)
+    local out = {}
+    local i = 1
+    while i <= count do
+        if keep[i] then
+            out[#out + 1] = points[i]
+        end
+        i = i + 1
+    end
+    return out
+end
+
+local function closestOnRing(polygon, x, z)
+    local best = 1e18
+    local bestI, bestT = 1, 0
+    local bestX, bestZ = polygon[1].x, polygon[1].z
+    local count = #polygon
+    local i = 1
+    while i <= count do
+        local a = polygon[i]
+        local b = polygon[(i % count) + 1]
+        local dx = b.x - a.x
+        local dz = b.z - a.z
+        local len2 = dx * dx + dz * dz
+        local t = 0
+        if len2 > 0.0001 then
+            t = ((x - a.x) * dx + (z - a.z) * dz) / len2
+            if t < 0 then
+                t = 0
+            elseif t > 1 then
+                t = 1
+            end
+        end
+        local px = a.x + dx * t
+        local pz = a.z + dz * t
+        local ex = x - px
+        local ez = z - pz
+        local dist = ex * ex + ez * ez
+        if dist < best then
+            best = dist
+            bestI, bestT, bestX, bestZ = i, t, px, pz
+        end
+        i = i + 1
+    end
+    return bestI, bestT, bestX, bestZ
+end
+
+local function ringChain(polygon, i0, t0, x0, z0, i1, t1, x1, z1, forward)
+    local out = { { x = x0, z = z0 } }
+    local count = #polygon
+    local sameEdge = i0 == i1 and ((forward and t1 >= t0 - 0.0001) or ((not forward) and t0 >= t1 - 0.0001))
+    if sameEdge then
+        out[2] = { x = x1, z = z1 }
+        return out
+    end
+    local i = i0
+    local guard = 0
+    while guard <= count do
+        guard = guard + 1
+        if forward then
+            local vertex = polygon[(i % count) + 1]
+            out[#out + 1] = { x = vertex.x, z = vertex.z }
+            i = (i % count) + 1
+        else
+            local vertex = polygon[i]
+            out[#out + 1] = { x = vertex.x, z = vertex.z }
+            i = i - 1
+            if i < 1 then
+                i = count
+            end
+        end
+        if i == i1 then
+            out[#out + 1] = { x = x1, z = z1 }
+            return out
+        end
+    end
+    out[#out + 1] = { x = x1, z = z1 }
+    return out
+end
+
+local function distToOpen(points, x, z)
+    local count = #points
+    if count == 0 then
+        return 1e9
+    end
+    if count == 1 then
+        local dx = x - points[1].x
+        local dz = z - points[1].z
+        return math.sqrt(dx * dx + dz * dz)
+    end
+    local best = 1e18
+    local i = 1
+    while i < count do
+        local dist = segmentDistance({ x = x, z = z }, points[i].x, points[i].z, points[i + 1].x, points[i + 1].z)
+        if dist < best then
+            best = dist
+        end
+        i = i + 1
+    end
+    return best
+end
+
+local function chainScore(chain, run)
+    local sum = 0
+    local i = 1
+    while i <= #chain do
+        sum = sum + distToOpen(run, chain[i].x, chain[i].z)
+        i = i + 1
+    end
+    return sum / #chain
+end
+
+-- The grid walk is stair-stepped. Runs that follow the map outline are
+-- replaced by that outline. Only the edge where the ground was built over
+-- stays, straightened to a few segments.
+local function stitchOutline(polygon, loop, kinds, step)
+    local count = #loop
+    if count < 3 or polygon == nil or #polygon < 3 then
+        return nil
+    end
+    local hasRim, hasCut = false, false
+    local i = 1
+    while i <= count do
+        if kinds[i] == "cut" then
+            hasCut = true
+        else
+            hasRim = true
+        end
+        i = i + 1
+    end
+    if hasRim and not hasCut then
+        return polygon
+    end
+    if hasCut and not hasRim then
+        return smoothLoop(loop, step)
+    end
+
+    local function nextIndex(index)
+        if index >= count then
+            return 1
+        end
+        return index + 1
+    end
+
+    local start = 1
+    i = 1
+    while i <= count do
+        local prev = i - 1
+        if prev < 1 then
+            prev = count
+        end
+        if kinds[i] ~= kinds[prev] then
+            start = i
+            break
+        end
+        i = i + 1
+    end
+
+    local function appendPoints(out, points)
+        local n = 1
+        while n <= #points do
+            local point = points[n]
+            local last = out[#out]
+            if last == nil or (last.x - point.x) * (last.x - point.x) + (last.z - point.z) * (last.z - point.z) > 0.25 then
+                out[#out + 1] = { x = point.x, z = point.z }
+            end
+            n = n + 1
+        end
+    end
+
+    local function boundaryChain(run)
+        local i0, t0, x0, z0 = closestOnRing(polygon, run[1].x, run[1].z)
+        local i1, t1, x1, z1 = closestOnRing(polygon, run[#run].x, run[#run].z)
+        local forward = ringChain(polygon, i0, t0, x0, z0, i1, t1, x1, z1, true)
+        local back = ringChain(polygon, i0, t0, x0, z0, i1, t1, x1, z1, false)
+        local forwardScore = chainScore(forward, run)
+        local backScore = chainScore(back, run)
+        if backScore < forwardScore - 0.05 then
+            return back
+        end
+        if math.abs(forwardScore - backScore) <= 0.05 and #back < #forward then
+            return back
+        end
+        return forward
+    end
+
+    local out = {}
+    local seen = 0
+    i = start
+    while seen < count do
+        local kind = kinds[i]
+        local run = { { x = loop[i].x, z = loop[i].z } }
+        while seen < count do
+            local nxt = nextIndex(i)
+            run[#run + 1] = { x = loop[nxt].x, z = loop[nxt].z }
+            seen = seen + 1
+            i = nxt
+            if seen >= count or kinds[i] ~= kind then
+                break
+            end
+        end
+        if kind == "cut" then
+            local _, _, x0, z0 = closestOnRing(polygon, run[1].x, run[1].z)
+            local _, _, x1, z1 = closestOnRing(polygon, run[#run].x, run[#run].z)
+            run[1] = { x = x0, z = z0 }
+            run[#run] = { x = x1, z = z1 }
+            appendPoints(out, simplifyOpen(run, step * 0.8))
+        else
+            appendPoints(out, boundaryChain(run))
+        end
+    end
+    if #out >= 2 then
+        local first = out[1]
+        local last = out[#out]
+        if (first.x - last.x) * (first.x - last.x) + (first.z - last.z) * (first.z - last.z) <= 0.25 then
+            out[#out] = nil
+        end
+    end
+    if #out < 3 then
+        return nil
+    end
+    return out
+end
+
 -- Walk the cells of the original outline that are still field ground.
 -- Returns nil when a sample could not be read, false when nothing is left,
 -- or { outer = points, holes = { points, ... }, area = sqm }.
@@ -1860,9 +2114,9 @@ local function traceFieldOutline(polygon)
     end
 
     local known = {}
-    local function cell(i, j)
+    local function classify(i, j)
         if i < 0 or j < 0 or i >= nx or j >= nz then
-            return false
+            return "out"
         end
         local key = i * 10000 + j
         local cached = known[key]
@@ -1874,27 +2128,36 @@ local function traceFieldOutline(polygon)
         end
         local x = minX + (i + 0.5) * step
         local z = minZ + (j + 0.5) * step
-        local value = false
-        if pointInside(polygon, x, z) then
-            value = onFieldGround(x, z)
-            if value == nil then
-                known[key] = "nil"
-                return nil
-            end
+        if not pointInside(polygon, x, z) then
+            known[key] = "out"
+            return "out"
         end
-        known[key] = value == true
-        return value == true
+        local on = onFieldGround(x, z)
+        if on == nil then
+            known[key] = "nil"
+            return nil
+        end
+        local kind = on == true and "field" or "built"
+        known[key] = kind
+        return kind
     end
 
     local edges = {}
-    local function addEdge(i0, j0, i1, j1)
+    local function addEdge(i0, j0, i1, j1, kind)
         local key = i0 .. ":" .. j0
         local list = edges[key]
         if list == nil then
             list = {}
             edges[key] = list
         end
-        list[#list + 1] = i1 .. ":" .. j1
+        list[#list + 1] = { to = i1 .. ":" .. j1, kind = kind }
+    end
+
+    local function edgeKind(neighbor)
+        if neighbor == "built" then
+            return "cut"
+        end
+        return "rim"
     end
 
     local fieldCells = 0
@@ -1902,23 +2165,23 @@ local function traceFieldOutline(polygon)
     while j < nz do
         local i = 0
         while i < nx do
-            local here = cell(i, j)
+            local here = classify(i, j)
             if here == nil then
                 return nil
             end
-            if here then
+            if here == "field" then
                 fieldCells = fieldCells + 1
-                local south = cell(i, j - 1)
-                local east = cell(i + 1, j)
-                local north = cell(i, j + 1)
-                local west = cell(i - 1, j)
+                local south = classify(i, j - 1)
+                local east = classify(i + 1, j)
+                local north = classify(i, j + 1)
+                local west = classify(i - 1, j)
                 if south == nil or east == nil or north == nil or west == nil then
                     return nil
                 end
-                if not south then addEdge(i, j, i + 1, j) end
-                if not east then addEdge(i + 1, j, i + 1, j + 1) end
-                if not north then addEdge(i + 1, j + 1, i, j + 1) end
-                if not west then addEdge(i, j + 1, i, j) end
+                if south ~= "field" then addEdge(i, j, i + 1, j, edgeKind(south)) end
+                if east ~= "field" then addEdge(i + 1, j, i + 1, j + 1, edgeKind(east)) end
+                if north ~= "field" then addEdge(i + 1, j + 1, i, j + 1, edgeKind(north)) end
+                if west ~= "field" then addEdge(i, j + 1, i, j, edgeKind(west)) end
             end
             i = i + 1
         end
@@ -1945,6 +2208,7 @@ local function traceFieldOutline(polygon)
     for start, list in pairs(edges) do
         while list ~= nil and #list > 0 do
             local loop = {}
+            local kinds = {}
             local cursor = start
             local closed = false
             local guard = 0
@@ -1954,20 +2218,21 @@ local function traceFieldOutline(polygon)
                 if pending == nil or #pending == 0 then
                     break
                 end
-                local nxt = pending[#pending]
+                local edge = pending[#pending]
                 pending[#pending] = nil
                 local point = cornerPoint(cursor)
                 if point ~= nil then
                     loop[#loop + 1] = point
+                    kinds[#kinds + 1] = edge.kind
                 end
-                if nxt == start then
+                if edge.to == start then
                     closed = true
                     break
                 end
-                cursor = nxt
+                cursor = edge.to
             end
-            if closed and #loop >= 3 then
-                loops[#loops + 1] = loop
+            if closed and #loop >= 3 and #kinds == #loop then
+                loops[#loops + 1] = { points = loop, kinds = kinds }
             end
         end
     end
@@ -1979,7 +2244,7 @@ local function traceFieldOutline(polygon)
     local outerArea = 0
     local flipped = false
     for _, loop in ipairs(loops) do
-        local area = signedArea(loop)
+        local area = signedArea(loop.points)
         if area > outerArea then
             outerArea = area
             outer = loop
@@ -1988,7 +2253,7 @@ local function traceFieldOutline(polygon)
     if outer == nil then
         flipped = true
         for _, loop in ipairs(loops) do
-            local area = -signedArea(loop)
+            local area = -signedArea(loop.points)
             if area > outerArea then
                 outerArea = area
                 outer = loop
@@ -1996,7 +2261,7 @@ local function traceFieldOutline(polygon)
         end
     end
     local rawOuter = outer
-    outer = smoothLoop(rawOuter, step)
+    outer = stitchOutline(polygon, rawOuter.points, rawOuter.kinds, step)
     if outer == nil then
         return nil
     end
@@ -2008,10 +2273,10 @@ local function traceFieldOutline(polygon)
     local area = polygonArea(outer) or 0
     for _, loop in ipairs(loops) do
         if loop ~= rawOuter then
-            local loopArea = signedArea(loop)
+            local loopArea = signedArea(loop.points)
             if math.abs(loopArea) >= minHole then
-                local ring = smoothLoop(loop, step)
-                if ring ~= nil then
+                local ring = stitchOutline(polygon, loop.points, loop.kinds, step)
+                if ring ~= nil and ring ~= polygon then
                     local isHole = (not flipped and loopArea < 0) or (flipped and loopArea > 0)
                     local keep = true
                     if isHole then
@@ -2677,6 +2942,11 @@ function FieldSnapshot.writeIfDue(connector)
             return
         end
         connector.fieldAccumMs = 0
+        connector.fieldGroundCheckMs = (connector.fieldGroundCheckMs or 0) + FieldSnapshot.STATE_EVERY_MS
+        connector.fieldFitThisPass = connector.fieldGroundCheckMs >= FieldSnapshot.FIT_EVERY_MS
+        if connector.fieldFitThisPass then
+            connector.fieldGroundCheckMs = 0
+        end
         connector.tramlineIndex = nil
         connector.fieldStateIndex = 1
         connector.fieldStateRecords = {}
@@ -2689,7 +2959,7 @@ function FieldSnapshot.writeIfDue(connector)
         local id = stateIds[connector.fieldStateIndex]
         connector.fieldStateRecords[id] = collectState(connector, byId[id], id)
         local geo = connector.fieldGeoCache ~= nil and connector.fieldGeoCache[id] or nil
-        if geo ~= nil then
+        if connector.fieldFitThisPass and geo ~= nil then
             fitOutlineToGround(geo)
         end
         connector.fieldStateIndex = connector.fieldStateIndex + 1
