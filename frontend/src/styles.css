@@ -1414,6 +1414,7 @@ h1, h2, h3, p { margin: 0; }
   background: color-mix(in srgb, var(--accent) 6%, transparent);
   border-bottom: 1px solid var(--line);
 }
+.context:has(.context-toggle) { margin-bottom: 28px; }
 .context-toggle {
   position: absolute;
   left: 50%;
