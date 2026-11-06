@@ -2,8 +2,6 @@ import type { Vehicle } from "../types"
 
 type GaugeTone = "fuel" | "wear" | "def"
 
-const SEGMENT_COUNT = 10
-
 function amountLabel(value: number, max: number, language: string, unit: string) {
   const format = (n: number) => n.toLocaleString(language, { maximumFractionDigits: 0 })
   return `${format(value)} / ${format(max)} ${unit}`
@@ -55,14 +53,6 @@ function collectRows(vehicle: GaugeSource, language: string, label: (key: string
   return rows
 }
 
-function segmentFill(pct: number, index: number) {
-  const start = (index / SEGMENT_COUNT) * 100
-  const end = ((index + 1) / SEGMENT_COUNT) * 100
-  if (pct <= start) return 0
-  if (pct >= end) return 100
-  return ((pct - start) / (end - start)) * 100
-}
-
 function StatusMeter({
   tone,
   label,
@@ -94,20 +84,13 @@ function StatusMeter({
         aria-valuemax={100}
         aria-valuenow={rounded}
       >
-        {Array.from({ length: SEGMENT_COUNT }, (_, index) => {
-          const fill = segmentFill(pct, index)
-          return (
-            <span key={index} className="status-segment" aria-hidden="true">
-              <i className="status-segment-fill" style={{ width: `${fill}%` }} />
-            </span>
-          )
-        })}
+        <i className="statusbar-fill" style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
 }
 
-/** Segmented telemetry meters for fleet-style equipment cards. */
+/** Telemetry meters for fleet-style equipment cards. */
 export function VehicleStatusRows({
   vehicle,
   language,
@@ -140,7 +123,7 @@ export function VehicleStatusRows({
   )
 }
 
-/** Larger status block for vehicle detail. */
+/** Status block for vehicle detail. */
 export function VehicleGauges({
   vehicle,
   language,

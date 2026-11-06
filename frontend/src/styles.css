@@ -745,7 +745,7 @@ h1, h2, h3, p { margin: 0; }
 }
 .status-list {
   display: grid;
-  gap: 12px;
+  gap: 11px;
   margin-top: 10px;
   padding-top: 11px;
   border-top: 1px solid color-mix(in srgb, white 7%, transparent);
@@ -757,57 +757,49 @@ h1, h2, h3, p { margin: 0; }
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 7px;
+  margin-bottom: 6px;
 }
 .status-labels span {
-  color: #c5cdd2;
+  color: var(--text-muted);
   font-size: 0.625rem;
-  font-weight: 650;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.07em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .status-labels output {
-  color: #f1f3f4;
+  color: var(--text);
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
 }
 .statusbar {
-  display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 2px;
-  height: 9px;
-}
-.status-segment {
   display: block;
-  height: 100%;
-  min-width: 0;
+  height: 4px;
+  border-radius: 1px;
+  background: color-mix(in srgb, white 9%, transparent);
   overflow: hidden;
-  border-radius: 2px;
-  background: #303940;
 }
-.status-segment-fill {
+.statusbar-fill {
   display: block;
-  width: 0;
   height: 100%;
+  width: 0;
   border-radius: inherit;
   background: var(--status-color);
-  transition: width 200ms ease;
 }
-.status-fuel { --status-color: #3ecf6e; }
-.status-wear { --status-color: #f0a832; }
-.status-adblue { --status-color: #3aa8d8; }
+.status-fuel { --status-color: #6aad7a; }
+.status-wear { --status-color: #c9954a; }
+.status-adblue { --status-color: #5a96b0; }
 .equip-sheet > .status-list {
   margin: 18px 28px 0;
   padding-top: 14px;
-  gap: 16px;
+  gap: 14px;
 }
-.equip-sheet .status-labels { margin-bottom: 9px; }
-.equip-sheet .statusbar { height: 10px; }
+.equip-sheet .status-labels { margin-bottom: 7px; }
+.equip-sheet .statusbar { height: 5px; }
 
 .equip-back {
   display: inline-flex;
