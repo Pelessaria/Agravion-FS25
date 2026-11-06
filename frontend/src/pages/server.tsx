@@ -424,7 +424,7 @@ export function ServerPage() {
   const stampText = stamp && !Number.isNaN(stamp.getTime()) ? stamp.toLocaleString() : snapshot.at
   const stateLabel = snapshot.running === true ? t("server.running") : snapshot.running === false ? t("server.stopped") : t("server.pending")
   const actions = [
-    { id: "start" as const, icon: Play, className: "btn btn-primary" },
+    { id: "start" as const, icon: Play, className: "btn btn-ok" },
     { id: "stop" as const, icon: Square, className: "btn btn-danger" },
     { id: "restart" as const, icon: RotateCcw, className: "btn btn-secondary" },
   ]
@@ -706,7 +706,7 @@ export function ServerPage() {
                       <td>{formatBytes(mod.bytes)}</td>
                       <td>
                         <div className="server-mod-meta">
-                          <span className={mod.active == null ? "badge is-unknown" : mod.active ? "badge" : "badge is-inactive"}>
+                          <span className={mod.active == null ? "badge is-unknown" : mod.active ? "badge is-ok" : "badge is-inactive"}>
                             {mod.active == null ? t("server.unknownActive") : mod.active ? t("server.active") : t("server.inactive")}
                           </span>
                         </div>

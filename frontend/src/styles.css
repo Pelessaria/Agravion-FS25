@@ -36,7 +36,9 @@
   --accent: #a52e35;
   --accent-2: #d4787e;
   --accent-ink: #fff6f6;
-  --online: #4caf50;
+  --ok: #4caf50;
+  --ok-2: #9fd4a3;
+  --online: var(--ok);
   --offline: #7aa2ff;
   --warning: #ff8f5a;
   --danger: #ff6d88;
@@ -207,6 +209,13 @@ h1, h2, h3, p { margin: 0; }
   box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 10px 26px color-mix(in srgb, var(--accent) 40%, transparent); }
+.btn-ok {
+  background: linear-gradient(135deg, #7ed67f 0%, #4caf50 100%);
+  color: #062110;
+  font-weight: 600;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--ok) 28%, transparent);
+}
+.btn-ok:hover { filter: brightness(1.06); box-shadow: 0 10px 26px color-mix(in srgb, var(--ok) 40%, transparent); }
 .btn-secondary { border-color: var(--line-strong); background: var(--surface-2); }
 .btn-secondary:hover { background: var(--surface-3); }
 .btn-ghost { border-color: var(--line); }
@@ -1654,6 +1663,11 @@ h1.title-with-no { display: flex; }
   padding: 3px 8px;
   flex: none;
 }
+.badge.is-ok {
+  color: var(--ok-2);
+  border-color: color-mix(in srgb, var(--ok) 42%, transparent);
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+}
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin: 0; }
 .stats div { min-width: 0; }
 .stats dt { color: var(--text-faint); font-size: 0.75rem; }
@@ -1855,7 +1869,7 @@ h1.title-with-no { display: flex; }
   font-size: 0.78rem;
   color: var(--muted);
 }
-.savegame-status.status-ready { color: var(--accent); }
+.savegame-status.status-ready { color: var(--ok); }
 .savegame-status.status-no_farms { color: #d4a017; }
 .savegame-status.status-error { color: #ff6d88; }
 .savegame-note {
@@ -1865,7 +1879,7 @@ h1.title-with-no { display: flex; }
 }
 .savegame-active-label {
   font-size: 0.78rem;
-  color: var(--accent);
+  color: var(--ok);
   white-space: nowrap;
 }
 .req-mods {
@@ -1944,7 +1958,7 @@ h1.title-with-no { display: flex; }
 }
 .req-mods .flag.ok,
 .req-mods .flag.status-active {
-  color: var(--accent);
+  color: var(--ok);
 }
 .req-mods .flag.status-installed {
   color: #c9a227;
@@ -1953,7 +1967,7 @@ h1.title-with-no { display: flex; }
   color: #ff6d88;
 }
 .req-mods .flag.status-update {
-  color: var(--accent);
+  color: var(--warning);
   white-space: normal;
   line-height: 1.3;
 }
@@ -2158,11 +2172,11 @@ h1.title-with-no { display: flex; }
   line-height: 1.45;
 }
 .update-status-current {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--ok) 42%, var(--line));
+  background: color-mix(in srgb, var(--ok) 10%, var(--surface-2));
 }
-.update-status-current > .icon { color: var(--accent); }
-.update-status-current strong { color: var(--accent-2); }
+.update-status-current > .icon { color: var(--ok); }
+.update-status-current strong { color: var(--ok-2); }
 .update-status-available {
   border-color: color-mix(in srgb, var(--warning) 48%, var(--line));
   background: color-mix(in srgb, var(--warning) 12%, var(--surface-2));
@@ -2552,7 +2566,7 @@ tbody tr { cursor: pointer; }
   justify-content: flex-start;
 }
 .switch[aria-checked="true"] {
-  background: linear-gradient(135deg, #c45c63, #a52e35);
+  background: linear-gradient(135deg, #7ed67f, #4caf50);
   border-color: transparent;
   justify-content: flex-end;
 }
@@ -2560,7 +2574,7 @@ tbody tr { cursor: pointer; }
   width: 18px;
   height: 18px;
   border-radius: 99px;
-  background: #fff6f6;
+  background: #f4fbf6;
   display: block;
 }
 .switch:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -3101,6 +3115,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-facts div { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 14px; align-items: center; }
 .fields-facts dt { color: var(--text-faint); white-space: nowrap; }
 .fields-facts dd { margin: 0; text-align: right; white-space: nowrap; }
+.fields-facts dd.is-ok { color: var(--ok); }
+.fields-facts dd.is-no { color: var(--text-muted); }
 .fields-facts .is-muted { opacity: 0.62; }
 .fields-facts .is-muted dd { font-style: italic; }
 .fields-facts > .fields-note {
@@ -3532,6 +3548,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .server-state { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .server-state > div { display: grid; gap: 2px; }
 .server-state strong { font-weight: 600; letter-spacing: -0.02em; }
+.server-state:has(.dot.online) strong { color: var(--ok); }
 .server-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .server-panel-head {
   display: flex;

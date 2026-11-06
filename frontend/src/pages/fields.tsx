@@ -1525,10 +1525,13 @@ const GRASS_FRUIT = new Set(["GRASS", "MEADOW", "FIELDGRASS", "GREENRYE", "VETCH
 
 function Fact({ label, value }: { label: string; value: string | null }) {
   const { t } = useTranslation()
+  const yes = t("yes")
+  const no = t("no")
+  const tone = value === yes ? "is-ok" : value === no ? "is-no" : undefined
   return (
     <div>
       <dt>{label}</dt>
-      <dd>{value ?? t("unavailable")}</dd>
+      <dd className={tone}>{value ?? t("unavailable")}</dd>
     </div>
   )
 }
