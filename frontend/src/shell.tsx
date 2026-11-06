@@ -23,6 +23,7 @@ import {
   Server,
   Settings,
   Sprout,
+  Tag,
   Tractor,
   Users,
   Wallet,
@@ -380,13 +381,16 @@ export function Shell() {
             </label>
           ) : null}
           {workspace ? (
-            <div className="side-instance" title={`${workspace.name} · ${linkLabel}`}>
-              <span className="ws-no">{workspace.number}</span>
-              <span className={`dot ${workspace.disabled ? "unknown" : workspace.linkState}`} />
-              <span className="side-instance-copy nav-label">
-                <strong>{workspace.name}</strong>
-                <span>{linkLabel}</span>
-              </span>
+            <div className="side-instance" title={`${t("context.instance")}: ${workspace.name} · ${linkLabel}`}>
+              <span className="side-instance-label nav-label">{t("context.instance")}</span>
+              <div className="side-instance-row">
+                <span className="ws-no">{workspace.number}</span>
+                <span className={`dot ${workspace.disabled ? "unknown" : workspace.linkState}`} />
+                <span className="side-instance-copy nav-label">
+                  <strong>{workspace.name}</strong>
+                  <span>{linkLabel}</span>
+                </span>
+              </div>
             </div>
           ) : null}
           <p className="side-version">
@@ -588,12 +592,6 @@ export function Shell() {
                 value={playerValue}
                 label={t("context.players")}
               />
-              <span className="context-pipe" aria-hidden="true">|</span>
-              <ContextStat
-                symbol={<Map className="icon" />}
-                value={workspace.mapName?.trim() || "—"}
-                label={t("context.map")}
-              />
               {farm ? (
                 <>
                   <span className="context-pipe" aria-hidden="true">|</span>
@@ -615,6 +613,18 @@ export function Shell() {
                 symbol={<RefreshCw className="icon" />}
                 value={workspace.lastSyncAt ? stamp(workspace.lastSyncAt, "—") : "—"}
                 label={t("context.sync")}
+              />
+              <span className="context-pipe" aria-hidden="true">|</span>
+              <ContextStat
+                symbol={<Map className="icon" />}
+                value={workspace.mapName?.trim() || "—"}
+                label={t("context.map")}
+              />
+              <span className="context-pipe" aria-hidden="true">|</span>
+              <ContextStat
+                symbol={<Tag className="icon" />}
+                value={workspace.gameVersion?.trim() || "—"}
+                label={t("workspace.gameVersion")}
               />
             </div>
           </div>
