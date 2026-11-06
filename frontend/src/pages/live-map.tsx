@@ -137,7 +137,7 @@ export function LiveMapPage() {
   const [fields, setFields] = useState<FieldsResponse | null>(null)
   const [fleet, setFleet] = useState<Vehicle[]>([])
   const [bootLoading, setBootLoading] = useState(liveMode)
-  const [pdaLoading, setPdaLoading] = useState(false)
+  const [pdaReadyFor, setPdaReadyFor] = useState<string | null>(null)
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [hiddenFarms, setHiddenFarms] = useState<number[]>([])
   const [showFields, setShowFields] = useState(true)
@@ -334,7 +334,10 @@ export function LiveMapPage() {
   const selectedVehicle = vehicles.find((vehicle) => `v:${vehicle.id}` === selected) ?? null
 
   const mapUrl = workspace && fields?.pdaMap && liveMode ? `/api/workspaces/${workspace.id}/pda-map` : null
-  const mapBusy = bootLoading || (mapUrl != null && pdaLoading)
+  // Compare ready URL instead of a boolean — avoids the race where onLoad finishes
+  // before an effect re-arms "loading" and the overlay never clears.
+  const pdaPending = mapUrl != null && pdaReadyFor !== mapUrl
+  const mapBusy = bootLoading || pdaPending
   const hasMapFrame = Boolean(reported && reported.worldX > 0 && reported.worldZ > 0 && reported.scaleX > 0 && reported.scaleZ > 0)
 
   // Warm browser cache so SVG <image> markers paint quickly once fleet icons exist.
@@ -348,10 +351,20 @@ export function LiveMapPage() {
   }, [fleetById])
 
   useEffect(() => {
-    setPdaLoading(Boolean(mapUrl))
-  }, [mapUrl])
+    if (!bootLoading) return
+    const timer = window.setTimeout(() => setBootLoading(false), 12_000)
+    return () => window.clearTimeout(timer)
+  }, [bootLoading])
 
-  const onMapReady = useCallback(() => setPdaLoading(false), [])
+  useEffect(() => {
+    if (!mapUrl || pdaReadyFor === mapUrl) return
+    const timer = window.setTimeout(() => setPdaReadyFor(mapUrl), 10_000)
+    return () => window.clearTimeout(timer)
+  }, [mapUrl, pdaReadyFor])
+
+  const onMapReady = useCallback(() => {
+    setPdaReadyFor(mapUrl)
+  }, [mapUrl])
 
   if (!workspace) return <MissingWorkspace />
   if (!allowed || !access) return <PermissionBlock />
@@ -460,7 +473,7 @@ export function LiveMapPage() {
           <div className="live-loading" role="status" aria-live="polite">
             <Loader2 className="icon live-loading-spin" aria-hidden="true" />
             <strong>{t("live.loading")}</strong>
-            <span>{bootLoading ? t("live.loadingHint") : t("live.loadingPda")}</span>
+            <span>{bootLoading ? t("live.loadingHint") : pdaPending ? t("live.loadingPda") : t("live.loadingHint")}</span>
           </div>
         ) : null}
         <div className="live-toolbar">
@@ -645,22 +658,60 @@ function RoleIcon({ role, className }: { role: MarkerRole; className?: string })
 }
 
 function MarkerGlyph({ role }: { role: MarkerRole }) {
-  if (role === "building") return <polygon points="0,-0.78 0.66,-0.16 0.66,0.62 -0.66,0.62 -0.66,-0.16" />
+  // Compact stroke icons (concept-style) so markers stay readable without store art.
+  const stroke = { fill: "none", strokeWidth: 0.18, strokeLinecap: "round" as const, strokeLinejoin: "round" as const }
+  if (role === "building") {
+    return <path {...stroke} d="M-0.55,0.55 V-0.05 L0,-0.55 L0.55,-0.05 V0.55 Z M-0.18,0.55 V0.15 H0.18 V0.55" />
+  }
   if (role === "player") {
     return (
-      <g>
-        <circle cy="-0.32" r="0.24" />
-        <path d="M-0.42,0.58 Q0,0.02 0.42,0.58 Z" />
+      <g {...stroke}>
+        <circle cy="-0.28" r="0.22" />
+        <path d="M-0.45,0.58 C-0.45,0.1 0.45,0.1 0.45,0.58" />
       </g>
     )
   }
-  if (role === "trailer") return <rect x="-0.68" y="-0.3" width="1.36" height="0.6" rx="0.14" />
-  if (role === "tool") return <polygon points="0,-0.66 0.66,0 0,0.66 -0.66,0" />
-  if (role === "harvester") return <polygon points="-0.74,-0.32 0.28,-0.32 0.74,0.08 0.28,0.42 -0.74,0.42" />
-  if (role === "pallet") return <rect x="-0.34" y="-0.34" width="0.68" height="0.68" />
-  if (role === "pin") return <polygon points="0,-0.72 0.16,-0.16 0.72,0 0.16,0.16 0,0.72 -0.16,0.16 -0.72,0 -0.16,-0.16" />
-  if (role === "tractor") return <polygon points="0,0.72 -0.5,-0.48 0.5,-0.48" />
-  return <circle r="0.42" />
+  if (role === "trailer") {
+    return (
+      <g {...stroke}>
+        <rect x="-0.7" y="-0.28" width="1.1" height="0.56" rx="0.1" />
+        <path d="M0.4,-0.05 H0.72 L0.9,0.2 V0.28 H0.4" />
+        <circle cx="-0.35" cy="0.42" r="0.16" />
+        <circle cx="0.55" cy="0.42" r="0.16" />
+      </g>
+    )
+  }
+  if (role === "tool") {
+    return <path {...stroke} d="M-0.55,-0.45 H0.15 L0.55,0 L0.15,0.45 H-0.55 Z M-0.2,-0.2 V0.2" />
+  }
+  if (role === "harvester") {
+    return (
+      <g {...stroke}>
+        <path d="M-0.72,-0.15 H0.2 L0.55,0.15 H-0.72 Z" />
+        <path d="M-0.35,-0.15 V-0.45 H0.15 L0.35,-0.15" />
+        <circle cx="-0.35" cy="0.38" r="0.18" />
+        <circle cx="0.28" cy="0.38" r="0.22" />
+      </g>
+    )
+  }
+  if (role === "pallet") return <rect {...stroke} x="-0.42" y="-0.42" width="0.84" height="0.84" rx="0.08" />
+  if (role === "pin") return <path {...stroke} d="M0,-0.7 L0.18,-0.12 L0.7,0 L0.18,0.12 L0,0.7 L-0.18,0.12 L-0.7,0 L-0.18,-0.12 Z" />
+  if (role === "tractor" || role === "vehicle") {
+    return (
+      <g {...stroke}>
+        <path d="M-0.7,0.15 H0.15 L0.45,-0.25 H0.75 V0.15 H0.55" />
+        <path d="M-0.55,-0.25 H0.05 L0.25,0.15" />
+        <circle cx="-0.35" cy="0.4" r="0.2" />
+        <circle cx="0.4" cy="0.4" r="0.24" />
+      </g>
+    )
+  }
+  return <circle {...stroke} r="0.42" />
+}
+
+function showsHeading(role: MarkerRole, active: boolean, heading: number | null, piled: boolean) {
+  if (piled || heading == null || !active) return false
+  return role === "tractor" || role === "harvester" || role === "vehicle"
 }
 
 function LiveCanvas({
@@ -1102,23 +1153,25 @@ function LiveCanvas({
               const rotation = marker.heading == null ? 0 : (marker.heading * 180) / Math.PI
               const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
               const piled = (marker.count ?? 0) > 1
-              const base = piled ? 36 : marker.role === "tool" || marker.role === "trailer" || marker.role === "pallet" ? 22 : marker.role === "building" || marker.role === "player" ? 20 : 30
+              const implement = marker.role === "tool" || marker.role === "trailer" || marker.role === "pallet"
+              const base = piled ? 36 : implement ? 22 : marker.role === "building" || marker.role === "player" ? 20 : marker.active ? 32 : 28
               const mark = toMap(on ? base + 4 : base)
               const ring = marker.farmColor || (marker.role === "player" ? "#f4f1e8" : "#8e9890")
-              const showArrow = marker.heading != null && !piled
+              const showArrow = showsHeading(marker.role, marker.active, marker.heading, piled)
               const icon = marker.icon && !brokenIcons.has(marker.icon) ? marker.icon : null
+              const stateClass = [on ? "is-on" : "", marker.active ? "is-active" : "is-idle", `is-${marker.role}`].filter(Boolean).join(" ")
               return (
-                <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.role} is-on` : `live-marker is-${marker.role}`} transform={`translate(${marker.x} ${marker.y})`}>
+                <g key={marker.key} data-marker={marker.key} className={`live-marker ${stateClass}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`scale(${mark})`}>
                     <circle r="1.16" className="live-marker-ring" style={{ stroke: ring }} />
                     <circle r="0.94" className="live-marker-plate" />
                     {icon ? (
                       <image
                         href={icon}
-                        x="-0.86"
-                        y="-0.86"
-                        width="1.72"
-                        height="1.72"
+                        x="-0.72"
+                        y="-0.72"
+                        width="1.44"
+                        height="1.44"
                         clipPath="url(#live-icon-clip)"
                         preserveAspectRatio="xMidYMid meet"
                         onError={() => setBrokenIcons((prev) => new Set(prev).add(icon))}
