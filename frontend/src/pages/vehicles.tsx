@@ -6,7 +6,7 @@ import { apiWorkspaceVehicles } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock } from "../components/ui"
 import { useWorkspaceRoute } from "../use-workspace"
 import { useStore } from "../store"
-import { VehicleMeterBars } from "../components/equip-gauge"
+import { VehicleGauges } from "../components/equip-gauge"
 import type { Vehicle, VehicleCategory } from "../types"
 import { isPallet, vehicleBrand, vehicleDisplayName } from "../vehicle-label"
 
@@ -234,12 +234,10 @@ export function VehiclesPage() {
               }
             }
 
-            const categoryName = t(categoryLabelKey(category === "selfpropelled" ? "harvester" : category))
-
             return (
               <article
                 key={vehicle.id}
-                className="equip-card is-poster"
+                className="equip-card"
                 role="link"
                 tabIndex={0}
                 onClick={openDetail}
@@ -250,8 +248,9 @@ export function VehiclesPage() {
                     <img src={vehicle.iconUrl} alt="" onError={onIconError} />
                   ) : null}
                   <Tractor className={`icon icon-fallback${vehicle.iconUrl ? " is-hidden" : ""}`} />
-                  <span className="equip-card-cat" title={categoryName} aria-label={categoryName}>
+                  <span className="equip-card-cat">
                     <CategoryIcon category={category} />
+                    <span>{t(categoryLabelKey(category === "selfpropelled" ? "harvester" : category))}</span>
                   </span>
                   <button
                     type="button"
@@ -269,24 +268,26 @@ export function VehiclesPage() {
                   <span className="equip-card-caption">
                     {brand ? <span className="equip-card-brand">{brand}</span> : null}
                     <strong className="equip-card-title">{title}</strong>
-                    {hours || vehicle.plate ? (
-                      <span className="equip-card-meta">
-                        {hours ? (
-                          <span className="equip-card-meta-item">
-                            <Clock3 className="icon" aria-hidden="true" />
-                            <span>{hours}</span>
-                          </span>
-                        ) : null}
-                        {vehicle.plate ? (
-                          <span className="equip-card-meta-item">
-                            <span>{vehicle.plate}</span>
-                          </span>
-                        ) : null}
+                  </span>
+                </span>
+                <span className="equip-card-body">
+                  <span className="equip-card-facts">
+                    <span>
+                      <em>
+                        <Clock3 className="icon" aria-hidden="true" />
+                        {t("vehicles.hours")}
+                      </em>
+                      <strong>{hours ?? t("unavailable")}</strong>
+                    </span>
+                    {vehicle.plate ? (
+                      <span>
+                        <em>{t("vehicles.plate")}</em>
+                        <strong>{vehicle.plate}</strong>
                       </span>
                     ) : null}
                   </span>
+                  <VehicleGauges vehicle={vehicle} language={i18n.language} label={(key) => t(key)} />
                 </span>
-                <VehicleMeterBars vehicle={vehicle} language={i18n.language} label={(key) => t(key)} />
               </article>
             )
           })}
