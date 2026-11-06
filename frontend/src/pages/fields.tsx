@@ -408,7 +408,7 @@ export function FieldsPage() {
           <Scythe className="fields-stat-icon" />
           <strong>{harvest.toLocaleString(i18n.language)}</strong>
           <span>
-            {t("fields.harvest")}
+            <span>{t("fields.harvest")}</span>
             {harvestGrass > 0 ? <em>{t("fields.harvestGrass", { count: harvestGrass })}</em> : null}
           </span>
         </p>
