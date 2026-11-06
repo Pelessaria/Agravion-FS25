@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type SyntheticEvent } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
-import { Boxes, Clock, LayoutGrid, MapPin, Tractor, Truck, Wheat, Wrench } from "lucide-react"
+import { Boxes, Clock, Clock3, LayoutGrid, MapPin, Puzzle, Tractor, Truck, Wheat, Wrench } from "lucide-react"
 import { apiWorkspaceVehicles } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock } from "../components/ui"
 import { useWorkspaceRoute } from "../use-workspace"
@@ -142,14 +142,17 @@ export function VehiclesPage() {
         <h1>{t("modules.equipment")}</h1>
         <div className="fields-stats">
           <p>
+            <Tractor className="fields-stat-icon" aria-hidden="true" />
             <strong>{rows.length.toLocaleString(i18n.language)}</strong>
             <span>{t("vehicles.fleet")}</span>
           </p>
           <p>
+            <Clock3 className="fields-stat-icon" aria-hidden="true" />
             <strong>{fleetHours.toLocaleString(i18n.language, { maximumFractionDigits: 0 })} h</strong>
             <span>{t("vehicles.fleetHours")}</span>
           </p>
           <p>
+            <Puzzle className="fields-stat-icon" aria-hidden="true" />
             <strong>{fleetMods.toLocaleString(i18n.language)}</strong>
             <span>{t("vehicles.fleetMods")}</span>
           </p>

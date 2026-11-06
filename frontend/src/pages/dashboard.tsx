@@ -1,7 +1,17 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
-import { ArrowDown, ArrowUp, Eye, EyeOff, LayoutTemplate, RotateCcw } from "lucide-react"
+import {
+  ArrowDown,
+  ArrowUp,
+  Eye,
+  EyeOff,
+  LayoutTemplate,
+  RotateCcw,
+  Server,
+  TriangleAlert,
+  Users,
+} from "lucide-react"
 import { EmptyState, MissingValue } from "../components/ui"
 import {
   DASHBOARD_WIDGETS,
@@ -156,23 +166,26 @@ export function DashboardPage() {
         <div className="fields-mast" key={id}>
           <div className="fields-stats">
             <p className="has-note">
+              <Server className="fields-stat-icon" aria-hidden="true" />
               <strong>{online.length}</strong>
               <span>
-                {t("dashboard.activeInstances")}
+                <span>{t("dashboard.activeInstances")}</span>
                 <em>{t("dashboard.onlineCount", { count: ordered.length })}</em>
               </span>
             </p>
             <p className="has-note">
+              <TriangleAlert className="fields-stat-icon" aria-hidden="true" />
               <strong className={flagged.length > 0 ? "warn" : undefined}>{flagged.length}</strong>
               <span>
-                {t("dashboard.attention")}
+                <span>{t("dashboard.attention")}</span>
                 <em>{flagged.length === 0 ? t("dashboard.attentionQuiet") : t("dashboard.attentionSome")}</em>
               </span>
             </p>
             <p className={missingPlayers > 0 ? "has-note" : undefined}>
+              <Users className="fields-stat-icon" aria-hidden="true" />
               <strong>{reported.length === 0 ? <MissingValue text={null} /> : players}</strong>
               <span>
-                {t("dashboard.players")}
+                <span>{t("dashboard.players")}</span>
                 {missingPlayers > 0 ? <em>{t("dashboard.playersMissing", { count: missingPlayers })}</em> : null}
               </span>
             </p>

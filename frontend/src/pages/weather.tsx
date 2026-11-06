@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Cloud, CloudRain, Droplets, Snowflake, Wind } from "lucide-react"
+import { Clock3, Cloud, CloudRain, Droplets, Snowflake, Wind } from "lucide-react"
 import { apiWorkspaceLiveMap, type LiveForecastDay, type LiveForecastHour, type LiveMapResponse } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { useStore } from "../store"
@@ -134,6 +134,7 @@ export function WeatherPage() {
         <h1>{t("modules.weather")}</h1>
         <div className="fields-stats">
           <p>
+            <Clock3 className="fields-stat-icon" aria-hidden="true" />
             <strong>
               {payload?.writtenAt ? stamp(payload.writtenAt, t("unavailable")) : loading ? "…" : t("unavailable")}
             </strong>

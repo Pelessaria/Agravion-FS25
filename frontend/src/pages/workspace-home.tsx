@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
+import { Clock3, Map as MapIcon, Tag, Users, Wallet } from "lucide-react"
 import { RequiredModsPanel } from "../components/required-mods"
 import { EmptyState, MissingValue, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { APP_MODULES, moduleIsReady } from "../modules"
@@ -53,6 +54,7 @@ export function WorkspaceHomePage() {
       <div className="fields-mast">
         <div className="fields-stats">
           <p>
+            <Users className="fields-stat-icon" aria-hidden="true" />
             <strong>
               <MissingValue
                 text={
@@ -65,18 +67,21 @@ export function WorkspaceHomePage() {
             <span>{t("workspace.players")}</span>
           </p>
           <p>
+            <Tag className="fields-stat-icon" aria-hidden="true" />
             <strong>
               <MissingValue text={workspace.gameVersion ?? null} />
             </strong>
             <span>{t("workspace.gameVersion")}</span>
           </p>
           <p>
+            <MapIcon className="fields-stat-icon" aria-hidden="true" />
             <strong>
               <MissingValue text={workspace.mapName} />
             </strong>
             <span>{t("workspace.map")}</span>
           </p>
           <p>
+            <Clock3 className="fields-stat-icon" aria-hidden="true" />
             <strong>
               <MissingValue text={workspace.gameTime} />
             </strong>
@@ -84,6 +89,7 @@ export function WorkspaceHomePage() {
           </p>
           {farm ? (
             <p>
+              <Wallet className="fields-stat-icon" aria-hidden="true" />
               <strong>
                 <MissingValue text={money(farm.money, i18n.language)} />
               </strong>
@@ -91,6 +97,7 @@ export function WorkspaceHomePage() {
             </p>
           ) : null}
           <p>
+            <Clock3 className="fields-stat-icon" aria-hidden="true" />
             <strong>
               <MissingValue
                 text={workspace.lastSyncAt ? stamp(workspace.lastSyncAt, t("unavailable")) : null}

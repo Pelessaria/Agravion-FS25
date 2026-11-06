@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import type { TFunction } from "i18next"
 import { useTranslation } from "react-i18next"
-import { LocateFixed, Warehouse } from "lucide-react"
+import { Clock3, Cylinder, Layers, LocateFixed, Package, Warehouse } from "lucide-react"
 import { apiWorkspaceFields, apiWorkspaceStorage, type StorageFill, type StoragePlace, type StorageResponse } from "../api"
 import { cropIconExact } from "../crop-icons"
 import { effectiveMapSize, projectPoint, terrainFrame, type MapFrame } from "../field-format"
@@ -286,22 +286,27 @@ export function StoragePage() {
         {emptyKind || (loading && !payload) ? null : (
           <div className="fields-stats">
             <p>
+              <Warehouse className="fields-stat-icon" aria-hidden="true" />
               <strong>{own.length.toLocaleString(language)}</strong>
               <span>{t("stock.placeCount")}</span>
             </p>
             <p>
+              <Layers className="fields-stat-icon" aria-hidden="true" />
               <strong>{bulkRows.length.toLocaleString(language)}</strong>
               <span>{t("stock.goodCount")}</span>
             </p>
             <p>
+              <Cylinder className="fields-stat-icon" aria-hidden="true" />
               <strong>{hasFree ? bulk(freeLiters, language) : t("unavailable")}</strong>
               <span>{t("stock.freeSpace")}</span>
             </p>
             <p>
+              <Package className="fields-stat-icon" aria-hidden="true" />
               <strong>{baleRows.reduce((sum, row) => sum + row.count, 0).toLocaleString(language)}</strong>
               <span>{t("stock.bales")}</span>
             </p>
             <p>
+              <Clock3 className="fields-stat-icon" aria-hidden="true" />
               <strong>
                 {payload?.writtenAt ? stamp(payload.writtenAt, t("unavailable")) : t("unavailable")}
               </strong>
