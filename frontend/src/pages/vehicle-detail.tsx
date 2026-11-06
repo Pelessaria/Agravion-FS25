@@ -1,7 +1,8 @@
-import { type SyntheticEvent } from "react"
+import { useEffect, useState, type SyntheticEvent } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useParams } from "react-router-dom"
 import { Package, Tractor } from "lucide-react"
+import { apiWorkspaceVehicles } from "../api"
 import { VehicleGauges } from "../components/equip-gauge"
 import { EmptyState, MissingValue, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { farmDisplayName } from "../farm-label"
@@ -37,9 +38,32 @@ export function VehicleDetailPage() {
   const { t, i18n } = useTranslation()
   const stamp = useTimeLabel()
   const { vehicleId = "" } = useParams()
-  const { vehicles, moduleAccess, farmByGameId } = useStore()
+  const decodedId = decodeURIComponent(vehicleId)
+  const { vehicles, moduleAccess, farmByGameId, liveMode, replaceWorkspaceVehicles } = useStore()
   const { id, workspace, allowed } = useWorkspaceRoute()
-  const vehicle = vehicles.find((item) => item.id === vehicleId && item.workspaceId === id)
+  const [lookup, setLookup] = useState<"pending" | "done">("pending")
+  const vehicle = vehicles.find((item) => item.id === decodedId && item.workspaceId === id)
+
+  useEffect(() => {
+    if (!workspace || !liveMode) return
+    if (vehicles.some((item) => item.id === decodedId && item.workspaceId === workspace.id)) {
+      setLookup("done")
+      return
+    }
+    let cancelled = false
+    setLookup("pending")
+    apiWorkspaceVehicles(workspace.id)
+      .then((result) => {
+        if (!cancelled) replaceWorkspaceVehicles(workspace.id, result.vehicles)
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setLookup("done")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [decodedId, liveMode, workspace?.id])
   const fill = vehicle?.fill ? (i18n.language === "en" ? vehicle.fill.en : vehicle.fill.de) : null
   const equipmentAccess = workspace ? moduleAccess(workspace.id, "equipment") : null
   const linkedFarm = vehicle ? farmByGameId(id, vehicle.farmId) : null
@@ -49,6 +73,9 @@ export function VehicleDetailPage() {
 
   if (!workspace) return <MissingWorkspace />
   if (!allowed || !equipmentAccess) return <PermissionBlock />
+  if (!vehicle && lookup !== "done") {
+    return <EmptyState title={t("live.loading")} body={t("farm.discovering")} />
+  }
   if (!vehicle) {
     return (
       <EmptyState

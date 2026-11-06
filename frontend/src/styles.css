@@ -4586,9 +4586,9 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   padding: 8px 28px 0;
 }
 .live-carousel-dot {
-  width: 68px;
-  height: 68px;
-  margin-bottom: 16px;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 34px;
   border-radius: 50%;
   border: 3px solid rgba(255, 255, 255, 0.22);
   background: #1c2420;
@@ -4599,8 +4599,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .live-carousel-dot img, .live-carousel-dot .icon { width: 46px; height: 46px; object-fit: contain; }
 .live-carousel-dot.is-main {
-  width: 92px;
-  height: 92px;
+  width: 96px;
+  height: 96px;
   margin-bottom: 0;
 }
 .live-carousel-dot.is-main img, .live-carousel-dot.is-main .icon { width: 64px; height: 64px; }
@@ -4609,8 +4609,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   box-shadow: 0 0 0 4px rgba(228, 184, 74, 0.28), 0 8px 16px rgba(0, 0, 0, 0.28);
 }
 .live-carousel-plus {
-  align-self: center;
-  margin-bottom: 8px;
+  align-self: flex-end;
+  margin-bottom: 22px;
   color: #f4f1e8;
   font-style: normal;
   font-size: 1.7rem;
@@ -4642,20 +4642,14 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   0%, 100% { stroke-opacity: 0.5; }
   50% { stroke-opacity: 0.12; }
 }
-.live-beak-stem {
+.live-beak {
   fill: none;
-  stroke: #f7f8f7;
-  stroke-width: 0.18;
+  stroke: #f7f4ea;
+  stroke-width: 0.16;
   stroke-linecap: round;
-}
-.live-beak-head {
-  fill: #f7f8f7;
-  stroke: #12171a;
-  stroke-width: 0.06;
   stroke-linejoin: round;
 }
-.live-marker.is-occupied .live-beak-stem { stroke: #e4b84a; }
-.live-marker.is-occupied .live-beak-head { fill: #e4b84a; stroke: #3a2a08; }
+.live-marker.is-occupied .live-beak { stroke: #ffe08a; }
 .live-marker .live-marker-rim { stroke: #fff; stroke-width: 0.07; }
 .live-marker.is-idle { opacity: 0.8; }
 .live-marker.is-occupied,
@@ -4962,7 +4956,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-inspect dl { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 0; }
 .live-inspect dt { color: var(--text-faint); font-size: 0.68rem; }
 .live-inspect dd { margin: 0; font-size: 0.84rem; }
-.live-inspect a { color: var(--accent-2); font-size: 0.82rem; }
+.live-inspect-open { justify-self: start; }
 .live-train { display: flex; align-items: flex-end; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
 .live-train-slot { display: flex; align-items: flex-end; gap: 8px; }
 .live-train-plus { color: var(--text-faint); font-style: normal; font-size: 1.15rem; font-weight: 650; padding-bottom: 22px; }

@@ -486,8 +486,8 @@ export function LiveMapPage() {
   const focusPiece = trainSequence[trainFocus] ?? null
   const focusVehicle = focusPiece ? vehicles.find((vehicle) => vehicle.id === focusPiece.id) ?? null : null
   const focusFleet = focusPiece ? fleetMatch(focusPiece.id) : null
-  const leftPiece = train && train.front.length > 0 ? (train.front.some((piece) => piece.id === focusPiece?.id) ? focusPiece : train.front[0]) : null
-  const rightPiece = train && train.rear.length > 0 ? (train.rear.some((piece) => piece.id === focusPiece?.id) ? focusPiece : train.rear[0]) : null
+  const prevPiece = trainFocus > 0 ? trainSequence[trainFocus - 1] : null
+  const nextPiece = trainFocus < trainSequence.length - 1 ? trainSequence[trainFocus + 1] : null
   const mapVehicles = visibleVehicles.filter((vehicle) => {
     const kind = objectKind(roleOf(vehicle))
     if (tab === "building" || tab === "player") return false
@@ -605,11 +605,11 @@ export function LiveMapPage() {
               ×
             </button>
             <div className="live-carousel">
-              {leftPiece ? <CarouselDot piece={leftPiece} on={leftPiece.id === focusPiece.id} /> : null}
-              {leftPiece ? <em className="live-carousel-plus">+</em> : null}
-              <CarouselDot piece={trainCenter} main on={trainCenter.id === focusPiece.id} />
-              {rightPiece ? <em className="live-carousel-plus">+</em> : null}
-              {rightPiece ? <CarouselDot piece={rightPiece} on={rightPiece.id === focusPiece.id} /> : null}
+              {prevPiece ? <CarouselDot piece={prevPiece} /> : null}
+              {prevPiece ? <em className="live-carousel-plus">+</em> : null}
+              <CarouselDot piece={focusPiece} main />
+              {nextPiece ? <em className="live-carousel-plus">+</em> : null}
+              {nextPiece ? <CarouselDot piece={nextPiece} /> : null}
             </div>
             <div className="live-carousel-nav">
               <button
@@ -642,14 +642,6 @@ export function LiveMapPage() {
               </span>
             </header>
             <dl>
-              {focusVehicle ? (
-                <div>
-                  <dt>{t("vehicles.position")}</dt>
-                  <dd>
-                    {Math.round(focusVehicle.x)} / {Math.round(focusVehicle.z)} m
-                  </dd>
-                </div>
-              ) : null}
               {focusFleet?.hours != null ? (
                 <div>
                   <dt>{t("vehicles.hours")}</dt>
@@ -665,7 +657,9 @@ export function LiveMapPage() {
             </dl>
             {focusFleet ? <VehicleStatusRows vehicle={focusFleet} language={i18n.language} label={(key) => t(key)} /> : null}
             {focusFleet ? (
-              <Link to={`/w/${workspace.id}/equipment/${encodeURIComponent(focusFleet.id)}`}>{t("modules.equipment")}</Link>
+              <Link className="btn btn-secondary live-inspect-open" to={`/w/${workspace.id}/equipment/${focusFleet.id}`}>
+                {t("modules.equipment")}
+              </Link>
             ) : null}
           </aside>
         ) : null}
@@ -1474,7 +1468,7 @@ function LiveCanvas({
                 .filter(Boolean)
                 .join(" ")
               const showCaption = (marker.occupied || marker.kind === "player") && Boolean(marker.label)
-              const captionY = showArrow ? -(mark * 2.05) : -(mark * 0.95 + toMap(2))
+              const captionY = showArrow ? -(mark * 1.55) : -(mark * 0.95 + toMap(2))
               const countLabel = `+${marker.count ?? 0}`
               const countW = Math.max(1.7, countLabel.length * 0.72 + 0.7)
               return (
@@ -1511,10 +1505,11 @@ function LiveCanvas({
                     {marker.occupied ? <circle className="live-marker-halo" r="1.18" /> : null}
                     {on ? <circle className="live-marker-rim" r="0.96" /> : null}
                     {showArrow ? (
-                      <g className="live-beak" transform={`rotate(${rotation})`}>
-                        <path className="live-beak-stem" d="M0,-0.62 L0,-1.48" />
-                        <path className="live-beak-head" d="M-0.38,-1.12 L0,-1.78 L0.38,-1.12 Z" />
-                      </g>
+                      <path
+                        className="live-beak"
+                        transform={`rotate(${rotation})`}
+                        d="M-0.34,-0.98 L0,-1.36 L0.34,-0.98"
+                      />
                     ) : null}
                     <circle r="1.2" fill="transparent" />
                   </g>
