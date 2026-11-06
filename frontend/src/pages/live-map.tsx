@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
-import { Boxes, Minus, Plus, Tractor, Truck, UserRound, Warehouse, Wheat, Wrench } from "lucide-react"
+import { Boxes, ChevronLeft, ChevronRight, Minus, Plus, Search, Tractor, Truck, UserRound, Warehouse, Wheat, Wrench } from "lucide-react"
 import {
   apiWorkspaceFields,
   apiWorkspaceLiveMap,
@@ -118,6 +118,12 @@ function matches(query: string, value: string | null) {
   return (value ?? "").toLowerCase().includes(needle)
 }
 
+function onListIconError(event: SyntheticEvent<HTMLImageElement>) {
+  const wrap = event.currentTarget.parentElement
+  event.currentTarget.remove()
+  wrap?.querySelector(".icon-fallback")?.classList.remove("is-hidden")
+}
+
 export function LiveMapPage() {
   const { t } = useTranslation()
   const stamp = useTimeLabel()
@@ -139,6 +145,7 @@ export function LiveMapPage() {
   const [resetToken, setResetToken] = useState(0)
   const [tab, setTab] = useState<ObjectTab>(vehicleParam ? "all" : pin ? "building" : "all")
   const [query, setQuery] = useState(pin?.name ?? "")
+  const [objectsOpen, setObjectsOpen] = useState(false)
   const [selected, setSelected] = useState<string | null>(vehicleParam ? `v:${vehicleParam}` : pin ? "pin" : null)
   const deepLinkDone = useRef(false)
 
@@ -300,7 +307,16 @@ export function LiveMapPage() {
   const month = payload?.period != null && payload.period >= 1 && payload.period <= 12 ? PERIOD_TO_MONTH[payload.period - 1] : null
   const clock = clockLabel(payload?.dayTime ?? null)
   const farmColor = (farmId: number | null) => payload?.farms?.find((item) => item.id === farmId)?.color ?? null
-  const fleetMatch = (id: string) => fleet.find((item) => item.id === `feed-${workspace?.id ?? ""}-${id}` || item.id === id) ?? null
+  const fleetById = useMemo(() => {
+    const map = new Map<string, Vehicle>()
+    const prefix = `feed-${workspace?.id ?? ""}-`
+    for (const item of fleet) {
+      map.set(item.id, item)
+      if (item.id.startsWith(prefix)) map.set(item.id.slice(prefix.length), item)
+    }
+    return map
+  }, [fleet, workspace?.id])
+  const fleetMatch = (id: string) => fleetById.get(id) ?? null
   const selectedVehicle = vehicles.find((vehicle) => `v:${vehicle.id}` === selected) ?? null
 
   if (!workspace) return <MissingWorkspace />
@@ -378,7 +394,7 @@ export function LiveMapPage() {
           ))}
         </div>
       </header>
-      <div className="live-stage">
+      <div className={objectsOpen ? "live-stage is-objects-open" : "live-stage"}>
         {loading && !payload ? <p className="live-wait">{t("live.loading")}</p> : null}
         {payload?.error === "failed" && payload.vehicles.length === 0 ? (
           <EmptyState title={t("live.failedTitle")} body={t("live.failedBody")} />
@@ -400,7 +416,6 @@ export function LiveMapPage() {
           showFields={showFields}
           resetToken={resetToken}
           vehicleRole={roleOf}
-          vehicleIcon={(vehicle) => fleetMatch(vehicle.id)?.iconUrl ?? null}
           placeColor={(farmId) => farmColor(farmId)}
           onSelect={setSelected}
           onContentBox={setContentBox}
@@ -434,83 +449,126 @@ export function LiveMapPage() {
             </span>
           ) : null}
         </div>
-      <aside className="live-side">
-        <section className="panel live-objects">
-          <header>
-            <h2>{t("live.objects")}</h2>
-            <span>{t("live.objectCount", { count: catalog.length })}</span>
-          </header>
-          <label className="live-search">
-            <span className="sr-only">{t("live.search")}</span>
-            <input value={query} placeholder={t("live.search")} onChange={(event) => setQuery(event.target.value)} />
-          </label>
-          <div className="live-tabs" role="tablist">
-            {(["all", "vehicle", "implement", "building", "player"] as const).map((id) => (
+      <aside className={objectsOpen ? "live-side is-open" : "live-side is-collapsed"}>
+        {objectsOpen ? (
+          <section className="panel live-objects">
+            <header>
+              <div>
+                <h2>{t("live.objects")}</h2>
+                <span>{t("live.objectCount", { count: catalog.length })}</span>
+              </div>
               <button
-                key={id}
                 type="button"
-                className={tab === id ? "is-on" : ""}
-                onClick={() => {
-                  setTab(id)
-                  if (id === "building") setShowBuildings(true)
-                }}
+                className="live-side-toggle"
+                aria-expanded={true}
+                aria-label={t("live.objectsClose")}
+                title={t("live.objectsClose")}
+                onClick={() => setObjectsOpen(false)}
               >
-                {t(id === "all" ? "live.all" : id === "vehicle" ? "live.vehicles" : id === "implement" ? "live.implements" : id === "building" ? "live.buildings" : "live.players")}
+                <ChevronRight className="icon" />
               </button>
-            ))}
-          </div>
-          {tab === "building" ? (
-            <div className="live-kind-filters">
-              {(["all", "silo", "animal", "production", "trade", "yard"] as const)
-                .filter((id) => id === "all" || buildingCounts[id] > 0)
-                .map((id) => (
-                  <button key={id} type="button" className={buildingFilter === id ? "is-on" : ""} onClick={() => setBuildingFilter(id)}>
-                    {t(`live.buildingKind.${id}`)}
-                    {id === "all" ? null : <em>{buildingCounts[id]}</em>}
-                  </button>
-                ))}
+            </header>
+            <div className="fields-jump live-jump">
+              <label>
+                <span>{t("live.searchShort")}</span>
+                <input
+                  type="search"
+                  value={query}
+                  placeholder=" "
+                  aria-label={t("live.search")}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </label>
+              <button type="button" tabIndex={-1} aria-hidden="true">
+                <Search className="icon" />
+              </button>
             </div>
-          ) : null}
-          {selectedVehicle ? (
-            <div className="live-card">
-              <strong>{selectedVehicle.name || selectedVehicle.id}</strong>
-              <p>{selectedVehicle.ai ? t("live.ai") : selectedVehicle.driver}</p>
-              {fleetMatch(selectedVehicle.id) ? (
-                <Link to={`/w/${workspace.id}/equipment/${encodeURIComponent(fleetMatch(selectedVehicle.id)!.id)}`}>{t("modules.equipment")}</Link>
-              ) : null}
+            <div className="live-tabs" role="tablist">
+              {(["all", "vehicle", "implement", "building", "player"] as const).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={tab === id ? "is-on" : ""}
+                  onClick={() => {
+                    setTab(id)
+                    if (id === "building") setShowBuildings(true)
+                  }}
+                >
+                  {t(id === "all" ? "live.all" : id === "vehicle" ? "live.vehicles" : id === "implement" ? "live.implements" : id === "building" ? "live.buildings" : "live.players")}
+                </button>
+              ))}
             </div>
-          ) : null}
-          <div className="live-groups">
-            {catalog.length === 0 ? (
-              <p className="live-empty">
-                {t(tab === "building" ? "live.emptyPlaces" : tab === "player" ? "live.emptyPlayers" : "live.emptyVehicles")}
-              </p>
-            ) : null}
-            {farmIds.map((groupId) => {
-              const group = catalog.filter((row) => row.farmId === groupId)
-              if (group.length === 0) return null
-              const color = farmColor(groupId)
-              const title = (payload?.farms ?? []).find((item) => item.id === groupId)?.name || (groupId == null ? t("live.players") : String(groupId))
-              return (
-                <section key={groupId ?? "none"}>
-                  <header style={color ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}>
-                    <span>{title}</span>
-                    <em>{group.length}</em>
-                  </header>
-                  {group.map((row) => (
-                    <button key={row.key} type="button" className={selected === row.key ? "is-on" : ""} onClick={() => setSelected(row.key)}>
-                      {row.iconUrl ? <img src={row.iconUrl} alt="" /> : <RoleIcon role={row.role} />}
-                      <span>
-                        <strong>{row.name}</strong>
-                        <small>{row.detail}</small>
-                      </span>
+            {tab === "building" ? (
+              <div className="live-kind-filters">
+                {(["all", "silo", "animal", "production", "trade", "yard"] as const)
+                  .filter((id) => id === "all" || buildingCounts[id] > 0)
+                  .map((id) => (
+                    <button key={id} type="button" className={buildingFilter === id ? "is-on" : ""} onClick={() => setBuildingFilter(id)}>
+                      {t(`live.buildingKind.${id}`)}
+                      {id === "all" ? null : <em>{buildingCounts[id]}</em>}
                     </button>
                   ))}
-                </section>
-              )
-            })}
-          </div>
-        </section>
+              </div>
+            ) : null}
+            {selectedVehicle ? (
+              <div className="live-card">
+                <strong>{selectedVehicle.name || selectedVehicle.id}</strong>
+                <p>{selectedVehicle.ai ? t("live.ai") : selectedVehicle.driver}</p>
+                {fleetMatch(selectedVehicle.id) ? (
+                  <Link to={`/w/${workspace.id}/equipment/${encodeURIComponent(fleetMatch(selectedVehicle.id)!.id)}`}>{t("modules.equipment")}</Link>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="live-groups">
+              {catalog.length === 0 ? (
+                <p className="live-empty">
+                  {t(tab === "building" ? "live.emptyPlaces" : tab === "player" ? "live.emptyPlayers" : "live.emptyVehicles")}
+                </p>
+              ) : null}
+              {farmIds.map((groupId) => {
+                const group = catalog.filter((row) => row.farmId === groupId)
+                if (group.length === 0) return null
+                const color = farmColor(groupId)
+                const title = (payload?.farms ?? []).find((item) => item.id === groupId)?.name || (groupId == null ? t("live.players") : String(groupId))
+                return (
+                  <section key={groupId ?? "none"}>
+                    <header style={color ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}>
+                      <span>{title}</span>
+                      <em>{group.length}</em>
+                    </header>
+                    {group.map((row) => (
+                      <button key={row.key} type="button" className={selected === row.key ? "is-on" : ""} onClick={() => setSelected(row.key)}>
+                        <span className="live-obj-icon">
+                          {row.iconUrl ? (
+                            <img src={row.iconUrl} alt="" loading="lazy" decoding="async" onError={onListIconError} />
+                          ) : null}
+                          <RoleIcon role={row.role} className={row.iconUrl ? "icon-fallback is-hidden" : "icon-fallback"} />
+                        </span>
+                        <span>
+                          <strong>{row.name}</strong>
+                          <small>{row.detail}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </section>
+                )
+              })}
+            </div>
+          </section>
+        ) : (
+          <button
+            type="button"
+            className="live-side-toggle is-fab"
+            aria-expanded={false}
+            aria-label={t("live.objectsOpen")}
+            title={t("live.objectsToggle")}
+            onClick={() => setObjectsOpen(true)}
+          >
+            <ChevronLeft className="icon" />
+            <span>{t("live.objectsToggle")}</span>
+            <em>{catalog.length}</em>
+          </button>
+        )}
       </aside>
       <div className="live-stats-bar">
         <span><Tractor className="icon" /><strong>{vehicleCount}</strong><small>{t("live.vehicles")}</small></span>
@@ -523,7 +581,7 @@ export function LiveMapPage() {
   )
 }
 
-function RoleIcon({ role }: { role: MarkerRole }) {
+function RoleIcon({ role, className }: { role: MarkerRole; className?: string }) {
   const Icon =
     role === "tractor"
       ? Tractor
@@ -540,7 +598,7 @@ function RoleIcon({ role }: { role: MarkerRole }) {
                 : role === "player"
                   ? UserRound
                   : Tractor
-  return <Icon className="icon" aria-hidden="true" />
+  return <Icon className={["icon", className].filter(Boolean).join(" ")} aria-hidden="true" />
 }
 
 function MarkerGlyph({ role }: { role: MarkerRole }) {
@@ -576,7 +634,6 @@ function LiveCanvas({
   viewUserId,
   viewScope,
   vehicleRole,
-  vehicleIcon,
   placeColor,
   onSelect,
   onContentBox,
@@ -594,7 +651,6 @@ function LiveCanvas({
   viewUserId: string | null
   viewScope: string
   vehicleRole: (vehicle: LiveVehicle) => MarkerRole
-  vehicleIcon: (vehicle: LiveVehicle) => string | null
   placeColor: (farmId: number | null) => string | null
   onSelect: (id: string) => void
   onContentBox: (box: { x: number; y: number; w: number; h: number } | null) => void
@@ -690,7 +746,7 @@ function LiveCanvas({
         role: vehicleRole(vehicle),
         farmColor: placeColor(vehicle.farmId),
         label: vehicle.name || vehicle.id,
-        icon: vehicleIcon(vehicle),
+        icon: null,
         active: vehicleActive(vehicle),
         priority: rolePriority(vehicleRole(vehicle)),
         busy: vehicle.ai ? "ai" : vehicle.driver || (vehicle.controlled ? "moving" : null),
@@ -748,7 +804,7 @@ function LiveCanvas({
       })
     }
     return next
-  }, [frame, pin, placeColor, places, players, vehicleIcon, vehicleRole, vehicles])
+  }, [frame, pin, placeColor, places, players, vehicleRole, vehicles])
 
   const draw = useMemo(() => {
     const kept = markers.filter((marker) => marker.key === selected || marker.kind === "pin")
@@ -864,7 +920,7 @@ function LiveCanvas({
                       onSelect(member.key)
                     }}
                   >
-                    {member.icon ? <img src={member.icon} alt="" /> : <RoleIcon role={member.role} />}
+                    <RoleIcon role={member.role} />
                     <span>
                       <strong>{member.label}</strong>
                       <small>
@@ -940,11 +996,6 @@ function LiveCanvas({
             <div className="fields-terrain" />
           )}
           <svg className="live-sheet" style={{ left: sheet.left, top: sheet.top, width: sheet.size, height: sheet.size }} viewBox="0 0 100 100">
-            <defs>
-              <clipPath id="live-icon-clip" clipPathUnits="objectBoundingBox">
-                <circle cx="0.5" cy="0.5" r="0.5" />
-              </clipPath>
-            </defs>
             {showFields
               ? shapes.map((shape) => {
                   const labelSize = (11 * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
@@ -982,13 +1033,9 @@ function LiveCanvas({
                   <g transform={`scale(${mark})`}>
                     <circle r="1.16" className="live-marker-ring" style={{ stroke: ring }} />
                     <circle r="0.94" className="live-marker-plate" />
-                    {marker.icon ? (
-                      <image href={marker.icon} x="-0.86" y="-0.86" width="1.72" height="1.72" clipPath="url(#live-icon-clip)" />
-                    ) : (
-                      <g className="live-glyph">
-                        <MarkerGlyph role={marker.role} />
-                      </g>
-                    )}
+                    <g className="live-glyph">
+                      <MarkerGlyph role={marker.role} />
+                    </g>
                     {showArrow ? (
                       <path className="live-heading" transform={`rotate(${rotation})`} d="M0,-1.78 L0.46,-1.02 L-0.46,-1.02 Z" />
                     ) : null}

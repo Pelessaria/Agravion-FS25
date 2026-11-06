@@ -4257,7 +4257,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   position: absolute;
   z-index: 4;
   left: auto;
-  right: 360px;
+  right: 18px;
   top: 18px;
   height: auto;
   display: flex;
@@ -4271,6 +4271,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   backdrop-filter: blur(12px);
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
 }
+.live-stage.is-objects-open .live-toolbar { right: 360px; }
 .live-toolbar strong { display: none; }
 .live-toolbar div { display: flex; gap: 4px; }
 .live-toolbar button {
@@ -4293,11 +4294,17 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   z-index: 5;
   top: 18px;
   right: 18px;
-  bottom: 18px;
-  width: min(332px, calc(100% - 36px));
   display: flex;
   min-width: 0;
   pointer-events: none;
+}
+.live-side.is-open {
+  bottom: 18px;
+  width: min(332px, calc(100% - 36px));
+}
+.live-side.is-collapsed {
+  width: auto;
+  bottom: auto;
 }
 .live-side .panel {
   pointer-events: auto;
@@ -4315,6 +4322,72 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   border-radius: 12px;
   box-shadow: 0 18px 55px rgba(0, 0, 0, 0.34);
 }
+.live-side-toggle {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(22, 28, 32, 0.9);
+  color: #edf1f2;
+  border-radius: 9px;
+  padding: 0;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
+}
+.live-side-toggle .icon { width: 16px; height: 16px; }
+.live-objects > header .live-side-toggle {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  box-shadow: none;
+  background: #191f24;
+}
+.live-side-toggle.is-fab {
+  padding: 9px 12px 9px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.live-side-toggle.is-fab em {
+  font-style: normal;
+  min-width: 1.25rem;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent) 28%, #1c2024);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+.live-jump {
+  width: 100%;
+  flex: 0 0 auto;
+}
+.live-jump label { flex: 1 1 auto; min-width: 0; }
+.live-jump input {
+  width: auto !important;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-right: 2px;
+}
+.live-obj-icon {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+.live-obj-icon img,
+.live-obj-icon .icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  background: #14191e;
+  border-radius: 50%;
+  padding: 3px;
+}
+.live-obj-icon img { position: absolute; inset: 0; }
+.live-obj-icon .icon-fallback.is-hidden { visibility: hidden; }
 .live-hud {
   position: absolute;
   z-index: 4;
@@ -4366,8 +4439,9 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-stats-bar .icon { width: 16px; height: 16px; color: var(--accent-2); }
 .live-stats-bar strong { font-size: 1.15rem; line-height: 1.1; }
 .live-stats-bar small { color: var(--text-faint); font-size: 0.68rem; }
-.live-objects header, .live-stats h2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.live-objects header h2, .live-stats h2 { margin: 0; }
+.live-objects > header, .live-stats h2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.live-objects > header > div { min-width: 0; display: grid; gap: 2px; }
+.live-objects header h2, .live-stats h2 { margin: 0; font-size: 0.92rem; }
 .live-objects header span, .live-stats p { color: var(--text-faint); font-size: 0.78rem; }
 .live-objects { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; overflow: hidden; }
 .live-groups { display: grid; gap: 4px; overflow: auto; min-height: 0; padding-right: 2px; }
@@ -4411,14 +4485,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .live-kind-filters button.is-on { color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .live-kind-filters em { font-style: normal; color: var(--text-faint); }
-.live-groups button img, .live-groups button .icon {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-  background: #14191e;
-  border-radius: 50%;
-  padding: 3px;
-}
+.live-groups button .live-obj-icon { grid-column: 1; }
 .live-groups button strong, .live-groups button small { display: block; }
 .live-groups button strong { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .live-groups button small { color: var(--text-faint); font-size: 0.72rem; }
@@ -4495,6 +4562,22 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-cluster li small { color: var(--text-faint); font-size: 0.72rem; }
 .live-frame, .live-frame .fields-viewport { height: 100%; min-height: 0; }
 .live-frame .fields-viewport { background: #1a1f24; }
+.live-frame .fields-zoom {
+  left: 20px;
+  top: auto;
+  bottom: 92px;
+  z-index: 6;
+}
+.live-frame .fields-zoom .btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(22, 28, 32, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  color: #edf1f2;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
 .fields-stage img.live-sheet,
 .fields-stage svg.live-sheet {
   inset: auto;
@@ -4549,6 +4632,11 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-dock-head p { margin: 4px 0 0; color: var(--text-faint); font-size: 0.82rem; }
 .live-search { margin: 0; }
 .live-search input { width: 100%; }
+.live-jump.fields-jump {
+  height: 34px;
+  background: #14191e;
+  border-color: var(--line-strong);
+}
 .live-tabs {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -4686,7 +4774,9 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   .live-page { height: auto; }
   .live-stage { height: auto; overflow: visible; }
   .live-frame, .live-frame .fields-viewport { height: 68vh; min-height: 420px; }
+  .live-frame .fields-zoom { bottom: 14px; }
   .live-side { position: static; width: auto; margin-top: 12px; pointer-events: auto; }
+  .live-stage.is-objects-open .live-toolbar { right: 18px; }
   .live-stats-bar { position: static; margin-top: 12px; width: fit-content; }
   .live-groups { max-height: 360px; }
   .live-hud { max-width: calc(100% - 28px); }
