@@ -234,6 +234,8 @@ export function VehiclesPage() {
               }
             }
 
+            const categoryName = t(categoryLabelKey(category === "selfpropelled" ? "harvester" : category))
+
             return (
               <article
                 key={vehicle.id}
@@ -248,9 +250,8 @@ export function VehiclesPage() {
                     <img src={vehicle.iconUrl} alt="" onError={onIconError} />
                   ) : null}
                   <Tractor className={`icon icon-fallback${vehicle.iconUrl ? " is-hidden" : ""}`} />
-                  <span className="equip-card-cat">
+                  <span className="equip-card-cat" title={categoryName} aria-label={categoryName}>
                     <CategoryIcon category={category} />
-                    <span>{t(categoryLabelKey(category === "selfpropelled" ? "harvester" : category))}</span>
                   </span>
                   <button
                     type="button"
@@ -265,27 +266,27 @@ export function VehiclesPage() {
                   >
                     <LocateFixed className="icon" aria-hidden="true" />
                   </button>
+                  <span className="equip-card-caption">
+                    {brand ? <span className="equip-card-brand">{brand}</span> : null}
+                    <strong className="equip-card-title">{title}</strong>
+                    {hours || vehicle.plate ? (
+                      <span className="equip-card-meta">
+                        {hours ? (
+                          <span className="equip-card-meta-item">
+                            <Clock3 className="icon" aria-hidden="true" />
+                            <span>{hours}</span>
+                          </span>
+                        ) : null}
+                        {vehicle.plate ? (
+                          <span className="equip-card-meta-item">
+                            <span>{vehicle.plate}</span>
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : null}
+                  </span>
                 </span>
-                <span className="equip-card-body">
-                  {brand ? <span className="equip-card-brand">{brand}</span> : null}
-                  <strong className="equip-card-title">{title}</strong>
-                  {hours || vehicle.plate ? (
-                    <span className="equip-card-meta">
-                      {hours ? (
-                        <span className="equip-card-meta-item">
-                          <Clock3 className="icon" aria-hidden="true" />
-                          <span>{hours}</span>
-                        </span>
-                      ) : null}
-                      {vehicle.plate ? (
-                        <span className="equip-card-meta-item">
-                          <span>{t("vehicles.plate")} {vehicle.plate}</span>
-                        </span>
-                      ) : null}
-                    </span>
-                  ) : null}
-                  <VehicleMeterBars vehicle={vehicle} language={i18n.language} label={(key) => t(key)} />
-                </span>
+                <VehicleMeterBars vehicle={vehicle} language={i18n.language} label={(key) => t(key)} />
               </article>
             )
           })}

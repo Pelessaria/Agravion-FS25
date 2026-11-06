@@ -71,7 +71,7 @@ export function VehicleGauges({
   )
 }
 
-/** Compact horizontal meters for poster-style equipment tiles. */
+/** Compact status meters for poster-style equipment tiles. */
 export function VehicleMeterBars({
   vehicle,
   language,
@@ -84,21 +84,21 @@ export function VehicleMeterBars({
   const rows = collectGauges(vehicle, language, label)
   if (rows.length === 0) return null
   return (
-    <span className="equip-meters">
-      {rows.map((row) => {
-        const pct = row.max > 0 ? Math.max(0, Math.min(100, (row.value / row.max) * 100)) : 0
-        return (
-          <span key={row.key} className={`equip-meter is-${row.tone}`} title={row.amount}>
-            <span className="equip-meter-label">
+    <span className="equip-card-body">
+      <span className={`equip-meters is-${rows.length}`}>
+        {rows.map((row) => {
+          const pct = row.max > 0 ? Math.max(0, Math.min(100, (row.value / row.max) * 100)) : 0
+          return (
+            <span key={row.key} className={`equip-meter is-${row.tone}`} title={row.amount}>
               <em>{row.label}</em>
+              <span className="equip-meter-track" aria-hidden="true">
+                <i style={{ width: `${pct}%` }} />
+              </span>
               <strong>{Math.round(pct)}%</strong>
             </span>
-            <span className="equip-meter-track" aria-hidden="true">
-              <i style={{ width: `${pct}%` }} />
-            </span>
-          </span>
-        )
-      })}
+          )
+        })}
+      </span>
     </span>
   )
 }
