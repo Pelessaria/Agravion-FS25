@@ -354,7 +354,14 @@ final class GithubUpdateService
             $written += $this->overlayDirectory($assets, public_path('assets'));
         }
 
-        foreach (['favicon.svg', 'favicon-light.svg', 'logo.svg'] as $file) {
+        foreach (['brand', 'fonts'] as $dir) {
+            $src = $distPath.DIRECTORY_SEPARATOR.$dir;
+            if (File::isDirectory($src)) {
+                $written += $this->overlayDirectory($src, public_path($dir));
+            }
+        }
+
+        foreach (['favicon.svg', 'favicon-light.svg', 'logo.svg', 'logo-dark.svg'] as $file) {
             $src = $distPath.DIRECTORY_SEPARATOR.$file;
             if (File::exists($src)) {
                 File::copy($src, public_path($file));
@@ -364,9 +371,13 @@ final class GithubUpdateService
 
         $index = $distPath.DIRECTORY_SEPARATOR.'index.html';
         if (File::exists($index)) {
-            File::copy($index, public_path('agravion.html'));
-            @chmod(public_path('agravion.html'), 0644);
-            $written++;
+            // Write both names so a mid-rename update still serves the SPA
+            // (opcache may still run the previous shell filename for one request).
+            foreach (['agravion.html', 'agrivision.html'] as $shell) {
+                File::copy($index, public_path($shell));
+                @chmod(public_path($shell), 0644);
+                $written++;
+            }
         }
 
         return $written;
