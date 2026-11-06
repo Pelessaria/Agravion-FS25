@@ -12,7 +12,7 @@
 
 AgravionConnector = {}
 AgravionConnector.MOD_NAME = "FS25_AgravionConnector"
-AgravionConnector.VERSION = "0.1.25.0"
+AgravionConnector.VERSION = "0.1.26.0"
 AgravionConnector.SCHEMA = "1"
 AgravionConnector.TICK_MS = 5000
 AgravionConnector.HELLO_EVERY_MS = 60000
@@ -64,6 +64,7 @@ function AgravionConnector:init()
     self.storeIconsDir = self.iconsDir .. "store/"
     self.fruitsIconsDir = self.iconsDir .. "fruits/"
     self.modIconsDir = self.iconsDir .. "mods/"
+    self.brandIconsDir = self.iconsDir .. "brands/"
     self.pendingStoreIcons = {}
     self.pendingPlaceableIcons = {}
     self.copiedStorePaths = {}
@@ -72,6 +73,7 @@ function AgravionConnector:init()
     -- Vehicles/store icons must wait until the mission has spawned the fleet.
     -- Mod load runs before the savegame — scanning here always yields unique=0.
     self.vehiclesPrimed = false
+    self.brandsProbed = false
 
     ensureDir(profile .. "modSettings/")
     ensureDir(self.baseDir)
@@ -79,6 +81,7 @@ function AgravionConnector:init()
     ensureDir(self.iconsDir)
     ensureDir(self.storeIconsDir)
     ensureDir(self.fruitsIconsDir)
+    ensureDir(self.brandIconsDir)
     -- mod icons deferred (needed later for mod list UI, not vehicle overview)
 
     -- Drop empty leftover command.xml so the Engine does not spam
@@ -1113,6 +1116,162 @@ function AgravionConnector:iconExtFromPath(path)
     return "png"
 end
 
+--- One-shot probe: can we copy basegame brand logos (brand.image / imageShopOverview)?
+--- Writes state/brands_probe.xml with present/copied flags. Basegame first (isMod=false).
+function AgravionConnector:writeBrandsProbe()
+    ensureDir(self.brandIconsDir)
+    local rows = {}
+    local baseOk = 0
+    local baseFail = 0
+    local modSkip = 0
+    local total = 0
+
+    local function addBrand(brand)
+        if brand == nil or type(brand) ~= "table" then
+            return
+        end
+        local name = brand.name
+        if type(name) ~= "string" or name == "" then
+            return
+        end
+        total = total + 1
+        local isMod = brand.isMod == true
+        local title = brand.title
+        if type(title) ~= "string" then
+            title = ""
+        end
+        local image = brand.image
+        if type(image) ~= "string" then
+            image = ""
+        end
+        local overview = brand.imageShopOverview
+        if type(overview) ~= "string" then
+            overview = ""
+        end
+        local present = false
+        local copied = false
+        local usedSrc = ""
+        local dest = ""
+        if isMod then
+            modSkip = modSkip + 1
+        else
+            local raws = {}
+            if overview ~= "" then
+                table.insert(raws, overview)
+            end
+            if image ~= "" and image ~= overview then
+                table.insert(raws, image)
+            end
+            for _, raw in ipairs(raws) do
+                local candidates = self:buildStoreImageCandidates(raw)
+                for _, candidate in ipairs(candidates) do
+                    if self:fileLooksPresent(candidate) then
+                        present = true
+                        usedSrc = candidate
+                        local ext = self:iconExtFromPath(candidate)
+                        dest = self.brandIconsDir .. string.lower(name) .. "." .. ext
+                        if self:copyIconFile(candidate, dest) then
+                            copied = true
+                            break
+                        end
+                    end
+                end
+                if copied then
+                    break
+                end
+            end
+            if copied then
+                baseOk = baseOk + 1
+            else
+                baseFail = baseFail + 1
+            end
+        end
+        table.insert(rows, {
+            name = name,
+            title = title,
+            isMod = isMod,
+            image = image,
+            overview = overview,
+            present = present,
+            copied = copied,
+            src = usedSrc,
+            dest = dest,
+        })
+    end
+
+    if g_brandManager ~= nil then
+        local byIndex = g_brandManager.getBrandByIndex
+        local count = tonumber(g_brandManager.numOfBrands)
+        if type(byIndex) == "function" and count ~= nil and count > 0 then
+            for i = 1, count do
+                local ok, brand = pcall(function()
+                    return g_brandManager:getBrandByIndex(i)
+                end)
+                if ok then
+                    addBrand(brand)
+                end
+            end
+        elseif type(g_brandManager.nameToBrand) == "table" then
+            for _, brand in pairs(g_brandManager.nameToBrand) do
+                addBrand(brand)
+            end
+        elseif type(g_brandManager.indexToBrand) == "table" then
+            for _, brand in pairs(g_brandManager.indexToBrand) do
+                addBrand(brand)
+            end
+        end
+    end
+
+    table.sort(rows, function(a, b)
+        if a.isMod ~= b.isMod then
+            return not a.isMod
+        end
+        return tostring(a.name) < tostring(b.name)
+    end)
+
+    local parts = {
+        '<?xml version="1.0" encoding="utf-8"?>',
+        string.format(
+            '<brandsProbe writtenAt="%s" version="%s" total="%s" baseCopied="%s" baseFailed="%s" modSkipped="%s" copyFile="%s">',
+            self:xmlEscape(utcNow()),
+            self:xmlEscape(self.VERSION),
+            tostring(total),
+            tostring(baseOk),
+            tostring(baseFail),
+            tostring(modSkip),
+            tostring(copyFile ~= nil)
+        ),
+    }
+    for _, row in ipairs(rows) do
+        table.insert(
+            parts,
+            string.format(
+                '  <brand name="%s" title="%s" isMod="%s" present="%s" copied="%s" image="%s" overview="%s" src="%s" dest="%s" />',
+                self:xmlEscape(row.name),
+                self:xmlEscape(row.title),
+                tostring(row.isMod),
+                tostring(row.present),
+                tostring(row.copied),
+                self:xmlEscape(row.image),
+                self:xmlEscape(row.overview),
+                self:xmlEscape(row.src),
+                self:xmlEscape(row.dest)
+            )
+        )
+    end
+    table.insert(parts, "</brandsProbe>")
+    self:writeTextFile(self.stateDir .. "brands_probe.xml", table.concat(parts, "\n") .. "\n")
+    log(
+        string.format(
+            "brands_probe written total=%s baseCopied=%s baseFailed=%s modSkipped=%s",
+            tostring(total),
+            tostring(baseOk),
+            tostring(baseFail),
+            tostring(modSkip)
+        )
+    )
+end
+
 --- Vehicle and placeable store icons for the current mission. Mod-pack icons are deferred.
 --- forceWrite: rewrite the manifest even when nothing new was copied (fleet changed).
 function AgravionConnector:writeStoreIconsManifest(forceWrite)
@@ -1348,6 +1507,10 @@ function AgravionConnector:tick(dt)
             self.fullAccumMs = 0
             self:writeVehiclesFull()
             self.vehiclesPrimed = true
+        end
+        if self.vehiclesPrimed and not self.brandsProbed then
+            self:writeBrandsProbe()
+            self.brandsProbed = true
         end
     end)
     if not ok then
