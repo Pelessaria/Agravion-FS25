@@ -717,12 +717,12 @@ h1, h2, h3, p { margin: 0; }
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 0.74rem;
+  font-size: 0.68rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
-.equip-card-body .equip-gauge-pct { font-size: 0.66rem; }
+.equip-card-body .equip-gauge-pct { font-size: 0.58rem; }
 .equip-card-body .equip-gauge-label { font-size: 0.58rem; }
 .equip-card-body .equip-gauge-amt { font-size: 0.7rem; }
 .equip-gauge-label {
