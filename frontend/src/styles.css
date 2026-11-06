@@ -2749,7 +2749,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   padding: 8px 16px 10px;
   border: 1px solid color-mix(in srgb, #e7d7b0 32%, transparent);
   border-radius: 12px;
-  background: color-mix(in srgb, #14191e 55%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(14px);
 }
 .fields-mast h1 {
   margin: 0;
@@ -2964,7 +2965,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   min-height: 0;
   overflow: hidden;
   touch-action: none;
-  background: #121814;
+  background: #12171b;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -2984,8 +2985,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-stage img { object-fit: contain; pointer-events: none; user-select: none; }
 .fields-terrain {
   background:
-    radial-gradient(circle at 28% 22%, rgba(110, 150, 78, 0.35), transparent 42%),
-    radial-gradient(circle at 70% 68%, rgba(92, 78, 48, 0.4), transparent 46%),
+    radial-gradient(circle at 28% 22%, rgba(120, 108, 88, 0.28), transparent 42%),
+    radial-gradient(circle at 70% 68%, rgba(92, 78, 48, 0.36), transparent 46%),
     linear-gradient(165deg, #242a31, #14191e 58%, #1c2228);
 }
 .fields-stage svg { overflow: visible; }
@@ -3912,7 +3913,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .weather-top { grid-template-columns: 1fr; }
 .weather-mid { grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.9fr); }
 .weather-low { grid-template-columns: 1fr; }
-.weather-current { background: linear-gradient(145deg, #1d3344, #17242c 58%, #1a2420); border-color: #3c5c70; }
+.weather-current { background: linear-gradient(145deg, #1d3344, #17242c 58%, #1a1f24); border-color: #3c5c70; }
 .weather-now-row { display: flex; align-items: center; gap: 18px; margin-bottom: 16px; }
 .weather-sky, .weather-art { display: grid; place-items: center; }
 .weather-sky {
@@ -4406,7 +4407,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .live-cluster { cursor: pointer; }
 .live-cluster circle {
-  fill: #17201c;
+  fill: #171b20;
   stroke: rgba(247, 241, 228, 0.85);
   stroke-width: 1.5px;
   vector-effect: non-scaling-stroke;
