@@ -288,27 +288,80 @@ final class DedicatedServerConsole
     }
 
     /**
-     * Full dedicated-server log.txt via host file access (not the 120 KB UI tail).
+     * Full dedicated-server log (web UI download / textarea, else FTP).
+     * Unlike the dashboard snapshot tail, this does not cut at 120 KB.
      *
      * @return array{name: string, text: string, bytes: int, truncated: bool}
      */
     public function fullLog(Workspace $workspace, int $maxBytes = 8_000_000): array
     {
         $workspace->loadMissing('hostAccess');
+
+        if ($workspace->consoleConfigured()) {
+            try {
+                [$client, $base, $home] = $this->open($workspace);
+                $pages = $this->withPages($client, $base, $home, ['logs.html']);
+                foreach ($pages as $page) {
+                    $inline = trim((string) ($page['logText'] ?? ''));
+                    if ($inline !== '') {
+                        $truncated = strlen($inline) > $maxBytes;
+                        $text = $truncated ? substr($inline, -$maxBytes) : $inline;
+
+                        return [
+                            'name' => 'log',
+                            'text' => $text,
+                            'bytes' => strlen($inline),
+                            'truncated' => $truncated,
+                        ];
+                    }
+                    foreach ($page['logLinks'] as $link) {
+                        try {
+                            $url = $this->absolute($base, $page['pageUrl'] ?? $base, $link['href']);
+                        } catch (RuntimeException) {
+                            continue;
+                        }
+                        $response = $client->get($url);
+                        if ($response->status() >= 400) {
+                            continue;
+                        }
+                        $body = (string) $response->body();
+                        if ($body === '' || DedicatedServerPage::parse($body, $url)['loginForm']) {
+                            continue;
+                        }
+                        $text = str_contains(strtolower($body), '<html') ? trim(strip_tags($body)) : $body;
+                        if ($text === '') {
+                            continue;
+                        }
+                        $truncated = strlen($text) > $maxBytes;
+                        $out = $truncated ? substr($text, -$maxBytes) : $text;
+
+                        return [
+                            'name' => $link['text'] !== '' ? $link['text'] : 'log',
+                            'text' => $out,
+                            'bytes' => strlen($text),
+                            'truncated' => $truncated,
+                        ];
+                    }
+                }
+            } catch (Throwable) {
+                // Fall through to FTP.
+            }
+        }
+
         $access = $workspace->hostAccess;
         if ($access === null) {
-            throw new RuntimeException('Dateizugang fehlt für das komplette Log.');
+            throw new RuntimeException('Log ist weder über die Server-UI noch per Dateizugang erreichbar.');
         }
-        $client = new HostFileClient($access);
+        $files = new HostFileClient($access);
         foreach ($this->logCandidates($access) as $path) {
-            if (! $client->fileExists($path)) {
+            if (! $files->fileExists($path)) {
                 continue;
             }
-            $size = $client->fileSize($path);
+            $size = $files->fileSize($path);
             $truncated = $size > $maxBytes;
             $text = $truncated
-                ? $client->readRange($path, max(0, $size - $maxBytes), $maxBytes)
-                : $client->read($path);
+                ? $files->readRange($path, max(0, $size - $maxBytes), $maxBytes)
+                : $files->read($path);
 
             return [
                 'name' => basename($path),
@@ -1970,7 +2023,11 @@ final class DedicatedServerConsole
      */
     private function logCandidates(HostAccess $access): array
     {
-        $paths = ['log.txt'];
+        $paths = [
+            'log.txt',
+            'dedicatedServerLog.txt',
+            'server.log',
+        ];
         $save = trim(str_replace('\\', '/', (string) $access->remote_savegame_path), '/');
         if ($save !== '') {
             $parent = trim(dirname($save), '/.');
@@ -1978,8 +2035,15 @@ final class DedicatedServerConsole
                 $paths[] = $parent.'/log.txt';
             }
         }
+        $modSettings = trim(str_replace('\\', '/', (string) ($access->remote_mod_settings_path ?? '')), '/');
+        if ($modSettings !== '') {
+            $parent = trim(dirname($modSettings), '/.');
+            if ($parent !== '' && $parent !== '.') {
+                $paths[] = $parent.'/log.txt';
+            }
+        }
 
-        return $paths;
+        return array_values(array_unique($paths));
     }
 
     /**
