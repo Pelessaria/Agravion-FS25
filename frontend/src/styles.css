@@ -715,14 +715,14 @@ h1, h2, h3, p { margin: 0; }
 }
 .equip-meters {
   display: grid;
-  gap: 6px;
+  gap: 7px;
   margin-top: 6px;
   padding-top: 10px;
   border-top: 1px solid color-mix(in srgb, white 8%, transparent);
 }
 .equip-meter {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 .equip-meter-label {
@@ -738,30 +738,36 @@ h1, h2, h3, p { margin: 0; }
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: color-mix(in srgb, currentColor 72%, var(--text-muted));
 }
 .equip-meter-label strong {
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--text);
+  color: currentColor;
 }
 .equip-meter-track {
   display: block;
-  height: 4px;
+  height: 7px;
   border-radius: 99px;
-  background: color-mix(in srgb, white 10%, transparent);
+  background: color-mix(in srgb, currentColor 18%, color-mix(in srgb, white 8%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent);
   overflow: hidden;
 }
 .equip-meter-track i {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: currentColor;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, currentColor 82%, black),
+    currentColor
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, currentColor 55%, transparent);
 }
-.equip-meter.is-fuel { color: #3ae06e; }
-.equip-meter.is-wear { color: #ffb428; }
-.equip-meter.is-def { color: #45c0ff; }
+.equip-meter.is-fuel { color: #2fff78; }
+.equip-meter.is-wear { color: #ffc53d; }
+.equip-meter.is-def { color: #4dd2ff; }
 .equip-gauges {
   display: flex;
   flex-wrap: wrap;
