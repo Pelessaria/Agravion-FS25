@@ -1414,16 +1414,14 @@ h1, h2, h3, p { margin: 0; }
   border-bottom: 1px solid var(--line);
 }
 .context-toggle {
-  position: absolute;
-  top: 10px;
-  right: max(12px, calc((100% - var(--page)) / 2));
   display: inline-grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 42px;
+  height: 22px;
+  margin-top: 6px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
   color: var(--text-muted);
 }
 .context-toggle:hover { color: var(--text); border-color: var(--line-strong); }
@@ -1446,10 +1444,10 @@ h1, h2, h3, p { margin: 0; }
 }
 .context-extra-label {
   margin: 0;
-  color: var(--text-faint);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
   line-height: 1.2;
   text-transform: uppercase;
 }
@@ -1459,11 +1457,6 @@ h1, h2, h3, p { margin: 0; }
   align-items: center;
   justify-content: center;
   min-width: 0;
-}
-.context-bar,
-.context-extra {
-  box-sizing: border-box;
-  padding-inline: 44px;
 }
 .context-bar {
   width: 100%;

@@ -613,12 +613,12 @@ export function Shell() {
                 label={t("workspace.gameVersion")}
               />
             </div>
+            <ContextExtra open={statsOpen} />
             <ContextStatsToggle
               open={statsOpen}
               label={statsOpen ? t("context.statsHide") : t("context.statsShow")}
               onToggle={() => setStatsOpen((open) => !open)}
             />
-            <ContextExtra open={statsOpen} />
           </div>
         ) : null}
         <main id="content" className="content">
