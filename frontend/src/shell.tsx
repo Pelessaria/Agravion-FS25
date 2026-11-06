@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type ComponentType } from "react"
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   ArrowLeft,
   Bell,
+  CalendarDays,
+  Clock3,
   CloudSun,
   House,
   Landmark,
@@ -14,7 +16,10 @@ import {
   Package,
   PanelLeftClose,
   PanelLeftOpen,
+  Pause,
   PawPrint,
+  Play,
+  RefreshCw,
   Server,
   Settings,
   Sprout,
@@ -23,7 +28,7 @@ import {
   Wallet,
   X,
 } from "lucide-react"
-import { apiWorkspaceFarms } from "./api"
+import { apiWorkspaceFarms, apiWorkspaceLiveMap, type LiveMapResponse } from "./api"
 import { FarmSwitcher } from "./components/farm-switcher"
 import { BrandLockup, BrandMark, Toasts, useTimeLabel } from "./components/ui"
 import { seedNotifications, type AppNotification } from "./demo-notifications"
@@ -49,6 +54,52 @@ function chooseLocale(lng: "de" | "en") {
   void i18n.changeLanguage(lng)
   localStorage.setItem("fs25.locale", lng)
   document.documentElement.lang = lng
+}
+
+const PERIOD_TO_MONTH = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2]
+
+function clockLabel(value: number | null) {
+  if (value == null || !Number.isFinite(value)) return null
+  const ms = value > 0 && value <= 1 ? value * 24 * 60 * 60 * 1000 : value
+  if (ms < 0 || ms > 48 * 60 * 60 * 1000) return null
+  const minutes = Math.floor(ms / 60000) % (24 * 60)
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
+}
+
+function worldPlayerCount(live: LiveMapResponse | null, fallback: number | null) {
+  if (!live?.ok) return fallback
+  const names = new Set<string>()
+  for (const player of live.players) {
+    const name = player.name?.trim()
+    names.add(name ? name : player.id)
+  }
+  for (const vehicle of live.vehicles) {
+    if (!vehicle.controlled) continue
+    const name = vehicle.driver?.trim()
+    names.add(name ? name : `vehicle:${vehicle.id}`)
+  }
+  if (fallback != null && fallback > names.size) return fallback
+  return names.size
+}
+
+function ContextStat({
+  symbol,
+  value,
+  label,
+  className,
+}: {
+  symbol: ReactNode
+  value: string
+  label: string
+  className?: string
+}) {
+  return (
+    <span className={["context-stat", className].filter(Boolean).join(" ")} title={`${label}: ${value}`}>
+      {symbol}
+      <strong>{value}</strong>
+      <small>{label}</small>
+    </span>
+  )
 }
 
 function initials(name: string) {
@@ -89,6 +140,7 @@ export function Shell() {
   const [notifications, setNotifications] = useState<AppNotification[]>(seedNotifications)
   const [farmsBusy, setFarmsBusy] = useState(false)
   const headerMenusRef = useRef<HTMLDivElement>(null)
+  const [live, setLive] = useState<LiveMapResponse | null>(null)
 
   const workspaceId = location.pathname.match(/^\/w\/([^/]+)/)?.[1]
   const workspace = workspaceId ? workspaces.find((item) => item.id === workspaceId) : undefined
@@ -124,6 +176,30 @@ export function Shell() {
       cancelled = true
     }
   }, [liveMode, workspace?.id, workspace?.feedConfigured])
+
+  useEffect(() => {
+    if (!liveMode || !workspace || workspace.disabled) {
+      setLive(null)
+      return
+    }
+    const workspaceId = workspace.id
+    let cancelled = false
+    const load = async () => {
+      if (document.hidden) return
+      try {
+        const next = await apiWorkspaceLiveMap(workspaceId)
+        if (!cancelled) setLive(next)
+      } catch {
+        // Keep the last reading. The bar shows a dash until the first one arrives.
+      }
+    }
+    void load()
+    const timer = window.setInterval(() => void load(), 10_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [liveMode, workspace?.id, workspace?.disabled])
 
   useEffect(() => {
     localStorage.setItem("fs25.sidebar", collapsed ? "collapsed" : "open")
@@ -169,6 +245,10 @@ export function Shell() {
   const avatarLabel = actor?.name ?? t("profile.open")
   const farms = workspace ? accessibleFarms(workspace.id) : []
   const farm = workspace ? selectedFarm(workspace.id) : null
+  const monthIndex = live?.period != null && live.period >= 1 && live.period <= 12 ? PERIOD_TO_MONTH[live.period - 1] : null
+  const dayValue =
+    live?.day != null ? (monthIndex != null ? `${live.day} · ${t(`fields.month.${monthIndex}`)}` : String(live.day)) : "—"
+  const playerTotal = worldPlayerCount(live, workspace?.playersOnline ?? null)
 
   return (
     <div className={collapsed ? "shell collapsed" : "shell"}>
@@ -465,19 +545,59 @@ export function Shell() {
         </header>
         {workspace ? (
           <div className="context">
-            <div className="context-bar">
-              <span className="ws-no">{workspace.number}</span>
-              <strong>{workspace.name}</strong>
-              {farm ? <span className="context-farm">{farm.name?.trim() || t("farm.stubName", { id: farm.gameFarmId })}</span> : null}
-              <span className="status-line">
-                <span className={`dot ${workspace.disabled ? "unknown" : workspace.linkState}`} />
-                {workspace.disabled ? t("card.disabled") : t(`link.${workspace.linkState}`)}
-              </span>
-              <span className="faint">
-                {workspace.lastSyncAt
-                  ? t("workspace.sync", { time: stamp(workspace.lastSyncAt, "") })
-                  : t("workspace.neverSync")}
-              </span>
+            <div className="context-bar" aria-label={t("context.bar")}>
+              <ContextStat
+                symbol={<span className="ws-no">{workspace.number}</span>}
+                value={workspace.name}
+                label={t("context.instance")}
+              />
+              <span className="context-pipe" aria-hidden="true">|</span>
+              <ContextStat
+                symbol={<span className={`dot ${workspace.disabled ? "unknown" : workspace.linkState}`} />}
+                value={workspace.disabled ? t("card.disabled") : t(`link.${workspace.linkState}`)}
+                label={t("context.link")}
+              />
+              <span className="context-pipe" aria-hidden="true">|</span>
+              <ContextStat
+                symbol={live?.paused ? <Pause className="icon" /> : <Play className="icon" />}
+                value={live ? (live.paused ? t("context.paused") : t("context.active")) : "—"}
+                label={t("context.play")}
+                className={live?.paused ? "is-paused" : undefined}
+              />
+              <span className="context-pipe" aria-hidden="true">|</span>
+              <ContextStat
+                symbol={<CalendarDays className="icon" />}
+                value={dayValue}
+                label={t("context.day")}
+              />
+              <span className="context-pipe" aria-hidden="true">|</span>
+              <ContextStat
+                symbol={<Clock3 className="icon" />}
+                value={clockLabel(live?.dayTime ?? null) ?? "—"}
+                label={t("context.time")}
+              />
+              <span className="context-pipe" aria-hidden="true">|</span>
+              <ContextStat
+                symbol={<Users className="icon" />}
+                value={playerTotal == null ? "—" : String(playerTotal)}
+                label={t("context.players")}
+              />
+              {farm ? (
+                <>
+                  <span className="context-pipe" aria-hidden="true">|</span>
+                  <ContextStat
+                    symbol={<House className="icon" />}
+                    value={farm.name?.trim() || t("farm.stubName", { id: farm.gameFarmId })}
+                    label={t("context.farm")}
+                  />
+                </>
+              ) : null}
+              <span className="context-pipe" aria-hidden="true">|</span>
+              <ContextStat
+                symbol={<RefreshCw className="icon" />}
+                value={workspace.lastSyncAt ? stamp(workspace.lastSyncAt, "—") : "—"}
+                label={t("context.sync")}
+              />
             </div>
           </div>
         ) : null}
