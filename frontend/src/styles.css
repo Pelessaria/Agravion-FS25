@@ -2725,7 +2725,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-stats {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: flex-end;
   gap: 0;
   width: max-content;
   max-width: 100%;
@@ -2749,6 +2749,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   box-shadow: inset 1px 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .fields-stats strong {
+  color: var(--text);
   font-size: 1.45rem;
   font-weight: 560;
   letter-spacing: -0.04em;
@@ -2756,28 +2757,39 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   line-height: 1;
 }
 .fields-stats strong.warn { color: var(--warning); }
-.fields-stats span {
+.fields-stats > p > span {
   color: var(--text-faint);
   font-size: 0.72rem;
   line-height: 1.15;
 }
 /*
- * Mit Subtext: Icon + Zahl + Label bleiben oben (Zahl „wo sie war“).
- * Der Subtext bildet die Baseline und sitzt damit auf Höhe der
- * Hauptwerte der übrigen Kennzahlen.
+ * Icon + Zahl + Label unverändert als Kopfzeile.
+ * Subtext darunter, bündig mit den Hauptwerten der anderen Kennzahlen.
  */
 .fields-stats p.has-note .fields-stat-stack {
-  display: inline-block;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  color: var(--text);
+  font-size: inherit;
+  line-height: inherit;
 }
 .fields-stats p.has-note .fields-stat-head {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 2px;
+  color: var(--text);
+  font-size: inherit;
+  line-height: inherit;
   white-space: nowrap;
 }
+.fields-stats p.has-note .fields-stat-head > span {
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  line-height: 1.15;
+}
 .fields-stats p.has-note em {
-  display: block;
   font-style: normal;
   color: var(--text-muted);
   font-size: 0.72rem;
