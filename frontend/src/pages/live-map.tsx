@@ -351,6 +351,8 @@ export function LiveMapPage() {
     setPdaLoading(Boolean(mapUrl))
   }, [mapUrl])
 
+  const onMapReady = useCallback(() => setPdaLoading(false), [])
+
   if (!workspace) return <MissingWorkspace />
   if (!allowed || !access) return <PermissionBlock />
 
@@ -452,7 +454,7 @@ export function LiveMapPage() {
           skipContentBox={hasMapFrame}
           onSelect={setSelected}
           onContentBox={setContentBox}
-          onMapReady={() => setPdaLoading(false)}
+          onMapReady={onMapReady}
         />
         {mapBusy ? (
           <div className="live-loading" role="status" aria-live="polite">
