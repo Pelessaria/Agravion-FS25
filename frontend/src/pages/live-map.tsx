@@ -11,6 +11,7 @@ import {
   type LivePlayer,
   type LiveVehicle,
 } from "../api"
+import { VehicleStatusRows } from "../components/equip-gauge"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { cropIcon } from "../crop-icons"
 import { cropColor, projectPoint, effectiveMapSize, frameFromContentBox, measureMapContent, terrainFrame, type MapFrame } from "../field-format"
@@ -68,6 +69,70 @@ function vehicleActive(vehicle: LiveVehicle) {
 function vehicleOccupied(vehicle: LiveVehicle) {
   // Require the live controlled flag — a leftover driver name alone is not enough.
   return vehicle.controlled === true
+}
+
+function poweredRole(role: MarkerRole) {
+  return role === "tractor" || role === "harvester" || role === "vehicle"
+}
+
+function implementRole(role: MarkerRole) {
+  return role === "tool" || role === "trailer" || role === "pallet"
+}
+
+type TrainPiece = {
+  id: string
+  name: string
+  icon: string | null
+  role: MarkerRole
+}
+
+/** Order a hitch along the lead's forward axis: ahead, then the powered vehicle, then behind. */
+function hitchTrain(
+  clicked: LiveVehicle,
+  all: LiveVehicle[],
+  roleOf: (vehicle: LiveVehicle) => MarkerRole,
+  iconOf: (vehicle: LiveVehicle) => string | null,
+): { center: LiveVehicle; front: TrainPiece[]; rear: TrainPiece[] } {
+  const piece = (vehicle: LiveVehicle): TrainPiece => ({
+    id: vehicle.id,
+    name: vehicle.name || vehicle.id,
+    icon: iconOf(vehicle),
+    role: roleOf(vehicle),
+  })
+  const mates = (origin: LiveVehicle) => {
+    if (origin.heading == null) return [] as { vehicle: LiveVehicle; along: number }[]
+    const fx = Math.sin(origin.heading)
+    const fz = Math.cos(origin.heading)
+    const found: { vehicle: LiveVehicle; along: number }[] = []
+    for (const other of all) {
+      if (other.id === origin.id) continue
+      const dx = other.x - origin.x
+      const dz = other.z - origin.z
+      const along = dx * fx + dz * fz
+      const lateral = dx * fz - dz * fx
+      if (Math.abs(along) < 0.6 || Math.abs(along) > 28 || Math.abs(lateral) > 8) continue
+      if (!implementRole(roleOf(other))) continue
+      found.push({ vehicle: other, along })
+    }
+    return found
+  }
+  const nearestPower = all
+    .filter((other) => other.id !== clicked.id && poweredRole(roleOf(other)) && Math.hypot(other.x - clicked.x, other.z - clicked.z) < 28)
+    .sort((a, b) => Number(vehicleOccupied(b)) - Number(vehicleOccupied(a)) || rolePriority(roleOf(b)) - rolePriority(roleOf(a)))[0]
+  const center = poweredRole(roleOf(clicked)) ? clicked : nearestPower ?? clicked
+  const line = mates(center)
+  const toPieces = (rows: { vehicle: LiveVehicle; along: number }[]) =>
+    [...rows].sort((a, b) => b.along - a.along).map((row) => piece(row.vehicle))
+  let front = toPieces(line.filter((row) => row.along > 0))
+  let rear = toPieces(line.filter((row) => row.along < 0))
+  if (front.length === 0 && rear.length === 0 && clicked.attachments) {
+    rear = clicked.attachments
+      .split("·")
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .map((name) => ({ id: `name:${name}`, name, icon: null, role: "tool" as const }))
+  }
+  return { center, front, rear }
 }
 
 /** Giants yaw → SVG degrees. Map Y grows with world +Z (south), arrow tip is -Y (north). */
@@ -146,8 +211,19 @@ function onListIconError(event: SyntheticEvent<HTMLImageElement>) {
   wrap?.querySelector(".icon-fallback")?.classList.remove("is-hidden")
 }
 
+function TrainSlot({ piece, main, onPick }: { piece: TrainPiece; main?: boolean; onPick?: () => void }) {
+  return (
+    <button type="button" className={main ? "live-train-piece is-main" : "live-train-piece"} onClick={onPick} disabled={!onPick}>
+      <span>
+        {piece.icon ? <img src={piece.icon} alt="" /> : <RoleIcon role={piece.role} />}
+      </span>
+      <small>{piece.name}</small>
+    </button>
+  )
+}
+
 export function LiveMapPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const stamp = useTimeLabel()
   const [params] = useSearchParams()
   const pin = readPin(params)
@@ -404,6 +480,8 @@ export function LiveMapPage() {
   if (!allowed || !access) return <PermissionBlock />
 
   const roleOf = (vehicle: LiveVehicle) => markerRole("vehicle", fleetMatch(vehicle.id)?.category ?? null)
+  const train = selectedVehicle ? hitchTrain(selectedVehicle, vehicles, roleOf, vehicleIconOf) : null
+  const trainFleet = train ? fleetMatch(train.center.id) : null
   const mapVehicles = visibleVehicles.filter((vehicle) => {
     const kind = objectKind(roleOf(vehicle))
     if (tab === "building" || tab === "player") return false
@@ -514,6 +592,78 @@ export function LiveMapPage() {
             <strong>{t("live.loading")}</strong>
             <span>{bootLoading ? t("live.loadingHint") : pdaPending ? t("live.loadingPda") : t("live.loadingHint")}</span>
           </div>
+        ) : null}
+        {train ? (
+          <aside className="live-inspect">
+            <header>
+              <div>
+                <strong>{train.center.name || train.center.id}</strong>
+                <span className={vehicleOccupied(train.center) ? "is-driver" : ""}>
+                  {train.center.ai
+                    ? t("live.ai")
+                    : vehicleOccupied(train.center)
+                      ? train.center.driver || t("live.occupied")
+                      : t("live.parked")}
+                </span>
+              </div>
+              <button type="button" onClick={() => setSelected(null)} aria-label="×">
+                ×
+              </button>
+            </header>
+            <div className="live-train">
+              {train.front.map((piece, index) => (
+                <span key={piece.id} className="live-train-slot">
+                  {index > 0 ? <em className="live-train-plus">+</em> : null}
+                  <TrainSlot piece={piece} onPick={() => setSelected(`v:${piece.id}`)} />
+                </span>
+              ))}
+              {train.front.length > 0 ? <em className="live-train-plus">+</em> : null}
+              <TrainSlot
+                piece={{
+                  id: train.center.id,
+                  name: train.center.name || train.center.id,
+                  icon: vehicleIconOf(train.center),
+                  role: roleOf(train.center),
+                }}
+                main
+                onPick={() => setSelected(`v:${train.center.id}`)}
+              />
+              {train.rear.length > 0 ? <em className="live-train-plus">+</em> : null}
+              {train.rear.map((piece, index) => (
+                <span key={piece.id} className="live-train-slot">
+                  {index > 0 ? <em className="live-train-plus">+</em> : null}
+                  <TrainSlot
+                    piece={piece}
+                    onPick={piece.id.startsWith("name:") ? undefined : () => setSelected(`v:${piece.id}`)}
+                  />
+                </span>
+              ))}
+            </div>
+            <dl>
+              <div>
+                <dt>{t("vehicles.position")}</dt>
+                <dd>
+                  {Math.round(train.center.x)} / {Math.round(train.center.z)} m
+                </dd>
+              </div>
+              {trainFleet?.hours != null ? (
+                <div>
+                  <dt>{t("vehicles.hours")}</dt>
+                  <dd>{trainFleet.hours.toLocaleString(i18n.language, { maximumFractionDigits: 1 })} h</dd>
+                </div>
+              ) : null}
+              {trainFleet?.fill ? (
+                <div>
+                  <dt>{t("vehicles.fill")}</dt>
+                  <dd>{i18n.language === "en" ? trainFleet.fill.en : trainFleet.fill.de}</dd>
+                </div>
+              ) : null}
+            </dl>
+            {trainFleet ? <VehicleStatusRows vehicle={trainFleet} language={i18n.language} label={(key) => t(key)} /> : null}
+            {trainFleet ? (
+              <Link to={`/w/${workspace.id}/equipment/${encodeURIComponent(trainFleet.id)}`}>{t("modules.equipment")}</Link>
+            ) : null}
+          </aside>
         ) : null}
         <div className="live-toolbar">
           <strong>{workspace.mapName || t("modules.map")}</strong>
@@ -774,7 +924,7 @@ function markerScreenPx(marker: Marker, on: boolean) {
   if (marker.role === "player") return on ? 24 : 20
   if (piled) return 28
   if (implement) return on ? 20 : 16
-  if (marker.occupied) return 30
+  if (marker.occupied) return 38
   if (marker.active) return 24
   return on ? 22 : 18
 }
@@ -1200,7 +1350,17 @@ function LiveCanvas({
           const id = node?.getAttribute("data-marker") ?? ""
           if (id.startsWith("c:")) {
             const found = draw.find((marker) => marker.key === id)
-            setCluster(found?.members ?? null)
+            const members = found?.members ?? []
+            const hitch = members.some((member) => implementRole(member.role)) && members.some((member) => poweredRole(member.role))
+            if (hitch) {
+              const lead = [...members].sort(
+                (a, b) => Number(b.occupied) - Number(a.occupied) || b.priority - a.priority,
+              )[0]
+              setCluster(null)
+              if (lead) onSelect(lead.key)
+              return
+            }
+            setCluster(members.length > 0 ? members : null)
             return
           }
           setCluster(null)
@@ -1342,7 +1502,8 @@ function LiveCanvas({
                         <MarkerGlyph role={marker.role} />
                       </g>
                     )}
-                    {marker.occupied ? <circle className="live-marker-halo" r="1.02" style={{ stroke: ring }} /> : null}
+                    {marker.occupied ? <circle className="live-marker-driver" r="0.98" /> : null}
+                    {marker.occupied ? <circle className="live-marker-halo" r="1.18" /> : null}
                     {on ? <circle className="live-marker-rim" r="0.96" /> : null}
                     <circle r="1.15" fill="transparent" />
                   </g>
@@ -1355,7 +1516,7 @@ function LiveCanvas({
                     </g>
                   ) : null}
                   {showCaption ? (
-                    <g className="live-caption" transform={`translate(0 ${captionY}) scale(${toMap(12)})`}>
+                    <g className="live-caption is-driver" transform={`translate(0 ${captionY}) scale(${toMap(12)})`}>
                       <PlayerChip label={marker.label} />
                     </g>
                   ) : null}
