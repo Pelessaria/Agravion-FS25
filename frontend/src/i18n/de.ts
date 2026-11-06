@@ -1023,6 +1023,8 @@ export const de = {
     updated: "Stand {{time}}",
     asOf: "Stand",
     loading: "Karte wird geladen",
+    loadingHint: "Positionen und Kartenbild werden geladen …",
+    loadingPda: "Kartenbild wird vorbereitet …",
     missingTitle: "Noch keine Positionen",
     missingBody: "Sobald der Connector Fahrzeugpositionen schreibt, erscheinen sie hier. Richtung, Spieler und Orte kommen mit Paket 0.1.17 nach einem Neustart des Servers.",
     fromVehicles: "Positionen aus dem Fahrzeug-Snapshot. Fahrtrichtung, Spieler und Orte folgen mit Connector 0.1.18.",

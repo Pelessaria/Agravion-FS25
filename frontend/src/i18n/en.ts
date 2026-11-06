@@ -1025,6 +1025,8 @@ export const en = {
     updated: "As of {{time}}",
     asOf: "As of",
     loading: "Loading the map",
+    loadingHint: "Loading positions and map image …",
+    loadingPda: "Preparing the map image …",
     missingTitle: "No positions yet",
     missingBody: "Vehicles show up here once the connector has written their positions. Heading, players and places arrive with package 0.1.17 after a server restart.",
     fromVehicles: "Positions come from the vehicle snapshot. Heading, players and places follow with connector 0.1.18.",

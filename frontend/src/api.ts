@@ -303,6 +303,17 @@ export async function apiWorkspaceLiveMap(id: string): Promise<LiveMapResponse> 
   return apiFetch(`/api/workspaces/${encodeURIComponent(id)}/live-map`)
 }
 
+export async function apiWorkspaceLiveFleet(
+  id: string,
+): Promise<{
+  ok: boolean
+  error?: string | null
+  fetchedAt?: string | null
+  vehicles: Vehicle[]
+}> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(id)}/live-fleet`)
+}
+
 export async function apiWorkspaceVehicles(
   id: string,
 ): Promise<{

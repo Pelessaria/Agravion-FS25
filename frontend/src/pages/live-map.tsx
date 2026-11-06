@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
-import { Boxes, ChevronLeft, ChevronRight, Minus, Plus, Search, Tractor, Truck, UserRound, Warehouse, Wheat, Wrench } from "lucide-react"
+import { Boxes, ChevronLeft, ChevronRight, Loader2, Minus, Plus, Search, Tractor, Truck, UserRound, Warehouse, Wheat, Wrench } from "lucide-react"
 import {
   apiWorkspaceFields,
+  apiWorkspaceLiveFleet,
   apiWorkspaceLiveMap,
-  apiWorkspaceVehicles,
   type LiveMapResponse,
   type LivePlace,
   type LivePlayer,
@@ -136,7 +136,8 @@ export function LiveMapPage() {
   const [payload, setPayload] = useState<LiveMapResponse | null>(null)
   const [fields, setFields] = useState<FieldsResponse | null>(null)
   const [fleet, setFleet] = useState<Vehicle[]>([])
-  const [loading, setLoading] = useState(liveMode)
+  const [bootLoading, setBootLoading] = useState(liveMode)
+  const [pdaLoading, setPdaLoading] = useState(false)
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [hiddenFarms, setHiddenFarms] = useState<number[]>([])
   const [showFields, setShowFields] = useState(true)
@@ -152,17 +153,24 @@ export function LiveMapPage() {
   useEffect(() => {
     if (!workspace || !allowed || !access || !liveMode) return
     let cancelled = false
+    let fieldsDone = false
+    let liveDone = false
+    const finishBoot = () => {
+      if (!cancelled && fieldsDone && liveDone) setBootLoading(false)
+    }
     const loadFields = async () => {
       try {
         const next = await apiWorkspaceFields(workspace.id)
         if (!cancelled) setFields(next)
       } catch {
         if (!cancelled) setFields(null)
+      } finally {
+        fieldsDone = true
+        finishBoot()
       }
     }
     const loadLive = async (first: boolean) => {
       if (!first && document.hidden) return
-      if (first) setLoading(true)
       try {
         const next = await apiWorkspaceLiveMap(workspace.id)
         if (!cancelled) setPayload(next)
@@ -199,22 +207,27 @@ export function LiveMapPage() {
           })
         }
       } finally {
-        if (!cancelled && first) setLoading(false)
+        if (first) {
+          liveDone = true
+          finishBoot()
+        }
       }
     }
     const loadFleet = async () => {
       try {
-        const next = await apiWorkspaceVehicles(workspace.id)
+        // Local connector icons/categories only — no dedicated-server feed roundtrip.
+        const next = await apiWorkspaceLiveFleet(workspace.id)
         if (!cancelled) setFleet(next.vehicles ?? [])
       } catch {
         if (!cancelled) setFleet([])
       }
     }
+    setBootLoading(true)
     void loadFields()
     void loadLive(true)
     void loadFleet()
     const fieldsTimer = window.setInterval(() => void loadFields(), 60_000)
-    // Match connector live write (~2 s busy); FTP pull is throttled server-side to 2 s.
+    // Match connector live write (~2 s busy); FTP pull runs afterResponse server-side.
     const liveTimer = window.setInterval(() => void loadLive(false), 2_000)
     return () => {
       cancelled = true
@@ -320,6 +333,10 @@ export function LiveMapPage() {
   const vehicleIconOf = useCallback((vehicle: LiveVehicle) => fleetById.get(vehicle.id)?.iconUrl ?? null, [fleetById])
   const selectedVehicle = vehicles.find((vehicle) => `v:${vehicle.id}` === selected) ?? null
 
+  const mapUrl = workspace && fields?.pdaMap && liveMode ? `/api/workspaces/${workspace.id}/pda-map` : null
+  const mapBusy = bootLoading || (mapUrl != null && pdaLoading)
+  const hasMapFrame = Boolean(reported && reported.worldX > 0 && reported.worldZ > 0 && reported.scaleX > 0 && reported.scaleZ > 0)
+
   // Warm browser cache so SVG <image> markers paint quickly once fleet icons exist.
   useEffect(() => {
     const urls = [...new Set([...fleetById.values()].map((item) => item.iconUrl).filter(Boolean))] as string[]
@@ -329,6 +346,10 @@ export function LiveMapPage() {
       img.src = url
     }
   }, [fleetById])
+
+  useEffect(() => {
+    setPdaLoading(Boolean(mapUrl))
+  }, [mapUrl])
 
   if (!workspace) return <MissingWorkspace />
   if (!allowed || !access) return <PermissionBlock />
@@ -405,8 +426,7 @@ export function LiveMapPage() {
           ))}
         </div>
       </header>
-      <div className={objectsOpen ? "live-stage is-objects-open" : "live-stage"}>
-        {loading && !payload ? <p className="live-wait">{t("live.loading")}</p> : null}
+      <div className={[objectsOpen ? "live-stage is-objects-open" : "live-stage", mapBusy ? "is-loading" : ""].filter(Boolean).join(" ")}>
         {payload?.error === "failed" && payload.vehicles.length === 0 ? (
           <EmptyState title={t("live.failedTitle")} body={t("live.failedBody")} />
         ) : null}
@@ -414,7 +434,7 @@ export function LiveMapPage() {
           <EmptyState title={t("live.missingTitle")} body={t("live.missingBody")} />
         ) : null}
         <LiveCanvas
-          mapUrl={fields?.pdaMap && liveMode ? `/api/workspaces/${workspace.id}/pda-map` : null}
+          mapUrl={mapUrl}
           frame={frame}
           shapes={shapes}
           vehicles={mapVehicles}
@@ -429,9 +449,18 @@ export function LiveMapPage() {
           vehicleRole={roleOf}
           vehicleIcon={vehicleIconOf}
           placeColor={(farmId) => farmColor(farmId)}
+          skipContentBox={hasMapFrame}
           onSelect={setSelected}
           onContentBox={setContentBox}
+          onMapReady={() => setPdaLoading(false)}
         />
+        {mapBusy ? (
+          <div className="live-loading" role="status" aria-live="polite">
+            <Loader2 className="icon live-loading-spin" aria-hidden="true" />
+            <strong>{t("live.loading")}</strong>
+            <span>{bootLoading ? t("live.loadingHint") : t("live.loadingPda")}</span>
+          </div>
+        ) : null}
         <div className="live-toolbar">
           <strong>{workspace.mapName || t("modules.map")}</strong>
           <div>
@@ -648,8 +677,10 @@ function LiveCanvas({
   vehicleRole,
   vehicleIcon,
   placeColor,
+  skipContentBox,
   onSelect,
   onContentBox,
+  onMapReady,
 }: {
   mapUrl: string | null
   frame: MapFrame
@@ -666,8 +697,10 @@ function LiveCanvas({
   vehicleRole: (vehicle: LiveVehicle) => MarkerRole
   vehicleIcon: (vehicle: LiveVehicle) => string | null
   placeColor: (farmId: number | null) => string | null
+  skipContentBox: boolean
   onSelect: (id: string) => void
   onContentBox: (box: { x: number; y: number; w: number; h: number } | null) => void
+  onMapReady: () => void
 }) {
   const { t } = useTranslation()
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -734,6 +767,10 @@ function LiveCanvas({
     observer.observe(viewport)
     return () => observer.disconnect()
   }, [])
+
+  useEffect(() => {
+    if (!mapUrl || mapFailed) onMapReady()
+  }, [mapFailed, mapUrl, onMapReady])
 
   useEffect(() => {
     const viewport = viewportRef.current
@@ -1007,15 +1044,20 @@ function LiveCanvas({
               style={{ left: sheet.left, top: sheet.top, width: sheet.size, height: sheet.size }}
               src={mapUrl}
               alt=""
-              onError={() => setMapFailed(true)}
+              onError={() => {
+                setMapFailed(true)
+                onMapReady()
+              }}
               onLoad={(event) => {
+                onMapReady()
+                if (skipContentBox) return
                 const image = event.currentTarget
                 const canvas = document.createElement("canvas")
-                const width = Math.min(image.naturalWidth, 480)
+                const width = Math.min(image.naturalWidth, 320)
                 const height = Math.round((image.naturalHeight / image.naturalWidth) * width)
                 canvas.width = width
                 canvas.height = height
-                const context = canvas.getContext("2d")
+                const context = canvas.getContext("2d", { willReadFrequently: true })
                 if (!context) return
                 context.drawImage(image, 0, 0, width, height)
                 onContentBox(measureMapContent(context.getImageData(0, 0, width, height).data, width, height))

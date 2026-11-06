@@ -313,6 +313,11 @@ final class ConnectorSnapshotService
         ];
     }
 
+    public function hasLiveFile(Workspace $workspace): bool
+    {
+        return is_file($this->localStateDir($workspace).'/live_map.xml');
+    }
+
     /**
      * FTP-pull only live_map.xml so the live page can refresh without the full state cycle.
      */
@@ -330,17 +335,46 @@ final class ConnectorSnapshotService
         $access = $this->hostAccess($workspace);
         $base = $access !== null ? $this->connectorBase($access) : null;
         if ($access === null || $base === null) {
+            File::ensureDirectoryExists(dirname($marker));
+            File::put($marker, (string) time());
+
+            return;
+        }
+
+        $lockPath = $this->localStateDir($workspace).'/.live_sync.lock';
+        File::ensureDirectoryExists(dirname($lockPath));
+        $lock = @fopen($lockPath, 'c+');
+        if ($lock === false) {
+            return;
+        }
+        // Non-blocking: concurrent page polls must not stack FTP waits.
+        if (! flock($lock, LOCK_EX | LOCK_NB)) {
+            fclose($lock);
+
             return;
         }
 
         try {
+            // Re-check throttle after winning the lock.
+            if ($intervalSec > 0 && is_file($marker)) {
+                $age = time() - (int) filemtime($marker);
+                if ($age >= 0 && $age < $intervalSec) {
+                    return;
+                }
+            }
+
             $client = new HostFileClient($access);
-            $remote = $client->read($base.'/state/live_map.xml', 4);
+            $remote = $client->read($base.'/state/live_map.xml', 2);
             $this->storeLocalIfChanged($this->localStateDir($workspace).'/live_map.xml', $remote);
             File::ensureDirectoryExists(dirname($marker));
             File::put($marker, (string) time());
         } catch (Throwable) {
             // Keep the last cached live_map.xml; the page still renders.
+            File::ensureDirectoryExists(dirname($marker));
+            File::put($marker, (string) time());
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
         }
     }
 

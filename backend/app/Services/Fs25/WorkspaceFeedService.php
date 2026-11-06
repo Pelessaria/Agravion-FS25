@@ -292,6 +292,95 @@ final class WorkspaceFeedService
         }
     }
 
+    /**
+     * Local connector cache only — for the live map (icons/categories) without feed/savegame roundtrips.
+     *
+     * @return array{ok: bool, error: string|null, fetchedAt: string|null, vehicles: list<array<string, mixed>>}
+     */
+    public function fetchMapFleet(Workspace $workspace): array
+    {
+        if ($workspace->lifecycle === 'disabled') {
+            return [
+                'ok' => false,
+                'error' => 'Workspace is disabled.',
+                'fetchedAt' => null,
+                'vehicles' => [],
+            ];
+        }
+
+        try {
+            $connector = (new ConnectorSnapshotService)->readVehicles($workspace);
+        } catch (Throwable) {
+            return [
+                'ok' => false,
+                'error' => 'Connector vehicles unavailable.',
+                'fetchedAt' => null,
+                'vehicles' => [],
+            ];
+        }
+
+        $iconCache = new ModIconCacheService;
+        $vehicles = [];
+        foreach ($connector['vehicles'] as $index => $vehicle) {
+            if (! is_array($vehicle)) {
+                continue;
+            }
+            $unique = $vehicle['uniqueId'] ?? null;
+            $filename = $vehicle['filename'] ?? null;
+            $storeKey = $vehicle['storeKey'] ?? StoreKey::fromFilename(is_string($filename) ? $filename : null);
+            $modKey = $vehicle['modKey'] ?? ModKey::fromFilename(is_string($filename) ? $filename : null);
+            $iconUrl = null;
+            if (is_string($storeKey) && $storeKey !== ''
+                && ($iconCache->localPath($workspace, $storeKey) !== null
+                    || $iconCache->localDdsPath($workspace, $storeKey) !== null)) {
+                $iconUrl = $iconCache->publicUrl($workspace, $storeKey);
+            }
+            $id = is_string($unique) && $unique !== ''
+                ? $unique
+                : (string) $index;
+            $vehicles[] = [
+                'id' => 'feed-'.$workspace->public_id.'-'.$id,
+                'workspaceId' => $workspace->public_id,
+                'name' => $vehicle['name'] ?? $vehicle['nameHint'] ?? 'Fahrzeug',
+                'category' => self::mapVehicleCategory(
+                    isset($vehicle['category']) && is_string($vehicle['category']) ? $vehicle['category'] : null,
+                    isset($vehicle['type']) && is_string($vehicle['type']) ? $vehicle['type'] : null,
+                    is_string($filename) ? $filename : null,
+                    isset($vehicle['name']) && is_string($vehicle['name']) ? $vehicle['name'] : null,
+                    self::nullableNumber($vehicle['fuelCapacity'] ?? null),
+                ),
+                'farmId' => $vehicle['farmId'] ?? null,
+                'storeKey' => $storeKey,
+                'modKey' => $modKey,
+                'iconUrl' => $iconUrl,
+                'modIconUrl' => null,
+                'brandIconUrl' => null,
+                'x' => $vehicle['x'] ?? null,
+                'y' => $vehicle['y'] ?? null,
+                'z' => $vehicle['z'] ?? null,
+                'fuel' => null,
+                'fuelCapacity' => self::nullableNumber($vehicle['fuelCapacity'] ?? null),
+                'defLevel' => null,
+                'defCapacity' => null,
+                'wear' => null,
+                'plate' => null,
+                'fill' => null,
+                'hours' => $vehicle['hours'] ?? null,
+                'observedAt' => null,
+            ];
+        }
+
+        $path = storage_path('app/connector/'.$workspace->public_id.'/state/vehicles_full.xml');
+        $fetchedAt = is_file($path) ? gmdate('c', (int) filemtime($path)) : null;
+
+        return [
+            'ok' => true,
+            'error' => null,
+            'fetchedAt' => $fetchedAt,
+            'vehicles' => $vehicles,
+        ];
+    }
+
     public function fetchMapJpeg(Workspace $workspace, int $quality = 45, int $size = 384): string
     {
         $base = trim((string) $workspace->feed_base_url);

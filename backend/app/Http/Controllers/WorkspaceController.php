@@ -200,7 +200,28 @@ class WorkspaceController extends Controller
             ]);
         }
 
+        // Serve the local snapshot immediately; FTP refresh must not block the page.
+        if ($connector->hasLiveFile($row)) {
+            $workspaceId = $row->id;
+            dispatch(function () use ($workspaceId) {
+                $fresh = Workspace::query()->find($workspaceId);
+                if ($fresh === null) {
+                    return;
+                }
+                app(ConnectorSnapshotService::class)->refreshLiveFileIfDue($fresh);
+            })->afterResponse();
+
+            return response()->json($connector->readLive($row, false));
+        }
+
         return response()->json($connector->readLive($row, true));
+    }
+
+    public function liveFleet(string $workspace, WorkspaceFeedService $feeds): JsonResponse
+    {
+        $row = $this->findWorkspace($workspace);
+
+        return response()->json($feeds->fetchMapFleet($row));
     }
 
     public function pdaMap(string $workspace, ConnectorSnapshotService $connector): BinaryFileResponse|Response

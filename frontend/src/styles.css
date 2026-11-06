@@ -4253,6 +4253,46 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   background: #66715b;
   border: 0;
 }
+.live-stage.is-loading .live-frame {
+  filter: blur(5px) saturate(0.85);
+  transform: scale(1.02);
+  pointer-events: none;
+  transition: filter 180ms ease;
+}
+.live-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px;
+  background: rgba(12, 16, 20, 0.28);
+  color: #edf1f2;
+  text-align: center;
+  pointer-events: none;
+}
+.live-loading strong {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+.live-loading span {
+  max-width: 28ch;
+  color: rgba(237, 241, 242, 0.78);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.live-loading-spin {
+  width: 28px;
+  height: 28px;
+  color: var(--accent-2, #e4b84a);
+  animation: live-spin 0.85s linear infinite;
+}
+@keyframes live-spin {
+  to { transform: rotate(360deg); }
+}
 .live-toolbar {
   position: absolute;
   z-index: 4;
