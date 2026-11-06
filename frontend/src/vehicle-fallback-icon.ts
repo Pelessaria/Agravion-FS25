@@ -1,11 +1,15 @@
+import harvester from "./assets/vehicle-icons/harvester.png"
+import tractor from "./assets/vehicle-icons/tractor.png"
+import trailer from "./assets/vehicle-icons/trailer.png"
+import truck from "./assets/vehicle-icons/truck.png"
 import type { VehicleCategory } from "./types"
 
 /** Gold silhouettes for base-game and DLC vehicles that have no store icon. */
 const ICONS = {
-  tractor: "/vehicle-icons/tractor.png",
-  truck: "/vehicle-icons/truck.png",
-  harvester: "/vehicle-icons/harvester.png",
-  implement: "/vehicle-icons/trailer.png",
+  tractor,
+  truck,
+  harvester,
+  implement: trailer,
 } as const
 
 type IconSource = {
