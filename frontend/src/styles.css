@@ -777,16 +777,23 @@ h1, h2, h3, p { margin: 0; }
   flex: 0 0 auto;
 }
 .statusbar {
-  display: block;
-  height: 4px;
-  border-radius: 1px;
-  background: color-mix(in srgb, white 9%, transparent);
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 2px;
+  height: 5px;
 }
-.statusbar-fill {
+.status-segment {
   display: block;
   height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 1px;
+  background: color-mix(in srgb, white 9%, transparent);
+}
+.status-segment-fill {
+  display: block;
   width: 0;
+  height: 100%;
   border-radius: inherit;
   background: var(--status-color);
 }
@@ -799,7 +806,7 @@ h1, h2, h3, p { margin: 0; }
   gap: 14px;
 }
 .equip-sheet .status-labels { margin-bottom: 7px; }
-.equip-sheet .statusbar { height: 5px; }
+.equip-sheet .statusbar { height: 6px; }
 
 .equip-back {
   display: inline-flex;
