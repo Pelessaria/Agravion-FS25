@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState, type SyntheticEvent } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
-import { Boxes, Clock, Clock3, LayoutGrid, MapPin, Puzzle, Tractor, Truck, Wheat, Wrench } from "lucide-react"
+import { Boxes, Clock3, LayoutGrid, Puzzle, Tractor, Truck, Wheat, Wrench } from "lucide-react"
 import { apiWorkspaceVehicles } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock } from "../components/ui"
 import { useWorkspaceRoute } from "../use-workspace"
 import { useStore } from "../store"
-import { VehicleGauges } from "../components/equip-gauge"
+import { VehicleMeterBars } from "../components/equip-gauge"
 import type { Vehicle, VehicleCategory } from "../types"
 import { isPallet, vehicleBrand, vehicleDisplayName } from "../vehicle-label"
 
@@ -212,11 +212,17 @@ export function VehiclesPage() {
                 ? null
                 : `${vehicle.x.toFixed(0)} / ${vehicle.z.toFixed(0)} m`
 
+            const meta = [
+              position ? `${t("vehicles.position")} ${position}` : null,
+              hours,
+              vehicle.plate ? `${t("vehicles.plate")} ${vehicle.plate}` : null,
+            ].filter(Boolean)
+
             return (
               <button
                 key={vehicle.id}
                 type="button"
-                className="equip-card"
+                className="equip-card is-poster"
                 onClick={() => navigate(`/w/${id}/equipment/${vehicle.id}`)}
               >
                 <span className="equip-card-media">
@@ -228,35 +234,12 @@ export function VehiclesPage() {
                     <CategoryIcon category={category} />
                     <span>{t(categoryLabelKey(category === "selfpropelled" ? "harvester" : category))}</span>
                   </span>
-                  <span className="equip-card-caption">
-                    {brand ? <span className="equip-card-brand">{brand}</span> : null}
-                    <strong className="equip-card-title">{title}</strong>
-                  </span>
                 </span>
                 <span className="equip-card-body">
-                  <span className="equip-card-facts">
-                    <span>
-                      <em>
-                        <MapPin className="icon" aria-hidden="true" />
-                        {t("vehicles.position")}
-                      </em>
-                      <strong>{position ?? t("unavailable")}</strong>
-                    </span>
-                    <span>
-                      <em>
-                        <Clock className="icon" aria-hidden="true" />
-                        {t("vehicles.hours")}
-                      </em>
-                      <strong>{hours ?? t("unavailable")}</strong>
-                    </span>
-                    {vehicle.plate ? (
-                      <span>
-                        <em>{t("vehicles.plate")}</em>
-                        <strong>{vehicle.plate}</strong>
-                      </span>
-                    ) : null}
-                  </span>
-                  <VehicleGauges vehicle={vehicle} language={i18n.language} label={(key) => t(key)} />
+                  {brand ? <span className="equip-card-brand">{brand}</span> : null}
+                  <strong className="equip-card-title">{title}</strong>
+                  {meta.length > 0 ? <span className="equip-card-meta">{meta.join(" · ")}</span> : null}
+                  <VehicleMeterBars vehicle={vehicle} language={i18n.language} label={(key) => t(key)} />
                 </span>
               </button>
             )

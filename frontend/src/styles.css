@@ -544,7 +544,10 @@ h1, h2, h3, p { margin: 0; }
   border: 1px solid color-mix(in srgb, white 8%, transparent);
   border-radius: 14px;
   overflow: hidden;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.equip-card.is-poster:hover {
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
 }
 .equip-card:hover {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--line-strong));
@@ -581,6 +584,15 @@ h1, h2, h3, p { margin: 0; }
     radial-gradient(70% 80% at 84% 78%, #1a2228 0%, transparent 70%),
     linear-gradient(165deg, #1a1f24 0%, #101418 100%);
 }
+.equip-card.is-poster .equip-card-media {
+  aspect-ratio: 5 / 4;
+  background:
+    radial-gradient(90% 70% at 50% 78%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 62%),
+    linear-gradient(165deg, #1c2228 0%, #101418 100%);
+}
+.equip-card.is-poster .equip-card-media::after {
+  background: linear-gradient(180deg, transparent 55%, rgba(8, 10, 12, 0.28) 100%);
+}
 .equip-card-media img,
 .equip-sheet-media img {
   position: absolute;
@@ -592,6 +604,21 @@ h1, h2, h3, p { margin: 0; }
   object-fit: contain;
   object-position: right bottom;
   padding: 0;
+}
+.equip-card.is-poster .equip-card-media img {
+  inset: 14px 10px 8px;
+  right: auto;
+  bottom: auto;
+  width: calc(100% - 20px);
+  height: calc(100% - 22px);
+  max-width: none;
+  object-position: center;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.35));
+}
+.equip-card.is-poster .equip-card-media .icon-fallback {
+  width: 48px;
+  height: 48px;
+  opacity: 0.35;
 }
 .equip-mod-icon img {
   width: 100%;
@@ -660,6 +687,81 @@ h1, h2, h3, p { margin: 0; }
   padding: 12px 12px 14px;
   background: #14191e;
 }
+.equip-card.is-poster .equip-card-body {
+  gap: 6px;
+  padding: 12px 12px 13px;
+  align-content: start;
+}
+.equip-card.is-poster .equip-card-brand {
+  color: var(--text-faint);
+  letter-spacing: 0.12em;
+}
+.equip-card.is-poster .equip-card-title {
+  font-size: 0.98rem;
+  line-height: 1.2;
+  color: var(--text);
+  text-shadow: none;
+  -webkit-line-clamp: 2;
+}
+.equip-card-meta {
+  display: block;
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.equip-meters {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, white 8%, transparent);
+}
+.equip-meter {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.equip-meter-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.equip-meter-label em {
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.equip-meter-label strong {
+  font-size: 0.68rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.equip-meter-track {
+  display: block;
+  height: 4px;
+  border-radius: 99px;
+  background: color-mix(in srgb, white 10%, transparent);
+  overflow: hidden;
+}
+.equip-meter-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+}
+.equip-meter.is-fuel { color: #3ae06e; }
+.equip-meter.is-wear { color: #ffb428; }
+.equip-meter.is-def { color: #45c0ff; }
 .equip-gauges {
   display: flex;
   flex-wrap: wrap;

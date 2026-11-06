@@ -7,54 +7,100 @@ function amountLabel(value: number, max: number, language: string, unit: string)
   return `${format(value)} / ${format(max)} ${unit}`
 }
 
+type GaugeSource = Pick<Vehicle, "fuel" | "fuelCapacity" | "wear" | "defLevel" | "defCapacity">
+
+function collectGauges(vehicle: GaugeSource, language: string, label: (key: string) => string) {
+  const rows: { key: string; tone: GaugeTone; label: string; value: number; max: number; amount: string }[] = []
+  if (vehicle.fuel != null && vehicle.fuelCapacity != null && vehicle.fuelCapacity > 0) {
+    rows.push({
+      key: "fuel",
+      tone: "fuel",
+      label: label("vehicles.fuel"),
+      value: vehicle.fuel,
+      max: vehicle.fuelCapacity,
+      amount: amountLabel(vehicle.fuel, vehicle.fuelCapacity, language, "l"),
+    })
+  }
+  if (vehicle.wear != null) {
+    rows.push({
+      key: "wear",
+      tone: "wear",
+      label: label("vehicles.wear"),
+      value: vehicle.wear,
+      max: 100,
+      amount: amountLabel(vehicle.wear, 100, language, "%"),
+    })
+  }
+  if (vehicle.defLevel != null && vehicle.defCapacity != null && vehicle.defCapacity > 0) {
+    rows.push({
+      key: "def",
+      tone: "def",
+      label: label("vehicles.def"),
+      value: vehicle.defLevel,
+      max: vehicle.defCapacity,
+      amount: amountLabel(vehicle.defLevel, vehicle.defCapacity, language, "l"),
+    })
+  }
+  return rows
+}
+
 export function VehicleGauges({
   vehicle,
   language,
   label,
 }: {
-  vehicle: Pick<Vehicle, "fuel" | "fuelCapacity" | "wear" | "defLevel" | "defCapacity">
+  vehicle: GaugeSource
   language: string
   label: (key: string) => string
 }) {
-  const gauges: ReturnType<typeof EquipGauge>[] = []
-  if (vehicle.fuel != null && vehicle.fuelCapacity != null && vehicle.fuelCapacity > 0) {
-    gauges.push(
-      <EquipGauge
-        key="fuel"
-        tone="fuel"
-        label={label("vehicles.fuel")}
-        value={vehicle.fuel}
-        max={vehicle.fuelCapacity}
-        amount={amountLabel(vehicle.fuel, vehicle.fuelCapacity, language, "l")}
-      />,
-    )
-  }
-  if (vehicle.wear != null) {
-    gauges.push(
-      <EquipGauge
-        key="wear"
-        tone="wear"
-        label={label("vehicles.wear")}
-        value={vehicle.wear}
-        max={100}
-        amount={amountLabel(vehicle.wear, 100, language, "%")}
-      />,
-    )
-  }
-  if (vehicle.defLevel != null && vehicle.defCapacity != null && vehicle.defCapacity > 0) {
-    gauges.push(
-      <EquipGauge
-        key="def"
-        tone="def"
-        label={label("vehicles.def")}
-        value={vehicle.defLevel}
-        max={vehicle.defCapacity}
-        amount={amountLabel(vehicle.defLevel, vehicle.defCapacity, language, "l")}
-      />,
-    )
-  }
-  if (gauges.length === 0) return null
-  return <span className="equip-gauges">{gauges}</span>
+  const rows = collectGauges(vehicle, language, label)
+  if (rows.length === 0) return null
+  return (
+    <span className="equip-gauges">
+      {rows.map((row) => (
+        <EquipGauge
+          key={row.key}
+          tone={row.tone}
+          label={row.label}
+          value={row.value}
+          max={row.max}
+          amount={row.amount}
+        />
+      ))}
+    </span>
+  )
+}
+
+/** Compact horizontal meters for poster-style equipment tiles. */
+export function VehicleMeterBars({
+  vehicle,
+  language,
+  label,
+}: {
+  vehicle: GaugeSource
+  language: string
+  label: (key: string) => string
+}) {
+  const rows = collectGauges(vehicle, language, label)
+  if (rows.length === 0) return null
+  return (
+    <span className="equip-meters">
+      {rows.map((row) => {
+        const pct = row.max > 0 ? Math.max(0, Math.min(100, (row.value / row.max) * 100)) : 0
+        return (
+          <span key={row.key} className={`equip-meter is-${row.tone}`} title={row.amount}>
+            <span className="equip-meter-label">
+              <em>{row.label}</em>
+              <strong>{Math.round(pct)}%</strong>
+            </span>
+            <span className="equip-meter-track" aria-hidden="true">
+              <i style={{ width: `${pct}%` }} />
+            </span>
+          </span>
+        )
+      })}
+    </span>
+  )
 }
 
 export function EquipGauge({
