@@ -1163,8 +1163,8 @@ function LiveCanvas({
               return (
                 <g key={marker.key} data-marker={marker.key} className={`live-marker ${stateClass}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`scale(${mark})`}>
-                    <circle r="1.16" className="live-marker-ring" style={{ stroke: ring }} />
                     <circle r="0.94" className="live-marker-plate" />
+                    <circle r="0.94" className="live-marker-ring" style={{ stroke: ring }} />
                     {icon ? (
                       <image
                         href={icon}
@@ -1184,7 +1184,7 @@ function LiveCanvas({
                     {showArrow ? (
                       <path className="live-heading" transform={`rotate(${rotation})`} d="M0,-1.78 L0.46,-1.02 L-0.46,-1.02 Z" />
                     ) : null}
-                    {on ? <circle r="1.16" className="live-marker-rim" /> : null}
+                    {on ? <circle r="0.94" className="live-marker-rim" /> : null}
                   </g>
                   {piled ? (
                     <g className="live-count" transform={`translate(${toMap(14)} ${toMap(-14)}) scale(${toMap(16)})`}>
