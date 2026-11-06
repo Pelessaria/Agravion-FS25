@@ -4546,11 +4546,11 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .live-marker .live-marker-plate { fill: rgba(18, 23, 26, 0.92); }
 .live-marker .live-marker-ring {
   fill: none;
-  stroke-width: 0.22;
+  stroke-width: 0.11;
 }
-.live-marker .live-marker-rim { fill: none; stroke: rgba(255, 255, 255, 0.55); stroke-width: 0.12; }
+.live-marker .live-marker-rim { fill: none; stroke: rgba(255, 255, 255, 0.55); stroke-width: 0.08; }
 .live-marker.is-idle { opacity: 0.78; }
-.live-marker.is-active .live-marker-ring { stroke-width: 0.26; }
+.live-marker.is-active .live-marker-ring { stroke-width: 0.14; }
 .live-heading {
   fill: #f5f7f7;
   stroke: #101418;
