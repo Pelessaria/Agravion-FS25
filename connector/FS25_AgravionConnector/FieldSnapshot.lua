@@ -6,7 +6,9 @@
   field state is written, because plowing between parcels changes the join
   without moving the outlines. Farmlands hidden from the buy screen and not
   owned by a player farm are omitted: maps use those for mission and scenery
-  ground, and their polygons are not fields the player can buy.
+  ground, and their polygons are not fields the player can buy. A parcel whose
+  ground was built over (a farm expansion) keeps its map outline; it is omitted
+  once almost none of that outline is still field ground.
   Crop / ground / Precision Farming state is swept
   in small batches and written about once a minute to state/fields_state.xml.
 
@@ -1743,6 +1745,62 @@ local function onFieldGround(x, z)
     return isOnField == true
 end
 
+-- The map outline does not shrink when a placeable paints over a field.
+-- Sample the interior and drop the parcel when the ground is gone.
+local function fieldGroundRatio(points)
+    if type(points) ~= "table" or #points < 3 then
+        return nil
+    end
+    if FSDensityMapUtil == nil or FSDensityMapUtil.getFieldDataAtWorldPosition == nil then
+        return nil
+    end
+    local minX, maxX, minZ, maxZ = 1e12, -1e12, 1e12, -1e12
+    local i = 1
+    while i <= #points do
+        local point = points[i]
+        if point.x < minX then minX = point.x end
+        if point.x > maxX then maxX = point.x end
+        if point.z < minZ then minZ = point.z end
+        if point.z > maxZ then maxZ = point.z end
+        i = i + 1
+    end
+    local span = math.max(maxX - minX, maxZ - minZ)
+    if span < 1 then
+        return nil
+    end
+    local step = math.max(14, span / 4)
+    local yes, checked = 0, 0
+    local z = minZ + step * 0.5
+    while z < maxZ and checked < 16 do
+        local x = minX + step * 0.5
+        while x < maxX and checked < 16 do
+            if pointInside(points, x, z) then
+                local on = onFieldGround(x, z)
+                if on ~= nil then
+                    checked = checked + 1
+                    if on == true then
+                        yes = yes + 1
+                    end
+                end
+            end
+            x = x + step
+        end
+        z = z + step
+    end
+    if checked < 6 then
+        return nil
+    end
+    return yes / checked
+end
+
+local function fieldBuiltOver(points)
+    local ratio = fieldGroundRatio(points)
+    if ratio == nil then
+        return false
+    end
+    return ratio < 0.2
+end
+
 -- The nearest corners of two parcels often sit in a road. The shared edge
 -- is the place a plow actually joins them, so corridors are measured
 -- edge to edge and only kept when they fall outside both outlines.
@@ -1991,7 +2049,7 @@ local function writeGeometry(connector, ids, records)
     local lines = {}
     for _, id in ipairs(ids) do
         local row = records[id]
-        if row ~= nil then
+        if row ~= nil and row.removed ~= "1" then
             lines[#lines + 1] = string.format(
                 "<field%s%s%s%s%s%s%s%s />",
                 attr(connector, "id", row.id),
@@ -2060,7 +2118,8 @@ local function writeState(connector, ids, records)
     local precision = "0"
     for _, id in ipairs(ids) do
         local row = records[id]
-        if row ~= nil then
+        local geo = connector.fieldGeoCache ~= nil and connector.fieldGeoCache[id] or nil
+        if row ~= nil and (geo == nil or geo.removed ~= "1") then
             if row.precisionAvailable then
                 precision = "1"
             end
@@ -2177,7 +2236,7 @@ local function geometryFingerprint(connector, ids, records)
     for _, id in ipairs(ids) do
         local row = records[id]
         if row ~= nil then
-            parts[#parts + 1] = tostring(row.id) .. ":" .. tostring(row.lx) .. "," .. tostring(row.lz) .. ":" .. tostring(row.group or "") .. ":" .. tostring(row.points or "")
+            parts[#parts + 1] = tostring(row.id) .. ":" .. tostring(row.lx) .. "," .. tostring(row.lz) .. ":" .. tostring(row.group or "") .. ":" .. tostring(row.removed or "") .. ":" .. tostring(row.points or "")
         end
     end
     return table.concat(parts, "|") .. "#" .. mapFrameAttrs(connector)
@@ -2219,7 +2278,11 @@ function FieldSnapshot.writeIfDue(connector)
         local budget = FieldSnapshot.GEOMETRY_BUDGET
         while budget > 0 and connector.fieldGeoIndex <= #ids do
             local id = ids[connector.fieldGeoIndex]
-            connector.fieldGeoRecords[id] = collectGeometry(byId[id], id)
+            local row = collectGeometry(byId[id], id)
+            if fieldBuiltOver(row.raw) then
+                row.removed = "1"
+            end
+            connector.fieldGeoRecords[id] = row
             connector.fieldGeoIndex = connector.fieldGeoIndex + 1
             budget = budget - 1
         end
@@ -2267,6 +2330,10 @@ function FieldSnapshot.writeIfDue(connector)
     while budget > 0 and connector.fieldStateIndex <= #stateIds do
         local id = stateIds[connector.fieldStateIndex]
         connector.fieldStateRecords[id] = collectState(connector, byId[id], id)
+        local geo = connector.fieldGeoCache ~= nil and connector.fieldGeoCache[id] or nil
+        if geo ~= nil then
+            geo.removed = fieldBuiltOver(geo.raw) and "1" or nil
+        end
         connector.fieldStateIndex = connector.fieldStateIndex + 1
         budget = budget - 1
     end
