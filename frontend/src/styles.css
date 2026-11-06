@@ -4578,17 +4578,26 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   line-height: 1;
 }
 .live-carousel {
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: 64px 28px 96px 28px 64px;
   justify-content: center;
-  gap: 10px;
-  min-height: 118px;
+  align-items: end;
+  gap: 8px;
+  min-height: 130px;
   padding: 8px 28px 0;
 }
+.live-carousel-side {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 36px;
+  display: grid;
+  place-items: center;
+}
+.live-carousel-side .live-carousel-dot { margin-bottom: 0; }
 .live-carousel-dot {
   width: 64px;
   height: 64px;
-  margin-bottom: 34px;
+  margin-bottom: 0;
   border-radius: 50%;
   border: 3px solid rgba(255, 255, 255, 0.22);
   background: #1c2420;
@@ -4608,9 +4617,11 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   border-color: #e4b84a;
   box-shadow: 0 0 0 4px rgba(228, 184, 74, 0.28), 0 8px 16px rgba(0, 0, 0, 0.28);
 }
+.live-carousel-plus.is-empty { visibility: hidden; }
 .live-carousel-plus {
-  align-self: flex-end;
-  margin-bottom: 22px;
+  align-self: end;
+  justify-self: center;
+  margin-bottom: 46px;
   color: #f4f1e8;
   font-style: normal;
   font-size: 1.7rem;

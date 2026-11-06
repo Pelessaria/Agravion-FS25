@@ -605,11 +605,11 @@ export function LiveMapPage() {
               ×
             </button>
             <div className="live-carousel">
-              {prevPiece ? <CarouselDot piece={prevPiece} /> : null}
-              {prevPiece ? <em className="live-carousel-plus">+</em> : null}
+              <span className="live-carousel-side">{prevPiece ? <CarouselDot piece={prevPiece} /> : null}</span>
+              <em className={prevPiece ? "live-carousel-plus" : "live-carousel-plus is-empty"}>+</em>
               <CarouselDot piece={focusPiece} main />
-              {nextPiece ? <em className="live-carousel-plus">+</em> : null}
-              {nextPiece ? <CarouselDot piece={nextPiece} /> : null}
+              <em className={nextPiece ? "live-carousel-plus" : "live-carousel-plus is-empty"}>+</em>
+              <span className="live-carousel-side">{nextPiece ? <CarouselDot piece={nextPiece} /> : null}</span>
             </div>
             <div className="live-carousel-nav">
               <button
