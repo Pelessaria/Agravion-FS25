@@ -182,6 +182,23 @@ local function weatherName(forecastType)
     return nil
 end
 
+local function playerNickname(user, connection)
+    local name = safeMethod(user, "getNickname")
+    if type(name) == "string" and name ~= "" then
+        return name
+    end
+    if user ~= nil and type(user.nickname) == "string" and user.nickname ~= "" then
+        return user.nickname
+    end
+    if connection ~= nil and type(connection.nickname) == "string" and connection.nickname ~= "" then
+        return connection.nickname
+    end
+    if connection ~= nil and type(connection.userName) == "string" and connection.userName ~= "" then
+        return connection.userName
+    end
+    return nil
+end
+
 local function appendVehicles(connector, parts, fingerprint)
     local mission = g_currentMission
     local vehicles = mission ~= nil and mission.vehicleSystem ~= nil and mission.vehicleSystem.vehicles or nil
@@ -214,7 +231,18 @@ local function appendVehicles(connector, parts, fingerprint)
             local driver = nil
             local connection = safeMethod(vehicle, "getOwnerConnection")
             if connection ~= nil then
-                driver = connection.nickname or connection.userName
+                driver = playerNickname(nil, connection)
+                if driver == nil and mission ~= nil and mission.userManager ~= nil then
+                    local users = safeMethod(mission.userManager, "getUsers")
+                    if type(users) == "table" then
+                        for _, user in pairs(users) do
+                            if safeMethod(user, "getConnection") == connection then
+                                driver = playerNickname(user, connection)
+                                break
+                            end
+                        end
+                    end
+                end
             end
             local ai = safeMethod(vehicle, "getIsAIActive") == true
             local attachments = attachmentNames(vehicle)
@@ -279,23 +307,6 @@ local function playerPose(player)
         return num(x), num(z), headingOf(node)
     end
     return nil, nil, nil
-end
-
-local function playerNickname(user, connection)
-    local name = safeMethod(user, "getNickname")
-    if type(name) == "string" and name ~= "" then
-        return name
-    end
-    if user ~= nil and type(user.nickname) == "string" and user.nickname ~= "" then
-        return user.nickname
-    end
-    if connection ~= nil and type(connection.nickname) == "string" and connection.nickname ~= "" then
-        return connection.nickname
-    end
-    if connection ~= nil and type(connection.userName) == "string" and connection.userName ~= "" then
-        return connection.userName
-    end
-    return nil
 end
 
 local function appendPlayers(connector, parts, fingerprint)
@@ -704,16 +715,22 @@ function LiveSnapshot.writeIfDue(connector)
     local stamp = string.format(
         "%s|%s|%s|%s|%s|%s|%s",
         tostring(clock.day),
-        tostring(clock.dayTime ~= nil and round(clock.dayTime, -4) or ""),
+        tostring(clock.dayTime ~= nil and math.floor(clock.dayTime) or ""),
         tostring(clock.weather),
         tostring(clock.temperature),
         tostring(clock.rain),
         tostring(#clock.hours),
         body
     )
+    -- Heartbeat: even when nothing moved, rewrite every ~15 intervals so the
+    -- dashboard does not look frozen while the farm is paused / idle.
     if stamp == connector.liveFingerprint then
-        return
+        connector.liveQuietTicks = (connector.liveQuietTicks or 0) + 1
+        if connector.liveQuietTicks < 15 then
+            return
+        end
     end
+    connector.liveQuietTicks = 0
 
     local generation = 1
     if connector.nextGeneration ~= nil then

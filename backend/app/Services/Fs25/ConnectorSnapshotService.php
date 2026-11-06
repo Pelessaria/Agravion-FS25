@@ -369,9 +369,8 @@ final class ConnectorSnapshotService
             File::ensureDirectoryExists(dirname($marker));
             File::put($marker, (string) time());
         } catch (Throwable) {
-            // Keep the last cached live_map.xml; the page still renders.
-            File::ensureDirectoryExists(dirname($marker));
-            File::put($marker, (string) time());
+            // Keep the last cached live_map.xml. Do not touch the throttle marker on
+            // failure so the next live-map poll can retry immediately.
         } finally {
             flock($lock, LOCK_UN);
             fclose($lock);

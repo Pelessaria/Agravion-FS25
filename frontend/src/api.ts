@@ -301,8 +301,12 @@ export type LiveMapResponse = {
   days: LiveForecastDay[]
 }
 
-export async function apiWorkspaceLiveMap(id: string): Promise<LiveMapResponse> {
-  return apiFetch(`/api/workspaces/${encodeURIComponent(id)}/live-map`)
+export async function apiWorkspaceLiveMap(
+  id: string,
+  options?: { fresh?: boolean },
+): Promise<LiveMapResponse> {
+  const fresh = options?.fresh ? "?fresh=1" : ""
+  return apiFetch(`/api/workspaces/${encodeURIComponent(id)}/live-map${fresh}`)
 }
 
 export async function apiWorkspaceLiveFleet(

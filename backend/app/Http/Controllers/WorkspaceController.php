@@ -176,7 +176,7 @@ class WorkspaceController extends Controller
         return response()->json($connector->readStorage($row));
     }
 
-    public function liveMap(string $workspace, ConnectorSnapshotService $connector): JsonResponse
+    public function liveMap(Request $request, string $workspace, ConnectorSnapshotService $connector): JsonResponse
     {
         $row = $this->findWorkspace($workspace);
         if ($row->lifecycle === 'disabled') {
@@ -200,21 +200,27 @@ class WorkspaceController extends Controller
             ]);
         }
 
-        // Serve the local snapshot immediately; FTP refresh must not block the page.
-        if ($connector->hasLiveFile($row)) {
+        // Fast FTP pull only while the live-map page polls with ?fresh=1.
+        // Weather and other consumers read the local cache without waking FTP.
+        $fresh = $request->boolean('fresh');
+        if ($fresh && $connector->hasLiveFile($row)) {
             $workspaceId = $row->id;
             dispatch(function () use ($workspaceId) {
-                $fresh = Workspace::query()->find($workspaceId);
-                if ($fresh === null) {
+                $freshRow = Workspace::query()->find($workspaceId);
+                if ($freshRow === null) {
                     return;
                 }
-                app(ConnectorSnapshotService::class)->refreshLiveFileIfDue($fresh);
+                app(ConnectorSnapshotService::class)->refreshLiveFileIfDue($freshRow);
             })->afterResponse();
 
             return response()->json($connector->readLive($row, false));
         }
 
-        return response()->json($connector->readLive($row, true));
+        if ($fresh && ! $connector->hasLiveFile($row)) {
+            return response()->json($connector->readLive($row, true));
+        }
+
+        return response()->json($connector->readLive($row, false));
     }
 
     public function liveFleet(string $workspace, WorkspaceFeedService $feeds): JsonResponse

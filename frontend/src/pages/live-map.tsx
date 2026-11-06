@@ -183,7 +183,7 @@ export function LiveMapPage() {
     const loadLive = async (first: boolean) => {
       if (!first && document.hidden) return
       try {
-        const next = await apiWorkspaceLiveMap(workspace.id)
+        const next = await apiWorkspaceLiveMap(workspace.id, { fresh: true })
         if (!cancelled) setPayload(next)
       } catch {
         if (!cancelled && first) {
@@ -393,8 +393,12 @@ export function LiveMapPage() {
       key: `v:${vehicle.id}`,
       farmId: vehicle.farmId,
       kind: objectKind(roleOf(vehicle)),
-      name: vehicle.name || vehicle.id,
-      detail: vehicle.ai ? t("live.ai") : vehicle.driver || t("live.parked"),
+      name: vehicleOccupied(vehicle) ? vehicle.driver || t("live.occupied") : vehicle.name || vehicle.id,
+      detail: vehicleOccupied(vehicle)
+        ? [vehicle.name, vehicle.attachments].filter(Boolean).join(" · ") || t("live.occupied")
+        : vehicle.ai
+          ? t("live.ai")
+          : t("live.parked"),
       iconUrl: fleetMatch(vehicle.id)?.iconUrl ?? null,
       role: roleOf(vehicle),
     })),
@@ -866,6 +870,8 @@ function LiveCanvas({
       const point = projectPoint(vehicle.x, vehicle.z, frame)
       const occupied = vehicleOccupied(vehicle)
       const role = vehicleRole(vehicle)
+      const vehicleName = vehicle.name || vehicle.id
+      const driverName = vehicle.driver?.trim() || null
       next.push({
         key: `v:${vehicle.id}`,
         x: point.x,
@@ -874,13 +880,14 @@ function LiveCanvas({
         kind: "vehicle",
         role,
         farmColor: placeColor(vehicle.farmId),
-        label: vehicle.name || vehicle.id,
+        // Occupied: player name first; vehicle name as subtitle.
+        label: occupied ? driverName || t("live.occupied") : vehicleName,
         icon: vehicleIcon(vehicle),
         active: vehicleActive(vehicle),
         occupied,
         attachments: vehicle.attachments?.trim() || null,
         priority: occupied ? 100 : rolePriority(role),
-        busy: vehicle.ai ? "ai" : vehicle.driver || (vehicle.controlled ? "moving" : null),
+        busy: occupied ? vehicleName : vehicle.ai ? "ai" : null,
       })
     }
     for (const player of players) {
