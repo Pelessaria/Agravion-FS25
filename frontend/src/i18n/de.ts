@@ -1079,6 +1079,8 @@ export const de = {
     occupied: "Besetzt",
     onFoot: "Zu Fuß",
     attachments: "Angehängt",
+    prev: "Zurück",
+    next: "Weiter",
     cluster: "{{count}} Fahrzeuge",
     clusterHint: "Eintrag wählen, um hinzufahren.",
     moving: "Unterwegs",

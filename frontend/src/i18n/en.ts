@@ -1081,6 +1081,8 @@ export const en = {
     occupied: "Occupied",
     onFoot: "On foot",
     attachments: "Attached",
+    prev: "Previous",
+    next: "Next",
     cluster: "{{count}} vehicles",
     clusterHint: "Choose an entry to move there.",
     moving: "Moving",

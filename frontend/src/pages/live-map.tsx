@@ -200,14 +200,11 @@ function onListIconError(event: SyntheticEvent<HTMLImageElement>) {
   wrap?.querySelector(".icon-fallback")?.classList.remove("is-hidden")
 }
 
-function TrainSlot({ piece, main, onPick }: { piece: TrainPiece; main?: boolean; onPick?: () => void }) {
+function CarouselDot({ piece, main, on }: { piece: TrainPiece; main?: boolean; on?: boolean }) {
   return (
-    <button type="button" className={main ? "live-train-piece is-main" : "live-train-piece"} onClick={onPick} disabled={!onPick}>
-      <span>
-        {piece.icon ? <img src={piece.icon} alt="" /> : <RoleIcon role={piece.role} />}
-      </span>
-      <small>{piece.name}</small>
-    </button>
+    <span className={["live-carousel-dot", main ? "is-main" : "", on ? "is-on" : ""].filter(Boolean).join(" ")} title={piece.name}>
+      {piece.icon ? <img src={piece.icon} alt="" /> : <RoleIcon role={piece.role} />}
+    </span>
   )
 }
 
@@ -236,7 +233,12 @@ export function LiveMapPage() {
   const [query, setQuery] = useState(pin?.name ?? "")
   const [objectsOpen, setObjectsOpen] = useState(false)
   const [selected, setSelected] = useState<string | null>(vehicleParam ? `v:${vehicleParam}` : pin ? "pin" : null)
+  const [inspectAt, setInspectAt] = useState(-1)
   const deepLinkDone = useRef(false)
+
+  useEffect(() => {
+    setInspectAt(-1)
+  }, [selected])
 
   useEffect(() => {
     if (!workspace || !allowed || !access || !liveMode) return
@@ -470,7 +472,22 @@ export function LiveMapPage() {
 
   const roleOf = (vehicle: LiveVehicle) => markerRole("vehicle", fleetMatch(vehicle.id)?.category ?? null)
   const train = selectedVehicle ? hitchTrain(selectedVehicle, vehicles, roleOf, vehicleIconOf) : null
-  const trainFleet = train ? fleetMatch(train.center.id) : null
+  const trainCenter: TrainPiece | null = train
+    ? {
+        id: train.center.id,
+        name: train.center.name || train.center.id,
+        icon: vehicleIconOf(train.center),
+        role: roleOf(train.center),
+      }
+    : null
+  const trainSequence = train && trainCenter ? [...train.front, trainCenter, ...train.rear] : []
+  const trainFocus =
+    trainSequence.length === 0 ? 0 : inspectAt < 0 ? (train?.front.length ?? 0) : Math.min(inspectAt, trainSequence.length - 1)
+  const focusPiece = trainSequence[trainFocus] ?? null
+  const focusVehicle = focusPiece ? vehicles.find((vehicle) => vehicle.id === focusPiece.id) ?? null : null
+  const focusFleet = focusPiece ? fleetMatch(focusPiece.id) : null
+  const leftPiece = train && train.front.length > 0 ? (train.front.some((piece) => piece.id === focusPiece?.id) ? focusPiece : train.front[0]) : null
+  const rightPiece = train && train.rear.length > 0 ? (train.rear.some((piece) => piece.id === focusPiece?.id) ? focusPiece : train.rear[0]) : null
   const mapVehicles = visibleVehicles.filter((vehicle) => {
     const kind = objectKind(roleOf(vehicle))
     if (tab === "building" || tab === "player") return false
@@ -582,75 +599,73 @@ export function LiveMapPage() {
             <span>{bootLoading ? t("live.loadingHint") : pdaPending ? t("live.loadingPda") : t("live.loadingHint")}</span>
           </div>
         ) : null}
-        {train ? (
+        {train && trainCenter && focusPiece ? (
           <aside className="live-inspect">
-            <header>
-              <div>
-                <strong>{train.center.name || train.center.id}</strong>
-                <span className={vehicleOccupied(train.center) ? "is-driver" : ""}>
-                  {train.center.ai
-                    ? t("live.ai")
-                    : vehicleOccupied(train.center)
-                      ? train.center.driver || t("live.occupied")
-                      : t("live.parked")}
-                </span>
-              </div>
-              <button type="button" onClick={() => setSelected(null)} aria-label="×">
-                ×
-              </button>
-            </header>
-            <div className="live-train">
-              {train.front.map((piece, index) => (
-                <span key={piece.id} className="live-train-slot">
-                  {index > 0 ? <em className="live-train-plus">+</em> : null}
-                  <TrainSlot piece={piece} onPick={() => setSelected(`v:${piece.id}`)} />
-                </span>
-              ))}
-              {train.front.length > 0 ? <em className="live-train-plus">+</em> : null}
-              <TrainSlot
-                piece={{
-                  id: train.center.id,
-                  name: train.center.name || train.center.id,
-                  icon: vehicleIconOf(train.center),
-                  role: roleOf(train.center),
-                }}
-                main
-                onPick={() => setSelected(`v:${train.center.id}`)}
-              />
-              {train.rear.length > 0 ? <em className="live-train-plus">+</em> : null}
-              {train.rear.map((piece, index) => (
-                <span key={piece.id} className="live-train-slot">
-                  {index > 0 ? <em className="live-train-plus">+</em> : null}
-                  <TrainSlot
-                    piece={piece}
-                    onPick={piece.id.startsWith("name:") ? undefined : () => setSelected(`v:${piece.id}`)}
-                  />
-                </span>
-              ))}
+            <button type="button" className="live-inspect-close" onClick={() => setSelected(null)} aria-label="×">
+              ×
+            </button>
+            <div className="live-carousel">
+              {leftPiece ? <CarouselDot piece={leftPiece} on={leftPiece.id === focusPiece.id} /> : null}
+              {leftPiece ? <em className="live-carousel-plus">+</em> : null}
+              <CarouselDot piece={trainCenter} main on={trainCenter.id === focusPiece.id} />
+              {rightPiece ? <em className="live-carousel-plus">+</em> : null}
+              {rightPiece ? <CarouselDot piece={rightPiece} on={rightPiece.id === focusPiece.id} /> : null}
             </div>
+            <div className="live-carousel-nav">
+              <button
+                type="button"
+                aria-label={t("live.prev")}
+                disabled={trainSequence.length < 2}
+                onClick={() => setInspectAt((trainFocus - 1 + trainSequence.length) % trainSequence.length)}
+              >
+                <ChevronLeft className="icon" />
+              </button>
+              <button
+                type="button"
+                aria-label={t("live.next")}
+                disabled={trainSequence.length < 2}
+                onClick={() => setInspectAt((trainFocus + 1) % trainSequence.length)}
+              >
+                <ChevronRight className="icon" />
+              </button>
+            </div>
+            <header>
+              <strong>{focusPiece.name}</strong>
+              <span className={focusVehicle && vehicleOccupied(focusVehicle) ? "is-driver" : ""}>
+                {focusVehicle?.ai
+                  ? t("live.ai")
+                  : focusVehicle && vehicleOccupied(focusVehicle)
+                    ? focusVehicle.driver || t("live.occupied")
+                    : focusPiece.id === train.center.id
+                      ? t("live.parked")
+                      : t(`live.role.${focusPiece.role}`)}
+              </span>
+            </header>
             <dl>
-              <div>
-                <dt>{t("vehicles.position")}</dt>
-                <dd>
-                  {Math.round(train.center.x)} / {Math.round(train.center.z)} m
-                </dd>
-              </div>
-              {trainFleet?.hours != null ? (
+              {focusVehicle ? (
                 <div>
-                  <dt>{t("vehicles.hours")}</dt>
-                  <dd>{trainFleet.hours.toLocaleString(i18n.language, { maximumFractionDigits: 1 })} h</dd>
+                  <dt>{t("vehicles.position")}</dt>
+                  <dd>
+                    {Math.round(focusVehicle.x)} / {Math.round(focusVehicle.z)} m
+                  </dd>
                 </div>
               ) : null}
-              {trainFleet?.fill ? (
+              {focusFleet?.hours != null ? (
+                <div>
+                  <dt>{t("vehicles.hours")}</dt>
+                  <dd>{focusFleet.hours.toLocaleString(i18n.language, { maximumFractionDigits: 1 })} h</dd>
+                </div>
+              ) : null}
+              {focusFleet?.fill ? (
                 <div>
                   <dt>{t("vehicles.fill")}</dt>
-                  <dd>{i18n.language === "en" ? trainFleet.fill.en : trainFleet.fill.de}</dd>
+                  <dd>{i18n.language === "en" ? focusFleet.fill.en : focusFleet.fill.de}</dd>
                 </div>
               ) : null}
             </dl>
-            {trainFleet ? <VehicleStatusRows vehicle={trainFleet} language={i18n.language} label={(key) => t(key)} /> : null}
-            {trainFleet ? (
-              <Link to={`/w/${workspace.id}/equipment/${encodeURIComponent(trainFleet.id)}`}>{t("modules.equipment")}</Link>
+            {focusFleet ? <VehicleStatusRows vehicle={focusFleet} language={i18n.language} label={(key) => t(key)} /> : null}
+            {focusFleet ? (
+              <Link to={`/w/${workspace.id}/equipment/${encodeURIComponent(focusFleet.id)}`}>{t("modules.equipment")}</Link>
             ) : null}
           </aside>
         ) : null}
@@ -1208,19 +1223,23 @@ function LiveCanvas({
     return placed
   }, [markers, selected, sheet, zoom])
 
-  const focused = useRef<string | null>(null)
+  const follow = useRef<{ key: string; x: number; y: number } | null>(null)
   useEffect(() => {
     if (!selected) {
-      focused.current = null
+      follow.current = null
       return
     }
-    if (focused.current === selected) return
+    if (dragging) return
     const marker = markers.find((item) => item.key === selected)
     const viewport = viewportRef.current
-    const stage = stageRef.current
-    if (!marker || !viewport || !stage || sheet.size < 8) return
-    focused.current = selected
-    const k = Math.max(cam.current.k, 3.4)
+    if (!marker || !viewport || sheet.size < 8) return
+    const prev = follow.current
+    const moved =
+      !prev || prev.key !== selected || Math.abs(prev.x - marker.x) > 0.015 || Math.abs(prev.y - marker.y) > 0.015
+    if (!moved) return
+    const first = !prev || prev.key !== selected
+    follow.current = { key: selected, x: marker.x, y: marker.y }
+    const k = first ? Math.max(cam.current.k, 2.4) : cam.current.k
     const px = sheet.left + (marker.x / 100) * sheet.size
     const py = sheet.top + (marker.y / 100) * sheet.size
     commit({
@@ -1228,7 +1247,7 @@ function LiveCanvas({
       x: viewport.clientWidth / 2 - px * k,
       y: viewport.clientHeight / 2 - py * k,
     })
-  }, [markers, selected, sheet])
+  }, [dragging, markers, selected, sheet])
 
   return (
     <div className="fields-map-frame live-frame">
@@ -1445,7 +1464,7 @@ function LiveCanvas({
               const building = marker.role === "building"
               const mark = toMap(markerScreenPx(marker, on))
               const ring = marker.farmColor || (marker.role === "player" ? "#24302c" : "#d7dfda")
-              const showArrow = showsHeading(marker.role, marker.active || marker.occupied, marker.heading, piled && !marker.occupied)
+              const showArrow = showsHeading(marker.role, marker.active || marker.occupied, marker.heading, false)
               const icon = marker.icon && !brokenIcons.has(marker.icon) ? marker.icon : null
               const stateClass = [
                 on ? "is-on" : "",
@@ -1455,16 +1474,13 @@ function LiveCanvas({
                 .filter(Boolean)
                 .join(" ")
               const showCaption = (marker.occupied || marker.kind === "player") && Boolean(marker.label)
-              const captionY = -(mark * 0.86 + toMap(2))
+              const captionY = showArrow ? -(mark * 2.05) : -(mark * 0.95 + toMap(2))
               const countLabel = `+${marker.count ?? 0}`
               const countW = Math.max(1.7, countLabel.length * 0.72 + 0.7)
               return (
                 <g key={marker.key} data-marker={marker.key} className={`live-marker ${stateClass}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g className="live-puck" transform={`scale(${mark})`}>
                     <ellipse className="live-marker-shadow" cx="0" cy="0.28" rx="0.72" ry="0.22" />
-                    {showArrow ? (
-                      <path className="live-beak" transform={`rotate(${rotation})`} d="M-0.2,-0.86 L0,-1.28 L0.2,-0.86 Z" />
-                    ) : null}
                     {building ? (
                       <rect className="live-marker-plate" x="-0.7" y="-0.7" width="1.4" height="1.4" rx="0.34" />
                     ) : (
@@ -1494,7 +1510,13 @@ function LiveCanvas({
                     {marker.occupied ? <circle className="live-marker-driver" r="0.98" /> : null}
                     {marker.occupied ? <circle className="live-marker-halo" r="1.18" /> : null}
                     {on ? <circle className="live-marker-rim" r="0.96" /> : null}
-                    <circle r="1.15" fill="transparent" />
+                    {showArrow ? (
+                      <g className="live-beak" transform={`rotate(${rotation})`}>
+                        <path className="live-beak-stem" d="M0,-0.62 L0,-1.48" />
+                        <path className="live-beak-head" d="M-0.38,-1.12 L0,-1.78 L0.38,-1.12 Z" />
+                      </g>
+                    ) : null}
+                    <circle r="1.2" fill="transparent" />
                   </g>
                   {piled ? (
                     <g className="live-count" transform={`translate(${mark * 0.58} ${-mark * 0.58}) scale(${toMap(11)})`}>

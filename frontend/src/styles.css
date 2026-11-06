@@ -4567,7 +4567,72 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   stroke-width: 0.09;
   animation: live-driver-halo 1.25s ease-in-out infinite;
 }
-.live-marker.is-occupied .live-beak { fill: #e4b84a; }
+.live-inspect-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.live-carousel {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  min-height: 118px;
+  padding: 8px 28px 0;
+}
+.live-carousel-dot {
+  width: 68px;
+  height: 68px;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.22);
+  background: #1c2420;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.28);
+}
+.live-carousel-dot img, .live-carousel-dot .icon { width: 46px; height: 46px; object-fit: contain; }
+.live-carousel-dot.is-main {
+  width: 92px;
+  height: 92px;
+  margin-bottom: 0;
+}
+.live-carousel-dot.is-main img, .live-carousel-dot.is-main .icon { width: 64px; height: 64px; }
+.live-carousel-dot.is-on {
+  border-color: #e4b84a;
+  box-shadow: 0 0 0 4px rgba(228, 184, 74, 0.28), 0 8px 16px rgba(0, 0, 0, 0.28);
+}
+.live-carousel-plus {
+  align-self: center;
+  margin-bottom: 8px;
+  color: #f4f1e8;
+  font-style: normal;
+  font-size: 1.7rem;
+  font-weight: 750;
+  line-height: 1;
+}
+.live-carousel-nav {
+  display: flex;
+  justify-content: space-between;
+  margin: -6px 4px 0;
+}
+.live-carousel-nav button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+.live-carousel-nav button:disabled { opacity: 0.35; }
 .live-marker.is-occupied { filter: drop-shadow(0 0 6px rgba(228, 184, 74, 0.9)); }
 @keyframes live-driver-halo {
   0%, 100% { stroke-opacity: 1; }
@@ -4577,12 +4642,20 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   0%, 100% { stroke-opacity: 0.5; }
   50% { stroke-opacity: 0.12; }
 }
-.live-beak {
+.live-beak-stem {
+  fill: none;
+  stroke: #f7f8f7;
+  stroke-width: 0.18;
+  stroke-linecap: round;
+}
+.live-beak-head {
   fill: #f7f8f7;
   stroke: #12171a;
-  stroke-width: 0.05;
+  stroke-width: 0.06;
   stroke-linejoin: round;
 }
+.live-marker.is-occupied .live-beak-stem { stroke: #e4b84a; }
+.live-marker.is-occupied .live-beak-head { fill: #e4b84a; stroke: #3a2a08; }
 .live-marker .live-marker-rim { stroke: #fff; stroke-width: 0.07; }
 .live-marker.is-idle { opacity: 0.8; }
 .live-marker.is-occupied,
