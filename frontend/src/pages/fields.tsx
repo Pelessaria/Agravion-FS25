@@ -405,22 +405,12 @@ export function FieldsPage() {
           <span>{t("fields.allFarms")}</span>
         </p>
         <p className={harvestGrass > 0 ? "has-note" : undefined}>
-          {harvestGrass > 0 ? (
-            <span className="fields-stat-stack">
-              <span className="fields-stat-head">
-                <Scythe className="fields-stat-icon" />
-                <strong>{harvest.toLocaleString(i18n.language)}</strong>
-                <span>{t("fields.harvest")}</span>
-              </span>
-              <em>{t("fields.harvestGrass", { count: harvestGrass })}</em>
-            </span>
-          ) : (
-            <>
-              <Scythe className="fields-stat-icon" />
-              <strong>{harvest.toLocaleString(i18n.language)}</strong>
-              <span>{t("fields.harvest")}</span>
-            </>
-          )}
+          <Scythe className="fields-stat-icon" />
+          <strong>{harvest.toLocaleString(i18n.language)}</strong>
+          <span>
+            {t("fields.harvest")}
+            {harvestGrass > 0 ? <em>{t("fields.harvestGrass", { count: harvestGrass })}</em> : null}
+          </span>
         </p>
         <p>
           <LandPlot className="fields-stat-icon" aria-hidden="true" />

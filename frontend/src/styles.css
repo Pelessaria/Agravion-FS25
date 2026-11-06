@@ -2725,7 +2725,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-stats {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: baseline;
   gap: 0;
   width: max-content;
   max-width: 100%;
@@ -2762,32 +2762,12 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   font-size: 0.72rem;
   line-height: 1.15;
 }
-/*
- * Icon + Zahl + Label unverändert als Kopfzeile.
- * Subtext darunter, bündig mit den Hauptwerten der anderen Kennzahlen.
- */
-.fields-stats p.has-note .fields-stat-stack {
+/* Icon + Zahl bleiben auf der gemeinsamen Zeile; Subtext hängt darunter. */
+.fields-stats p.has-note > span {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  color: var(--text);
-  font-size: inherit;
-  line-height: inherit;
-}
-.fields-stats p.has-note .fields-stat-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  color: var(--text);
-  font-size: inherit;
-  line-height: inherit;
-  white-space: nowrap;
-}
-.fields-stats p.has-note .fields-stat-head > span {
-  color: var(--text-faint);
-  font-size: 0.72rem;
-  line-height: 1.15;
 }
 .fields-stats p.has-note em {
   font-style: normal;
