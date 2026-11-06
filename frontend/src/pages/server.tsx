@@ -8,6 +8,7 @@ import {
   apiDownloadServerMods,
   apiSaveServerSettings,
   apiServerAction,
+  apiServerRefresh,
   apiServerSnapshot,
   apiSetServerModActive,
   apiUpdateServerMod,
@@ -215,7 +216,7 @@ export function ServerPage() {
     if (!workspace) return
     setLoading(true)
     try {
-      const next = await apiServerSnapshot(workspace.id)
+      const next = await apiServerRefresh(workspace.id)
       setSnapshot(next)
       setSettings(next.settings)
       setError(next.error ?? "")

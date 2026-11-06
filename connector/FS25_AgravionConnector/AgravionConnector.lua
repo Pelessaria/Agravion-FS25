@@ -12,7 +12,7 @@
 
 AgravionConnector = {}
 AgravionConnector.MOD_NAME = "FS25_AgravionConnector"
-AgravionConnector.VERSION = "0.1.26.0"
+AgravionConnector.VERSION = "0.1.27.0"
 AgravionConnector.SCHEMA = "1"
 AgravionConnector.TICK_MS = 5000
 AgravionConnector.HELLO_EVERY_MS = 60000
@@ -903,8 +903,10 @@ function AgravionConnector:vehicleStoreImage(vehicle, filename)
     return nil
 end
 
--- Placeables often have no getImageFilename on a dedicated server. The store
--- picture lives in placeable.storeData.image, next to the XML.
+-- Placeables: never call XMLFile:getValue for storeData.image — Giants still
+-- logs schema errors ("Path not registered" / "Unable to get schema") even
+-- inside pcall, and StorageSnapshot retries every tick. Prefer storeManager /
+-- storeItem like vehicles, then file-name heuristics next to the XML.
 function AgravionConnector:placeableStoreImage(placeable, filename)
     local seeds = {}
     local function add(value)
@@ -912,37 +914,33 @@ function AgravionConnector:placeableStoreImage(placeable, filename)
             table.insert(seeds, tostring(value))
         end
     end
-    local function readXml(xmlFile)
-        if xmlFile == nil or xmlFile.getValue == nil then
-            return
-        end
-        local paths = {
-            "placeable.storeData.image",
-            "placeable.base.storeData.image",
-            "vehicle.storeData.image",
-        }
-        for _, path in ipairs(paths) do
-            local ok, image = pcall(function()
-                return xmlFile:getValue(path)
-            end)
-            if ok then
-                add(image)
-            end
-        end
-    end
-    if placeable ~= nil then
-        readXml(placeable.xmlFile)
-    end
-    if filename ~= nil and filename ~= "" and XMLFile ~= nil and XMLFile.load ~= nil then
-        local ok, xmlFile = pcall(function()
-            return XMLFile.load("avStoreImage", filename)
+    if placeable ~= nil and placeable.getImageFilename ~= nil then
+        local ok, image = pcall(function()
+            return placeable:getImageFilename()
         end)
-        if ok and xmlFile ~= nil then
-            readXml(xmlFile)
-            if xmlFile.delete ~= nil then
-                pcall(function()
-                    xmlFile:delete()
-                end)
+        if ok then
+            add(image)
+        end
+    end
+    if placeable ~= nil and placeable.storeItem ~= nil then
+        local si = placeable.storeItem
+        if si.imageFilename ~= nil then
+            add(si.imageFilename)
+        end
+        if si.imageActive ~= nil then
+            add(si.imageActive)
+        end
+    end
+    if g_storeManager ~= nil and g_storeManager.getItemByXMLFilename ~= nil and filename ~= nil and filename ~= "" then
+        local ok, item = pcall(function()
+            return g_storeManager:getItemByXMLFilename(filename)
+        end)
+        if ok and item ~= nil then
+            if item.imageFilename ~= nil then
+                add(item.imageFilename)
+            end
+            if item.imageActive ~= nil then
+                add(item.imageActive)
             end
         end
     end
@@ -952,7 +950,9 @@ function AgravionConnector:placeableStoreImage(placeable, filename)
         base = string.gsub(base, "%.[Xx][Mm][Ll]$", "")
         if dir ~= nil and dir ~= "" then
             add(dir .. "/store_" .. base .. ".dds")
+            add(dir .. "/store_" .. base .. ".png")
             add(dir .. "/" .. base .. ".dds")
+            add(dir .. "/" .. base .. ".png")
         end
     end
     local normalized = {}

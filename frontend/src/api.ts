@@ -536,6 +536,14 @@ export async function apiServerSnapshot(workspaceId: string): Promise<ServerSnap
   return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server`)
 }
 
+/** Live re-list from FTP + dedicated-server UI (invalidates the mods_list cache). */
+export async function apiServerRefresh(workspaceId: string): Promise<ServerSnapshot> {
+  return apiFetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/server/refresh`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  })
+}
+
 export async function apiSaveServerLogin(
   workspaceId: string,
   body: { username: string; password?: string; keepPassword: boolean },

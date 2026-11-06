@@ -39,11 +39,14 @@ final class DedicatedServerConsole
             'pending' => false,
         ];
 
+        $ftpOk = false;
         try {
             $result['mods'] = $this->ftpMods($workspace);
+            $ftpOk = true;
         } catch (Throwable) {
             try {
                 $result['mods'] = $this->ftpMods($workspace);
+                $ftpOk = true;
             } catch (Throwable) {
                 $result['error'] = 'Dateizugang fehlgeschlagen.';
             }
@@ -60,7 +63,7 @@ final class DedicatedServerConsole
                 $result['running'] = $home['running'];
                 $result['statusAt'] = microtime(true);
                 $result['actions'] = $this->publicActions($pages);
-                $result['mods'] = $this->mergeMods($result['mods'], $pages);
+                $result['mods'] = $this->mergeMods($result['mods'], $pages, $ftpOk);
                 $result['settings'] = $this->publicSettings($pages);
                 $result['log'] = $this->readLog($client, $base, $pages, $workspace);
             } catch (RuntimeException $e) {
@@ -108,6 +111,9 @@ final class DedicatedServerConsole
      */
     public function refresh(Workspace $workspace): array
     {
+        // Always re-list mods on FTP after mutations / manual reload — the 15‑min
+        // mods_list cache otherwise keeps deleted zips visible in the UI.
+        $this->clearModListCache($workspace);
         $result = $this->snapshot($workspace);
         $result['at'] = now()->toIso8601String();
         $result['pending'] = false;
@@ -267,6 +273,8 @@ final class DedicatedServerConsole
         if ($workspace->consoleConfigured()) {
             try {
                 if ($this->uploadViaWeb($workspace, $name, $bytes)) {
+                    $this->clearModListCache($workspace);
+
                     return ['ok' => true, 'via' => 'web'];
                 }
             } catch (Throwable) {
@@ -274,8 +282,43 @@ final class DedicatedServerConsole
             }
         }
         $this->writeFtp($workspace, $name, $bytes);
+        $this->clearModListCache($workspace);
 
         return ['ok' => true, 'via' => 'ftp'];
+    }
+
+    /**
+     * Full dedicated-server log.txt via host file access (not the 120 KB UI tail).
+     *
+     * @return array{name: string, text: string, bytes: int, truncated: bool}
+     */
+    public function fullLog(Workspace $workspace, int $maxBytes = 8_000_000): array
+    {
+        $workspace->loadMissing('hostAccess');
+        $access = $workspace->hostAccess;
+        if ($access === null) {
+            throw new RuntimeException('Dateizugang fehlt für das komplette Log.');
+        }
+        $client = new HostFileClient($access);
+        foreach ($this->logCandidates($access) as $path) {
+            if (! $client->fileExists($path)) {
+                continue;
+            }
+            $size = $client->fileSize($path);
+            $truncated = $size > $maxBytes;
+            $text = $truncated
+                ? $client->readRange($path, max(0, $size - $maxBytes), $maxBytes)
+                : $client->read($path);
+
+            return [
+                'name' => basename($path),
+                'text' => $text,
+                'bytes' => $size,
+                'truncated' => $truncated,
+            ];
+        }
+
+        throw new RuntimeException('log.txt wurde auf dem Host nicht gefunden.');
     }
 
     /**
@@ -411,6 +454,7 @@ final class DedicatedServerConsole
         foreach ($files as $name) {
             $filesClient->delete($this->modPath($filesClient, $access, $name));
         }
+        $this->clearModListCache($workspace);
 
         return ['ok' => true, 'deleted' => count($files)];
     }
@@ -1797,7 +1841,7 @@ final class DedicatedServerConsole
      * @param  list<array<string, mixed>>  $pages
      * @return list<array<string, mixed>>
      */
-    private function mergeMods(array $ftp, array $pages): array
+    private function mergeMods(array $ftp, array $pages, bool $ftpOk = false): array
     {
         $byName = [];
         foreach ($ftp as $mod) {
@@ -1806,17 +1850,27 @@ final class DedicatedServerConsole
         foreach ($pages as $page) {
             foreach ($page['modRows'] as $row) {
                 $key = strtolower($row['name']);
-                $current = $byName[$key] ?? [
-                    'name' => $row['name'],
-                    'bytes' => null,
-                    'active' => null,
-                    'source' => 'web',
-                    'download' => $row['download'] !== null,
-                ];
+                // When FTP listed successfully, it is authoritative for which zips
+                // still exist — do not resurrect deleted mods from the web UI.
+                if (! isset($byName[$key])) {
+                    if ($ftpOk) {
+                        continue;
+                    }
+                    $byName[$key] = [
+                        'name' => $row['name'],
+                        'bytes' => null,
+                        'active' => null,
+                        'source' => 'web',
+                        'download' => $row['download'] !== null,
+                    ];
+                }
+                $current = $byName[$key];
                 if ($row['active'] !== null) {
                     $current['active'] = $row['active'];
                 }
-                $current['source'] = isset($byName[$key]) ? 'both' : 'web';
+                if (($current['source'] ?? '') === 'ftp' || ($current['source'] ?? '') === 'both') {
+                    $current['source'] = 'both';
+                }
                 $current['download'] = ($current['download'] ?? false) || $row['download'] !== null;
                 $byName[$key] = $current;
             }
@@ -2181,6 +2235,14 @@ final class DedicatedServerConsole
             mkdir(dirname($path), 0775, true);
         }
         file_put_contents($path, json_encode(array_values($mods), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function clearModListCache(Workspace $workspace): void
+    {
+        $path = dirname($this->cachePath($workspace)).'/mods_list.json';
+        if (is_file($path)) {
+            @unlink($path);
+        }
     }
 
     /**

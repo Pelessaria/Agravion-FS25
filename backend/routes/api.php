@@ -44,6 +44,8 @@ Route::middleware('auth:web')->group(function () {
     Route::delete('/workspaces/{workspace}/host-access', [WorkspaceController::class, 'deleteHostAccess']);
     Route::post('/workspaces/{workspace}/savegames/select', [WorkspaceController::class, 'selectSavegame']);
     Route::get('/workspaces/{workspace}/server', [ServerConsoleController::class, 'show']);
+    Route::post('/workspaces/{workspace}/server/refresh', [ServerConsoleController::class, 'refresh']);
+    Route::get('/workspaces/{workspace}/server/log', [ServerConsoleController::class, 'log']);
     Route::put('/workspaces/{workspace}/server/login', [ServerConsoleController::class, 'saveLogin']);
     Route::post('/workspaces/{workspace}/server/action', [ServerConsoleController::class, 'action']);
     Route::post('/workspaces/{workspace}/server/settings', [ServerConsoleController::class, 'settings']);

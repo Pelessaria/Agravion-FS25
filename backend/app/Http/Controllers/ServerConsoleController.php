@@ -36,6 +36,46 @@ class ServerConsoleController extends Controller
         return response()->json($payload);
     }
 
+    public function refresh(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): JsonResponse
+    {
+        $row = $this->workspace($workspace);
+        $this->requireServer($request, $row, $grants, 'any');
+        $payload = $console->refresh($row);
+        $caps = $grants->serverFlagsFor($request->user(), $row);
+        if (! $caps['mods']) {
+            $payload['mods'] = [];
+        }
+        if (! $caps['log']) {
+            $payload['log'] = null;
+        }
+        if (! $caps['control']) {
+            $payload['actions'] = [];
+            $payload['settings'] = [];
+        }
+
+        return response()->json($payload);
+    }
+
+    public function log(Request $request, string $workspace, DedicatedServerConsole $console, ModuleGrantService $grants): Response
+    {
+        $row = $this->workspace($workspace);
+        $this->requireServer($request, $row, $grants, 'log');
+        try {
+            $file = $console->fullLog($row);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        } catch (Throwable) {
+            return response()->json(['error' => 'Log konnte nicht gelesen werden.'], 422);
+        }
+
+        return response($file['text'], 200, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Content-Disposition' => 'inline; filename="'.$file['name'].'"',
+            'X-Log-Bytes' => (string) $file['bytes'],
+            'X-Log-Truncated' => $file['truncated'] ? '1' : '0',
+        ]);
+    }
+
     public function saveLogin(Request $request, string $workspace, DedicatedServerConsole $console): JsonResponse
     {
         $this->requireAdmin($request);
