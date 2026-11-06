@@ -77,7 +77,7 @@ const GROUND_COLOR: Record<number, string> = {
 
 const NEUTRAL = "#5c6560"
 const UNOWNED = "#3c4742"
-const OWNER_COLORS = ["#4caf50", "#7aa2ff", "#e0a15a", "#c6e88a", "#d98ad4", "#5ec8c8", "#e6c23a", "#ff8f7a"]
+const OWNER_COLORS = ["#a52e35", "#7aa2ff", "#e0a15a", "#d4787e", "#d98ad4", "#5ec8c8", "#e6c23a", "#ff8f7a"]
 
 export function ownerColor(farmId: number | null, owned: boolean | null): string {
   if (owned === false || farmId == null || farmId <= 0) return UNOWNED

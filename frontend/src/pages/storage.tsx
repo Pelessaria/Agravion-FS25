@@ -12,7 +12,7 @@ import type { FieldsResponse } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
 
 const PEEK_ZOOM = 18
-const COLORS = ["#c6e88a", "#7ec8f0", "#e4b84a", "#e39ad8", "#f0a07a", "#8fd0c4", "#f2d27a", "#9bb7e8", "#f0c2b0", "#b7d48a"]
+const COLORS = ["#c45c63", "#7ec8f0", "#e4b84a", "#e39ad8", "#f0a07a", "#8fd0c4", "#f2d27a", "#9bb7e8", "#f0c2b0", "#d4787e"]
 
 const DEMO: StorageResponse = {
   ok: true,
