@@ -1776,12 +1776,17 @@ local function fieldGroundRatio(points)
     if span < 1 then
         return nil
     end
-    local step = math.max(8, span / 16)
+    -- Cover the whole outline. A cap that stops early only sees one corner
+    -- and misses a farm built on the far edge.
+    local step = math.max(10, span / 8)
+    while ((maxX - minX) / step) * ((maxZ - minZ) / step) > 80 and step < span do
+        step = step * 1.25
+    end
     local yes, checked, unknown = 0, 0, 0
     local z = minZ + step * 0.5
-    while z < maxZ and checked + unknown < 48 do
+    while z < maxZ do
         local x = minX + step * 0.5
-        while x < maxX and checked + unknown < 48 do
+        while x < maxX do
             if pointInside(points, x, z) then
                 local on = onFieldGround(x, z)
                 if on == nil then
