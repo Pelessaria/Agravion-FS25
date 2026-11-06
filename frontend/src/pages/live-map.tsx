@@ -1081,21 +1081,39 @@ function markerScreenPx(marker: Marker, on: boolean) {
   return on ? 22 : 18
 }
 
+const captionMeasure = document.createElement("canvas").getContext("2d")
+
+function captionWidth(label: string) {
+  if (!captionMeasure) return label.length * 0.5
+  captionMeasure.font = '600 100px "IBM Plex Sans", "Segoe UI", sans-serif'
+  return (captionMeasure.measureText(label).width / 100) * 0.92
+}
+
 function PlayerChip({ label }: { label: string }) {
-  const pad = 0.46
-  const icon = 1.2
+  const pad = 0.4
+  const iconBox = 0.92
+  const gap = 0.18
+  const bar = 0.2
   const h = 1.7
-  const textW = Math.max(label.length * 0.58, 1.3)
-  const w = pad + icon + textW + pad
+  const textW = Math.max(captionWidth(label) + 0.08, 1.1)
+  const w = pad + iconBox + gap + bar + gap + textW + pad
+  const left = -w / 2
+  const midY = -h / 2
+  const iconX = left + pad + iconBox / 2
+  const barX = left + pad + iconBox + gap + bar / 2
+  const textX = barX + bar / 2 + gap
   return (
     <>
-      <rect className="live-caption-bg" x={-w / 2} y={-h} width={w} height={h} rx={0.42} />
+      <rect className="live-caption-bg" x={left} y={-h} width={w} height={h} rx={0.42} />
       <path className="live-caption-caret" d="M-0.26,0 L0.26,0 L0,0.28 Z" />
-      <g className="live-caption-user" transform={`translate(${-w / 2 + pad + 0.5} ${-h / 2})`}>
+      <g className="live-caption-user" transform={`translate(${iconX} ${midY})`}>
         <circle cy="-0.24" r="0.22" />
         <path d="M-0.44,0.46 C-0.4,0.02 -0.18,-0.1 0,-0.1 C0.18,-0.1 0.4,0.02 0.44,0.46 Z" />
       </g>
-      <text x={-w / 2 + pad + icon} y={-h / 2 + 0.34} textAnchor="start">
+      <text x={barX} y={midY + 0.32} textAnchor="middle">
+        |
+      </text>
+      <text x={textX} y={midY + 0.34} textAnchor="start">
         {label}
       </text>
     </>
