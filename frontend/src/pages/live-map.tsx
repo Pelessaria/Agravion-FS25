@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { Boxes, ChevronLeft, ChevronRight, LandPlot, Loader2, Minus, Plus, Search, Tractor, Truck, UserRound, Warehouse, Wheat, Wrench } from "lucide-react"
@@ -1090,12 +1090,28 @@ function captionWidth(label: string) {
 }
 
 function PlayerChip({ label }: { label: string }) {
+  const textRef = useRef<SVGTextElement>(null)
+  const [textW, setTextW] = useState(() => captionWidth(label))
+  useLayoutEffect(() => {
+    const fit = () => {
+      const width = textRef.current?.getBBox().width ?? 0
+      if (width <= 0) return
+      setTextW((prev) => (Math.abs(prev - width) < 0.04 ? prev : width))
+    }
+    fit()
+    let alive = true
+    void document.fonts?.ready.then(() => {
+      if (alive) fit()
+    })
+    return () => {
+      alive = false
+    }
+  }, [label])
   const pad = 0.4
   const iconBox = 0.92
-  const gap = 0.18
-  const bar = 0.2
+  const gap = 0.16
+  const bar = 0.18
   const h = 1.7
-  const textW = Math.max(captionWidth(label) + 0.08, 1.1)
   const w = pad + iconBox + gap + bar + gap + textW + pad
   const left = -w / 2
   const midY = -h / 2
@@ -1113,7 +1129,7 @@ function PlayerChip({ label }: { label: string }) {
       <text x={barX} y={midY + 0.32} textAnchor="middle">
         |
       </text>
-      <text x={textX} y={midY + 0.34} textAnchor="start">
+      <text ref={textRef} x={textX} y={midY + 0.34} textAnchor="start">
         {label}
       </text>
     </>
