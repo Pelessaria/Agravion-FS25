@@ -2723,6 +2723,14 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-mast-top .faint,
 .fields-mast-top p { margin: 0; }
 .fields-stats {
+  --fields-stat-label: 0.72rem;
+  --fields-stat-label-lh: 1.15;
+  --fields-stat-stack-gap: 2px;
+  --fields-stat-rail: calc(
+    (var(--fields-stat-label) * var(--fields-stat-label-lh)) +
+    var(--fields-stat-stack-gap) +
+    1.45rem
+  );
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -2731,6 +2739,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   max-width: 100%;
 }
 .fields-stats p {
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -2759,13 +2768,14 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-stats strong.warn { color: var(--warning); }
 .fields-stats > p > span {
   color: var(--text-faint);
-  font-size: 0.72rem;
-  line-height: 1.15;
+  font-size: var(--fields-stat-label);
+  line-height: var(--fields-stat-label-lh);
 }
 /*
  * Icon + Zahl bleiben auf der gemeinsamen Zeile.
  * Rechts daneben: „Erntebereit“ über „davon …“;
  * „davon …“ sitzt auf Höhe der Labels (Felder, Im Besitz, …).
+ * Icons + Pipes werden so hoch wie beide Textzeilen.
  */
 .fields-stats p.has-note > span {
   position: relative;
@@ -2775,22 +2785,39 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 .fields-stats p.has-note > span > span {
   position: absolute;
   left: 0;
-  bottom: calc(100% + 2px);
+  bottom: calc(100% + var(--fields-stat-stack-gap));
   color: var(--text-faint);
-  font-size: 0.72rem;
-  line-height: 1.15;
+  font-size: var(--fields-stat-label);
+  line-height: var(--fields-stat-label-lh);
   white-space: nowrap;
 }
 .fields-stats p.has-note em {
   display: block;
   font-style: normal;
   color: var(--text-muted);
-  font-size: 0.72rem;
-  line-height: 1.15;
+  font-size: var(--fields-stat-label);
+  line-height: var(--fields-stat-label-lh);
   white-space: nowrap;
 }
 .fields-stats:has(.has-note) {
-  padding-top: calc(0.72rem + 4px);
+  padding-top: calc((var(--fields-stat-label) * var(--fields-stat-label-lh)) + var(--fields-stat-stack-gap));
+}
+.fields-stats:has(.has-note) .fields-stat-icon {
+  width: 18px;
+  height: var(--fields-stat-rail);
+  transform: translateY(calc(-1 * (var(--fields-stat-label) * var(--fields-stat-label-lh) + var(--fields-stat-stack-gap))));
+}
+.fields-stats:has(.has-note) p + p {
+  box-shadow: none;
+}
+.fields-stats:has(.has-note) p + p::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: calc(-1 * ((var(--fields-stat-label) * var(--fields-stat-label-lh)) + var(--fields-stat-stack-gap)));
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .fields-layout {
   display: block;
