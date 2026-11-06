@@ -15,7 +15,7 @@ import {
 import { VehicleGauges } from "../components/equip-gauge"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { cropIcon } from "../crop-icons"
-import { cropColor, projectPoint, effectiveMapSize, frameFromContentBox, measureMapContent, terrainFrame, type MapFrame } from "../field-format"
+import { cropColor, fieldOutlinePath, projectPoint, effectiveMapSize, frameFromContentBox, measureMapContent, terrainFrame, type MapFrame } from "../field-format"
 import { clampCamera, readMapView, sheetFor, writeMapView, type MapCamera } from "../map-camera"
 import { useStore } from "../store"
 import type { FieldsResponse, Vehicle } from "../types"
@@ -468,7 +468,7 @@ export function LiveMapPage() {
     const rows = fields?.fields ?? []
     const next: {
       id: number
-      points: string
+      path: string
       x: number
       y: number
       color: string
@@ -487,11 +487,23 @@ export function LiveMapPage() {
           return `${point.x.toFixed(2)},${point.y.toFixed(2)}`
         })
         .join(" ")
+      const holes = (field.holes ?? [])
+        .map((ring) =>
+          ring
+            .map(([x, z]) => {
+              const point = projectPoint(x, z, frame)
+              return `${point.x.toFixed(2)},${point.y.toFixed(2)}`
+            })
+            .join(" "),
+        )
+        .filter((ring) => ring.split(" ").length >= 3)
+      const label =
+        field.labelX != null && field.labelZ != null ? projectPoint(field.labelX, field.labelZ, frame) : null
       next.push({
         id: field.id,
-        points,
-        x: sumX / field.points.length,
-        y: sumY / field.points.length,
+        path: fieldOutlinePath(points, holes),
+        x: label?.x ?? sumX / field.points.length,
+        y: label?.y ?? sumY / field.points.length,
         color: cropColor(field),
         fruitName: field.fruitName,
         iconUrl: field.iconUrl,
@@ -1169,7 +1181,7 @@ function LiveCanvas({
   frame: MapFrame
   shapes: {
     id: number
-    points: string
+    path: string
     x: number
     y: number
     color: string
@@ -1608,9 +1620,10 @@ function LiveCanvas({
                   const fruitIcon = showCrops ? game ?? pack : null
                   return (
                     <g key={`shape-${shape.id}`}>
-                      <polygon
+                      <path
                         className={showCrops ? "live-field is-crop" : "live-field"}
-                        points={shape.points}
+                        d={shape.path}
+                        fillRule="evenodd"
                         style={showCrops ? { fill: withAlpha(shape.color, 0.42) } : undefined}
                       />
                       {showFields ? (

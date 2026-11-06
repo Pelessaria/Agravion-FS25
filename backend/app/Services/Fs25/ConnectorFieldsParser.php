@@ -51,6 +51,7 @@ final class ConnectorFieldsParser
                 'labelZ' => $geo['labelZ'] ?? null,
                 'areaHa' => $row['areaHa'] ?? $geo['areaHa'] ?? null,
                 'points' => is_array($points) ? $points : [],
+                'holes' => is_array($geo['holes'] ?? null) ? $geo['holes'] : [],
                 'group' => $geo['group'] ?? null,
                 'farmId' => $row['farmId'] ?? null,
                 'farmlandId' => $row['farmlandId'] ?? null,
@@ -146,6 +147,7 @@ final class ConnectorFieldsParser
                 'labelZ' => self::floatAttr($blob, 'lz'),
                 'areaHa' => self::floatAttr($blob, 'areaHa'),
                 'points' => self::points(self::attr($blob, 'points')),
+                'holes' => self::rings(self::attr($blob, 'holes')),
                 'group' => self::idList(self::attr($blob, 'group')),
                 'farmId' => self::positiveInt(self::intAttr($blob, 'farmId')),
                 'farmlandId' => self::positiveInt(self::intAttr($blob, 'farmlandId')),
@@ -207,6 +209,26 @@ final class ConnectorFieldsParser
         }
 
         return $points;
+    }
+
+    /**
+     * @return list<list<array{0: float, 1: float}>>
+     */
+    private static function rings(?string $raw): array
+    {
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        $rings = [];
+        foreach (explode(';', $raw) as $ring) {
+            $points = self::points($ring);
+            if (count($points) >= 3) {
+                $rings[] = $points;
+            }
+        }
+
+        return $rings;
     }
 
     private static function root(string $xml, string $name): ?string

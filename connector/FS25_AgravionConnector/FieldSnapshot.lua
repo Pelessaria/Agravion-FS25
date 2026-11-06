@@ -4,11 +4,13 @@
   Geometry (polygon outlines) is collected once per field set and written to
   state/fields_geometry.xml. Joined-field groups are measured again whenever
   field state is written, because plowing between parcels changes the join
-  without moving the outlines. Farmlands hidden from the buy screen and not
+  without moving the outlines.   Farmlands hidden from the buy screen and not
   owned by a player farm are omitted: maps use those for mission and scenery
-  ground, and their polygons are not fields the player can buy. A parcel whose
-  ground was built over (a farm expansion) keeps its map outline; it is omitted
-  once almost none of that outline is still field ground.
+  ground, and their polygons are not fields the player can buy. A parcel that
+  was built over keeps only the ground that is still a field: the outline is
+  traced from the field density map, and a building inside the parcel is sent
+  as a hole. The map polygon stays in memory so a later demolition can grow
+  the outline back. The field is omitted only when no field ground remains.
   Crop / ground / Precision Farming state is swept
   in small batches and written about once a minute to state/fields_state.xml.
 
@@ -513,6 +515,8 @@ local function collectGeometry(field, id)
         areaHa = round(area, 2),
         points = pointString(outline),
         raw = outline,
+        -- Original map outline. Later clips replace raw, never this.
+        source = outline,
     }
 end
 
@@ -1745,8 +1749,8 @@ local function onFieldGround(x, z)
     return isOnField == true
 end
 
--- The map outline does not shrink when a placeable paints over a field.
--- Sample the interior and drop the parcel when the ground is gone.
+-- Share of the original outline that is still field ground.
+-- nil means the density map could not be read, so the outline stays as it is.
 local function fieldGroundRatio(points)
     if type(points) ~= "table" or #points < 3 then
         return nil
@@ -1768,15 +1772,17 @@ local function fieldGroundRatio(points)
     if span < 1 then
         return nil
     end
-    local step = math.max(14, span / 4)
-    local yes, checked = 0, 0
+    local step = math.max(8, span / 16)
+    local yes, checked, unknown = 0, 0, 0
     local z = minZ + step * 0.5
-    while z < maxZ and checked < 16 do
+    while z < maxZ and checked + unknown < 96 do
         local x = minX + step * 0.5
-        while x < maxX and checked < 16 do
+        while x < maxX and checked + unknown < 96 do
             if pointInside(points, x, z) then
                 local on = onFieldGround(x, z)
-                if on ~= nil then
+                if on == nil then
+                    unknown = unknown + 1
+                else
                     checked = checked + 1
                     if on == true then
                         yes = yes + 1
@@ -1787,18 +1793,371 @@ local function fieldGroundRatio(points)
         end
         z = z + step
     end
-    if checked < 6 then
+    if checked < 8 or unknown > checked then
         return nil
     end
     return yes / checked
 end
 
-local function fieldBuiltOver(points)
-    local ratio = fieldGroundRatio(points)
-    if ratio == nil then
+local function signedArea(points)
+    local sum = 0
+    local count = #points
+    local i = 1
+    while i <= count do
+        local p1 = points[i]
+        local p2 = points[(i % count) + 1]
+        sum = sum + (p1.x * p2.z - p2.x * p1.z)
+        i = i + 1
+    end
+    return sum * 0.5
+end
+
+local function smoothLoop(loop, step)
+    if loop == nil or #loop < 3 then
+        return nil
+    end
+    local outline = simplifyClosed(loop, step * 0.85)
+    if #outline > 140 then
+        outline = simplify(outline)
+    end
+    if outline == nil or #outline < 3 then
+        return nil
+    end
+    return outline
+end
+
+-- Walk the cells of the original outline that are still field ground.
+-- Returns nil when a sample could not be read, false when nothing is left,
+-- or { outer = points, holes = { points, ... }, area = sqm }.
+local function traceFieldOutline(polygon)
+    if polygon == nil or #polygon < 3 then
+        return nil
+    end
+    local minX, maxX, minZ, maxZ = 1e12, -1e12, 1e12, -1e12
+    local n = 1
+    while n <= #polygon do
+        local point = polygon[n]
+        if point.x < minX then minX = point.x end
+        if point.x > maxX then maxX = point.x end
+        if point.z < minZ then minZ = point.z end
+        if point.z > maxZ then maxZ = point.z end
+        n = n + 1
+    end
+    local span = math.max(maxX - minX, maxZ - minZ)
+    if span < 1 then
+        return nil
+    end
+    local step = math.max(6, span / 48)
+    local nx = math.ceil((maxX - minX) / step)
+    local nz = math.ceil((maxZ - minZ) / step)
+    while nx * nz > 1400 and step < span do
+        step = step * 1.2
+        nx = math.ceil((maxX - minX) / step)
+        nz = math.ceil((maxZ - minZ) / step)
+    end
+    if nx < 2 or nz < 2 then
+        return nil
+    end
+
+    local known = {}
+    local function cell(i, j)
+        if i < 0 or j < 0 or i >= nx or j >= nz then
+            return false
+        end
+        local key = i * 10000 + j
+        local cached = known[key]
+        if cached ~= nil then
+            if cached == "nil" then
+                return nil
+            end
+            return cached
+        end
+        local x = minX + (i + 0.5) * step
+        local z = minZ + (j + 0.5) * step
+        local value = false
+        if pointInside(polygon, x, z) then
+            value = onFieldGround(x, z)
+            if value == nil then
+                known[key] = "nil"
+                return nil
+            end
+        end
+        known[key] = value == true
+        return value == true
+    end
+
+    local edges = {}
+    local function addEdge(i0, j0, i1, j1)
+        local key = i0 .. ":" .. j0
+        local list = edges[key]
+        if list == nil then
+            list = {}
+            edges[key] = list
+        end
+        list[#list + 1] = i1 .. ":" .. j1
+    end
+
+    local fieldCells = 0
+    local j = 0
+    while j < nz do
+        local i = 0
+        while i < nx do
+            local here = cell(i, j)
+            if here == nil then
+                return nil
+            end
+            if here then
+                fieldCells = fieldCells + 1
+                local south = cell(i, j - 1)
+                local east = cell(i + 1, j)
+                local north = cell(i, j + 1)
+                local west = cell(i - 1, j)
+                if south == nil or east == nil or north == nil or west == nil then
+                    return nil
+                end
+                if not south then addEdge(i, j, i + 1, j) end
+                if not east then addEdge(i + 1, j, i + 1, j + 1) end
+                if not north then addEdge(i + 1, j + 1, i, j + 1) end
+                if not west then addEdge(i, j + 1, i, j) end
+            end
+            i = i + 1
+        end
+        j = j + 1
+    end
+    if fieldCells == 0 then
         return false
     end
-    return ratio < 0.2
+
+    local function cornerPoint(key)
+        local colon = string.find(key, ":", 1, true)
+        if colon == nil then
+            return nil
+        end
+        local ci = tonumber(string.sub(key, 1, colon - 1))
+        local cj = tonumber(string.sub(key, colon + 1))
+        if ci == nil or cj == nil then
+            return nil
+        end
+        return { x = minX + ci * step, z = minZ + cj * step }
+    end
+
+    local loops = {}
+    for start, list in pairs(edges) do
+        while list ~= nil and #list > 0 do
+            local loop = {}
+            local cursor = start
+            local closed = false
+            local guard = 0
+            while cursor ~= nil and guard < 8000 do
+                guard = guard + 1
+                local pending = edges[cursor]
+                if pending == nil or #pending == 0 then
+                    break
+                end
+                local nxt = pending[#pending]
+                pending[#pending] = nil
+                local point = cornerPoint(cursor)
+                if point ~= nil then
+                    loop[#loop + 1] = point
+                end
+                if nxt == start then
+                    closed = true
+                    break
+                end
+                cursor = nxt
+            end
+            if closed and #loop >= 3 then
+                loops[#loops + 1] = loop
+            end
+        end
+    end
+    if #loops == 0 then
+        return nil
+    end
+
+    local outer = nil
+    local outerArea = 0
+    local flipped = false
+    for _, loop in ipairs(loops) do
+        local area = signedArea(loop)
+        if area > outerArea then
+            outerArea = area
+            outer = loop
+        end
+    end
+    if outer == nil then
+        flipped = true
+        for _, loop in ipairs(loops) do
+            local area = -signedArea(loop)
+            if area > outerArea then
+                outerArea = area
+                outer = loop
+            end
+        end
+    end
+    local rawOuter = outer
+    outer = smoothLoop(rawOuter, step)
+    if outer == nil then
+        return nil
+    end
+
+    -- Extra rings are holes (a building inside the field) or a second
+    -- remaining piece. Even-odd fill punches holes and keeps islands.
+    local holes = {}
+    local minHole = step * step * 2.5
+    local area = polygonArea(outer) or 0
+    for _, loop in ipairs(loops) do
+        if loop ~= rawOuter then
+            local loopArea = signedArea(loop)
+            if math.abs(loopArea) >= minHole then
+                local ring = smoothLoop(loop, step)
+                if ring ~= nil then
+                    local isHole = (not flipped and loopArea < 0) or (flipped and loopArea > 0)
+                    local keep = true
+                    if isHole then
+                        local cx, cz = centroid(ring)
+                        keep = cx ~= nil and pointInside(outer, cx, cz)
+                    end
+                    if keep then
+                        local ringArea = polygonArea(ring) or 0
+                        holes[#holes + 1] = { ring = ring, area = ringArea, hole = isHole }
+                        if isHole then
+                            area = area - ringArea
+                        else
+                            area = area + ringArea
+                        end
+                    end
+                end
+            end
+        end
+    end
+    table.sort(holes, function(a, b)
+        return a.area > b.area
+    end)
+    while #holes > 6 do
+        local dropped = holes[#holes]
+        holes[#holes] = nil
+        if dropped.hole then
+            area = area + dropped.area
+        else
+            area = area - dropped.area
+        end
+    end
+    local rings = {}
+    for _, entry in ipairs(holes) do
+        rings[#rings + 1] = entry.ring
+    end
+    holes = rings
+    if area < step * step then
+        return false
+    end
+    return { outer = outer, holes = holes, area = area }
+end
+
+local function restoreOutline(row)
+    local source = row.source
+    if type(source) ~= "table" or #source < 3 then
+        return
+    end
+    row.raw = source
+    row.points = pointString(source)
+    row.holes = nil
+    row.removed = nil
+    row.clipped = nil
+    local area = polygonArea(source)
+    if area ~= nil then
+        row.areaHa = round(area / 10000, 2)
+    end
+    local cx, cz = centroid(source)
+    if cx ~= nil then
+        row.cx = round(cx, 1)
+        row.cz = round(cz, 1)
+    end
+end
+
+-- Replace the drawn outline with the ground that is still a field.
+-- row.source stays the map polygon, so a demolished building can come back.
+local function fitOutlineToGround(row)
+    if row == nil then
+        return
+    end
+    if type(row.source) ~= "table" or #row.source < 3 then
+        if type(row.raw) == "table" and #row.raw >= 3 then
+            row.source = row.raw
+        else
+            return
+        end
+    end
+    local ratio = fieldGroundRatio(row.source)
+    if ratio == nil then
+        return
+    end
+    -- A couple of missed samples is a road or a cell on the boundary.
+    -- Only a clear gap is worth replacing the smooth map outline.
+    if ratio >= 0.97 then
+        if row.clipped == "1" or row.removed == "1" or (row.holes ~= nil and row.holes ~= "") then
+            restoreOutline(row)
+        end
+        row.fitRatio = ratio
+        return
+    end
+    if row.fitRatio ~= nil and math.abs(ratio - row.fitRatio) < 0.04 then
+        return
+    end
+    local traced = traceFieldOutline(row.source)
+    if traced == nil then
+        return
+    end
+    row.fitRatio = ratio
+    if traced == false then
+        row.removed = "1"
+        row.clipped = nil
+        row.holes = nil
+        if row.clipLogged ~= true then
+            row.clipLogged = true
+            log(string.format("field %s has no field ground left", tostring(row.id)))
+        end
+        return
+    end
+    local sourceArea = polygonArea(row.source)
+    if #traced.holes == 0 and sourceArea ~= nil and traced.area >= sourceArea * 0.98 then
+        if row.clipped == "1" or row.removed == "1" then
+            restoreOutline(row)
+        end
+        return
+    end
+    row.raw = traced.outer
+    row.points = pointString(traced.outer)
+    row.removed = nil
+    row.clipped = "1"
+    local holeText = {}
+    for _, hole in ipairs(traced.holes) do
+        local text = pointString(hole)
+        if text ~= nil then
+            holeText[#holeText + 1] = text
+        end
+    end
+    row.holes = #holeText > 0 and table.concat(holeText, ";") or nil
+    row.areaHa = round(traced.area / 10000, 2)
+    local cx, cz = centroid(traced.outer)
+    if cx ~= nil then
+        row.cx = round(cx, 1)
+        row.cz = round(cz, 1)
+        if row.lx == nil or row.lz == nil or not pointInside(traced.outer, row.lx, row.lz) then
+            row.lx = row.cx
+            row.lz = row.cz
+        end
+    end
+    if row.clipLogged ~= true then
+        row.clipLogged = true
+        log(string.format(
+            "field %s outline clipped points=%s holes=%s areaHa=%s",
+            tostring(row.id),
+            tostring(#traced.outer),
+            tostring(#traced.holes),
+            tostring(row.areaHa)
+        ))
+    end
 end
 
 -- The nearest corners of two parcels often sit in a road. The shared edge
@@ -2051,7 +2410,7 @@ local function writeGeometry(connector, ids, records)
         local row = records[id]
         if row ~= nil and row.removed ~= "1" then
             lines[#lines + 1] = string.format(
-                "<field%s%s%s%s%s%s%s%s />",
+                "<field%s%s%s%s%s%s%s%s%s />",
                 attr(connector, "id", row.id),
                 attr(connector, "cx", row.cx),
                 attr(connector, "cz", row.cz),
@@ -2059,6 +2418,7 @@ local function writeGeometry(connector, ids, records)
                 attr(connector, "lz", row.lz),
                 attr(connector, "areaHa", row.areaHa),
                 attr(connector, "group", row.group),
+                attr(connector, "holes", row.holes),
                 attr(connector, "points", row.points)
             )
         end
@@ -2236,7 +2596,7 @@ local function geometryFingerprint(connector, ids, records)
     for _, id in ipairs(ids) do
         local row = records[id]
         if row ~= nil then
-            parts[#parts + 1] = tostring(row.id) .. ":" .. tostring(row.lx) .. "," .. tostring(row.lz) .. ":" .. tostring(row.group or "") .. ":" .. tostring(row.removed or "") .. ":" .. tostring(row.points or "")
+            parts[#parts + 1] = tostring(row.id) .. ":" .. tostring(row.lx) .. "," .. tostring(row.lz) .. ":" .. tostring(row.group or "") .. ":" .. tostring(row.removed or "") .. ":" .. tostring(row.points or "") .. ":" .. tostring(row.holes or "")
         end
     end
     return table.concat(parts, "|") .. "#" .. mapFrameAttrs(connector)
@@ -2279,9 +2639,7 @@ function FieldSnapshot.writeIfDue(connector)
         while budget > 0 and connector.fieldGeoIndex <= #ids do
             local id = ids[connector.fieldGeoIndex]
             local row = collectGeometry(byId[id], id)
-            if fieldBuiltOver(row.raw) then
-                row.removed = "1"
-            end
+            fitOutlineToGround(row)
             connector.fieldGeoRecords[id] = row
             connector.fieldGeoIndex = connector.fieldGeoIndex + 1
             budget = budget - 1
@@ -2332,7 +2690,7 @@ function FieldSnapshot.writeIfDue(connector)
         connector.fieldStateRecords[id] = collectState(connector, byId[id], id)
         local geo = connector.fieldGeoCache ~= nil and connector.fieldGeoCache[id] or nil
         if geo ~= nil then
-            geo.removed = fieldBuiltOver(geo.raw) and "1" or nil
+            fitOutlineToGround(geo)
         end
         connector.fieldStateIndex = connector.fieldStateIndex + 1
         budget = budget - 1

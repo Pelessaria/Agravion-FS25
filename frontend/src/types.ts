@@ -199,6 +199,8 @@ export interface FieldSnapshot {
   areaHa: number | null
   /** World X/Z pairs. Empty when the connector has not sent an outline. */
   points: [number, number][]
+  /** Inner rings cut out of the outline, where a building sits on the field. */
+  holes?: [number, number][][]
   /** Field ids plowed into one area, lowest id first. Null when the field stands alone. */
   group?: number[] | null
   farmId: number | null

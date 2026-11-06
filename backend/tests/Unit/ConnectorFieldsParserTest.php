@@ -12,7 +12,7 @@ class ConnectorFieldsParserTest extends TestCase
         $geometry = <<<'XML'
         <fieldsGeometry schema="1" mapSize="2048" writtenAtUtc="2026-11-02T18:00:00Z">
           <field id="2" cx="10.5" cz="-4" areaHa="1.25" points="0,0 10,0 10,8" />
-          <field id="1" cx="1" cz="2" areaHa="3.5" group="1 2" points="1,2 4,2 4,6 1,6" />
+          <field id="1" cx="1" cz="2" areaHa="3.5" group="1 2" holes="1.5,2.5 2.5,2.5 2.5,3.5;5,5 6,5 6,6 5,6" points="1,2 4,2 4,6 1,6" />
         </fieldsGeometry>
         XML;
 
@@ -45,6 +45,11 @@ class ConnectorFieldsParserTest extends TestCase
         $this->assertTrue($merged['fields'][0]['scanned']);
         $this->assertCount(4, $merged['fields'][0]['points']);
         $this->assertSame([1.0, 2.0], $merged['fields'][0]['points'][0]);
+        $this->assertCount(2, $merged['fields'][0]['holes']);
+        $this->assertCount(3, $merged['fields'][0]['holes'][0]);
+        $this->assertSame([5.0, 5.0], $merged['fields'][0]['holes'][1][0]);
+        $this->assertSame([], $merged['fields'][1]['holes']);
+        $this->assertSame([], $merged['fields'][2]['holes']);
         $this->assertSame([1, 2], $merged['fields'][0]['group']);
         $this->assertNull($merged['fields'][2]['group']);
         $this->assertNull($merged['fields'][1]['fruitName']);

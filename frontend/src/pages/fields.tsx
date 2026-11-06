@@ -23,6 +23,7 @@ import {
   cropKey,
   cropStateLabel,
   effectiveMapSize,
+  fieldOutlinePath,
   formatHa,
   formatHarvest,
   formatTarget,
@@ -77,6 +78,7 @@ type DrawnField = {
   id: number
   color: string
   polygon: string | null
+  path: string | null
   x: number
   y: number
   box: { x: number; y: number; w: number; h: number } | null
@@ -139,6 +141,16 @@ function projectFields(
           ? projectPoint(field.labelX, field.labelZ, frame)
           : center
     const projected = field.points.map(([x, z]) => projectPoint(x, z, frame))
+    const holes = (field.holes ?? [])
+      .map((ring) =>
+        ring
+          .map(([x, z]) => {
+            const point = projectPoint(x, z, frame)
+            return `${point.x},${point.y}`
+          })
+          .join(" "),
+      )
+      .filter((ring) => ring.split(/\s+/).length >= 3)
     const label = labelPoint ?? (projected.length > 0 ? projected[0] : null)
     const key = cropKey(field.fruitName)
     let boxPoints = projected
@@ -165,6 +177,13 @@ function projectFields(
       id: field.id,
       color: layer === "off" ? cropColor(field) : paintColor(field, layer),
       polygon: projected.length >= 3 ? projected.map((point) => `${point.x},${point.y}`).join(" ") : null,
+      path:
+        projected.length >= 3
+          ? fieldOutlinePath(
+              projected.map((point) => `${point.x},${point.y}`).join(" "),
+              holes,
+            )
+          : null,
       x: label?.x ?? 50,
       y: label?.y ?? 50,
       box: projected.length > 0 ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : null,
@@ -1174,7 +1193,7 @@ function FieldMap({
               <g clipPath="url(#precision-fields)">
                 <clipPath id="precision-fields">
                   {fields.map((field) =>
-                    field.polygon && !field.group ? <polygon key={field.id} points={field.polygon} /> : null,
+                    field.path && !field.group ? <path key={field.id} d={field.path} clipRule="evenodd" /> : null,
                   )}
                   {outlines.map((outline) => (
                     <polygon key={outline.key} points={outline.polygon} />
@@ -1229,12 +1248,13 @@ function FieldMap({
               ]
                 .filter(Boolean)
                 .join(" ")
-              return field.polygon ? (
-                <polygon
+              return field.path ? (
+                <path
                   key={field.id}
                   data-field={field.id}
                   className={className}
-                  points={field.polygon}
+                  d={field.path}
+                  fillRule="evenodd"
                   fill={showRaster ? "transparent" : field.color}
                 />
               ) : (

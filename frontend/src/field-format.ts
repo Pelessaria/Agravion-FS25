@@ -313,3 +313,13 @@ export function tramlineTracks(points: [number, number][], tram: Tramline, frame
   }
   return lines
 }
+
+/** SVG path for a field outline. Extra rings are holes (even-odd fill). */
+export function fieldOutlinePath(outer: string, holes: string[] = []): string {
+  const ring = (points: string) => {
+    const parts = points.trim().split(/\s+/).filter(Boolean)
+    if (parts.length < 3) return ""
+    return `M ${parts.join(" L ")} Z`
+  }
+  return [ring(outer), ...holes.map(ring)].filter(Boolean).join(" ")
+}

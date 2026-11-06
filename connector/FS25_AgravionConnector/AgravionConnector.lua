@@ -12,7 +12,7 @@
 
 AgravionConnector = {}
 AgravionConnector.MOD_NAME = "FS25_AgravionConnector"
-AgravionConnector.VERSION = "0.1.35.0"
+AgravionConnector.VERSION = "0.1.36.0"
 AgravionConnector.SCHEMA = "1"
 -- 1 s base tick so live.xml can refresh at ~2 s while busy (FNT Livemap pattern).
 AgravionConnector.TICK_MS = 1000
