@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type SyntheticEvent } from "react"
+import { useEffect, useMemo, useState, type KeyboardEvent, type SyntheticEvent } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
-import { Boxes, Clock3, LayoutGrid, Puzzle, Tractor, Truck, Wheat, Wrench } from "lucide-react"
+import { Boxes, Clock3, LayoutGrid, LocateFixed, Puzzle, Tractor, Truck, Wheat, Wrench } from "lucide-react"
 import { apiWorkspaceVehicles } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock } from "../components/ui"
 import { useWorkspaceRoute } from "../use-workspace"
@@ -9,6 +9,23 @@ import { useStore } from "../store"
 import { VehicleMeterBars } from "../components/equip-gauge"
 import type { Vehicle, VehicleCategory } from "../types"
 import { isPallet, vehicleBrand, vehicleDisplayName } from "../vehicle-label"
+
+function liveVehicleId(workspaceId: string, vehicleId: string) {
+  const prefix = `feed-${workspaceId}-`
+  return vehicleId.startsWith(prefix) ? vehicleId.slice(prefix.length) : vehicleId
+}
+
+function equipmentMapTarget(workspaceId: string, vehicle: Vehicle) {
+  const params = new URLSearchParams()
+  params.set("vehicle", liveVehicleId(workspaceId, vehicle.id))
+  if (vehicle.x != null && vehicle.z != null) {
+    params.set("x", String(vehicle.x))
+    params.set("z", String(vehicle.z))
+  }
+  const name = vehicleDisplayName(vehicle.name)
+  if (name) params.set("name", name)
+  return `/w/${workspaceId}/m/map?${params.toString()}`
+}
 
 type EquipmentFilter = "all" | "tractor" | "trailer" | "tool" | "selfpropelled" | "pallet"
 
@@ -207,23 +224,24 @@ export function VehiclesPage() {
                 : `${vehicle.hours.toLocaleString(i18n.language, { maximumFractionDigits: 0 })} h`
             const title = vehicleDisplayName(vehicle.name)
             const brand = vehicleBrand(vehicle)
-            const position =
-              vehicle.x === null || vehicle.z === null
-                ? null
-                : `${vehicle.x.toFixed(0)} / ${vehicle.z.toFixed(0)} m`
-
-            const meta = [
-              position ? `${t("vehicles.position")} ${position}` : null,
-              hours,
-              vehicle.plate ? `${t("vehicles.plate")} ${vehicle.plate}` : null,
-            ].filter(Boolean)
+            const detailPath = `/w/${id}/equipment/${vehicle.id}`
+            const mapPath = equipmentMapTarget(id, vehicle)
+            const openDetail = () => navigate(detailPath)
+            const onCardKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault()
+                openDetail()
+              }
+            }
 
             return (
-              <button
+              <article
                 key={vehicle.id}
-                type="button"
                 className="equip-card is-poster"
-                onClick={() => navigate(`/w/${id}/equipment/${vehicle.id}`)}
+                role="link"
+                tabIndex={0}
+                onClick={openDetail}
+                onKeyDown={onCardKeyDown}
               >
                 <span className="equip-card-media">
                   {vehicle.iconUrl ? (
@@ -234,14 +252,41 @@ export function VehiclesPage() {
                     <CategoryIcon category={category} />
                     <span>{t(categoryLabelKey(category === "selfpropelled" ? "harvester" : category))}</span>
                   </span>
+                  <button
+                    type="button"
+                    className="equip-card-gps"
+                    title={t("vehicles.showOnMap")}
+                    aria-label={t("vehicles.showOnMap")}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      navigate(mapPath)
+                    }}
+                  >
+                    <LocateFixed className="icon" aria-hidden="true" />
+                  </button>
                 </span>
                 <span className="equip-card-body">
                   {brand ? <span className="equip-card-brand">{brand}</span> : null}
                   <strong className="equip-card-title">{title}</strong>
-                  {meta.length > 0 ? <span className="equip-card-meta">{meta.join(" · ")}</span> : null}
+                  {hours || vehicle.plate ? (
+                    <span className="equip-card-meta">
+                      {hours ? (
+                        <span className="equip-card-meta-item">
+                          <Clock3 className="icon" aria-hidden="true" />
+                          <span>{hours}</span>
+                        </span>
+                      ) : null}
+                      {vehicle.plate ? (
+                        <span className="equip-card-meta-item">
+                          <span>{t("vehicles.plate")} {vehicle.plate}</span>
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
                   <VehicleMeterBars vehicle={vehicle} language={i18n.language} label={(key) => t(key)} />
                 </span>
-              </button>
+              </article>
             )
           })}
         </div>

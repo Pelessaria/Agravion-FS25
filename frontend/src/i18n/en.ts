@@ -465,6 +465,7 @@ export const en = {
     farm: "Farm",
     farmId: "Farm {{id}}",
     position: "Position",
+    showOnMap: "Show on live map",
     fill: "Fill level",
     hours: "Hours",
     heading: "Heading",

@@ -650,6 +650,34 @@ h1, h2, h3, p { margin: 0; }
   text-transform: uppercase;
 }
 .equip-card-cat .icon { width: 12px; height: 12px; }
+.equip-card-gps {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  border-radius: 9px;
+  color: #f4f5f7;
+  background: color-mix(in srgb, black 55%, transparent);
+  border: 1px solid color-mix(in srgb, white 12%, transparent);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.equip-card-gps .icon { width: 15px; height: 15px; }
+.equip-card-gps:hover {
+  color: white;
+  background: color-mix(in srgb, var(--accent) 72%, black);
+  border-color: color-mix(in srgb, var(--accent) 55%, white);
+}
+.equip-card-gps:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+}
 .equipment-tabs .access-tab { gap: 8px; padding-inline: 12px; }
 .equipment-tabs .icon { width: 16px; height: 16px; }
 .equip-card-caption {
@@ -704,14 +732,30 @@ h1, h2, h3, p { margin: 0; }
   -webkit-line-clamp: 2;
 }
 .equip-card-meta {
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
   margin: 0;
   color: var(--text-faint);
   font-size: 0.68rem;
   line-height: 1.35;
+}
+.equip-card-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.equip-card-meta-item .icon {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  opacity: 0.9;
 }
 .equip-meters {
   display: grid;

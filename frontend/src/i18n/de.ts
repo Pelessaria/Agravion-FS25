@@ -463,6 +463,7 @@ export const de = {
     farm: "Hof",
     farmId: "Hof {{id}}",
     position: "Position",
+    showOnMap: "Auf Live-Karte zeigen",
     fill: "Füllstand",
     hours: "Stunden",
     heading: "Ausrichtung",

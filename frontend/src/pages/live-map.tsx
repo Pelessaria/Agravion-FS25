@@ -81,6 +81,11 @@ function readPin(params: URLSearchParams) {
   return { x, z, name: params.get("name") || "" }
 }
 
+function readVehicleParam(params: URLSearchParams) {
+  const raw = params.get("vehicle")?.trim()
+  return raw ? raw : null
+}
+
 function objectKind(role: MarkerRole): Exclude<ObjectTab, "all"> {
   if (role === "player") return "player"
   if (role === "building") return "building"
@@ -118,6 +123,7 @@ export function LiveMapPage() {
   const stamp = useTimeLabel()
   const [params] = useSearchParams()
   const pin = readPin(params)
+  const vehicleParam = readVehicleParam(params)
   const { liveMode, moduleAccess, sessionUserId } = useStore()
   const { workspace, allowed } = useWorkspaceRoute()
   const access = workspace ? moduleAccess(workspace.id, "map") : null
@@ -128,12 +134,13 @@ export function LiveMapPage() {
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [hiddenFarms, setHiddenFarms] = useState<number[]>([])
   const [showFields, setShowFields] = useState(true)
-  const [showBuildings, setShowBuildings] = useState(pin != null)
+  const [showBuildings, setShowBuildings] = useState(pin != null && !vehicleParam)
   const [buildingFilter, setBuildingFilter] = useState<BuildingFilter>("all")
   const [resetToken, setResetToken] = useState(0)
-  const [tab, setTab] = useState<ObjectTab>(pin ? "building" : "all")
+  const [tab, setTab] = useState<ObjectTab>(vehicleParam ? "all" : pin ? "building" : "all")
   const [query, setQuery] = useState(pin?.name ?? "")
-  const [selected, setSelected] = useState<string | null>(pin ? "pin" : null)
+  const [selected, setSelected] = useState<string | null>(vehicleParam ? `v:${vehicleParam}` : pin ? "pin" : null)
+  const deepLinkDone = useRef(false)
 
   useEffect(() => {
     if (!workspace || !allowed || !access || !liveMode) return
@@ -207,6 +214,20 @@ export function LiveMapPage() {
       window.clearInterval(liveTimer)
     }
   }, [access, allowed, liveMode, workspace])
+
+  useEffect(() => {
+    if (deepLinkDone.current || !vehicleParam || !payload) return
+    const found = (payload.vehicles ?? []).some((vehicle) => vehicle.id === vehicleParam)
+    if (found) {
+      setSelected(`v:${vehicleParam}`)
+      deepLinkDone.current = true
+      return
+    }
+    if (pin) {
+      setSelected("pin")
+      deepLinkDone.current = true
+    }
+  }, [payload, pin, vehicleParam])
 
   const mapSize = effectiveMapSize(fields?.mapSize ?? null, fields?.fields ?? [])
   const reported = fields?.mapFrame ?? null
