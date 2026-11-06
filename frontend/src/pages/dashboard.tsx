@@ -12,7 +12,7 @@ import {
   TriangleAlert,
   Users,
 } from "lucide-react"
-import { EmptyState, MissingValue } from "../components/ui"
+import { BrandLockup, EmptyState, MissingValue } from "../components/ui"
 import {
   DASHBOARD_WIDGETS,
   defaultDashboardLayout,
@@ -314,6 +314,9 @@ export function DashboardPage() {
 
   return (
     <section>
+      <div className="dash-brand">
+        <BrandLockup size="hero" />
+      </div>
       <div className="page-head">
         <div>
           <h1>{t("dashboard.welcome")}</h1>

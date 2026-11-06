@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react"
 import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate } from "react-router-dom"
 import { LoaderCircle } from "lucide-react"
-import { BrandMark } from "../components/ui"
+import { BrandLockup } from "../components/ui"
 import { i18n } from "../i18n"
 import { useStore } from "../store"
 import { isLoginId } from "../validate"
@@ -61,9 +61,8 @@ export function LoginPage() {
     <div className="login">
       <aside className="login-aside">
         <div>
-          <BrandMark large />
+          <BrandLockup size="login" />
           <p className="hint">{t("login.kicker")}</p>
-          <h1>{t("appName")}</h1>
           <p className="lead">{t("login.lead")}</p>
         </div>
         {!liveMode ? <p className="hint">{t("demoBanner")}</p> : null}

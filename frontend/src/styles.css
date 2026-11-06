@@ -108,7 +108,7 @@ h1, h2, h3, p { margin: 0; }
 .brand-mark {
   width: 40px;
   height: 40px;
-  display: block;
+  display: none;
   flex: none;
   border-radius: 12px;
 }
@@ -117,15 +117,33 @@ h1, h2, h3, p { margin: 0; }
   height: 72px;
   border-radius: 18px;
 }
-.header-logo { display: none; }
-.login-aside h1 {
-  font-size: 2rem;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-  max-width: 14ch;
-  margin-top: 20px;
+.brand-lockup {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: left center;
 }
+.brand-lockup-sidebar {
+  width: min(168px, 100%);
+  height: 34px;
+}
+.brand-lockup-login {
+  width: min(320px, 100%);
+  height: auto;
+  max-height: 72px;
+}
+.brand-lockup-hero {
+  width: min(420px, 100%);
+  height: auto;
+  max-height: 96px;
+}
+.dash-brand {
+  margin: 4px 0 22px;
+}
+.header-logo { display: none; }
+.login-aside .hint { margin-top: 20px; }
 .login-aside .lead { color: var(--text-muted); max-width: 36ch; margin-top: 12px; }
 .login-panel {
   display: grid;
@@ -235,25 +253,9 @@ h1, h2, h3, p { margin: 0; }
   min-height: 44px;
   padding: 0 6px;
 }
-.side-brand > div { min-width: 0; }
 .side-brand .mobile-only { margin-left: auto; }
-.side-brand strong { font-size: 1.05rem; letter-spacing: -0.03em; line-height: 1.1; font-weight: 600; }
-.brand-word {
-  font-family: "Saira Stencil One", var(--font);
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.brand-word span { color: #a52e35; }
-.side-brand small { display: block; color: var(--text-faint); font-size: 0.72rem; font-weight: 500; }
-.login-aside h1 {
-  font-family: "Saira Stencil One", var(--font);
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.shell.collapsed .side-brand strong,
-.shell.collapsed .side-brand small,
+.shell.collapsed .side-brand .brand-lockup { display: none; }
+.shell.collapsed .side-brand .brand-mark { display: block; }
 .shell.collapsed .nav-label { display: none; }
 .nav {
   display: grid;
@@ -3468,12 +3470,14 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   }
   .sidebar.open { transform: none; }
   .backdrop { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 11; border: 0; }
-  .shell.collapsed .side-brand strong,
-  .shell.collapsed .side-brand small,
+  .shell.collapsed .side-brand .brand-lockup { display: block; }
+  .shell.collapsed .side-brand .brand-mark { display: none; }
   .shell.collapsed .nav-label { display: block; }
   .header-title { flex-direction: row; align-items: center; }
   .header-mobile-title { display: inline-flex; }
   .header-logo { display: block; width: 36px; height: 36px; flex: none; border-radius: 10px; }
+  .brand-lockup-hero { width: min(280px, 100%); max-height: 64px; }
+  .dash-brand { margin-bottom: 16px; }
   .mobile-only { display: inline-flex; }
   .desktop-only { display: none; }
   .page-head { flex-direction: column; align-items: stretch; }

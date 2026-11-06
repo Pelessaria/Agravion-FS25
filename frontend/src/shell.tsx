@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 import { apiWorkspaceFarms } from "./api"
 import { FarmSwitcher } from "./components/farm-switcher"
-import { BrandMark, Toasts, useTimeLabel } from "./components/ui"
+import { BrandLockup, BrandMark, Toasts, useTimeLabel } from "./components/ui"
 import { seedNotifications, type AppNotification } from "./demo-notifications"
 import { i18n } from "./i18n"
 import { APP_MODULES, MODULE_SECTIONS, moduleIsReady, type ModuleId } from "./modules"
@@ -178,12 +178,7 @@ export function Shell() {
       <aside className={drawer ? "sidebar open" : "sidebar"}>
         <div className="side-brand">
           <BrandMark />
-          <div>
-            <strong className="brand-word">
-              Agra<span>vion</span>
-            </strong>
-            <small>{t("shell.product")}</small>
-          </div>
+          <BrandLockup size="sidebar" />
           <button
             type="button"
             className="btn btn-ghost btn-icon mobile-only"

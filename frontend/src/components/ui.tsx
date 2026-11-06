@@ -156,15 +156,33 @@ export function Toasts() {
   )
 }
 
+/** Square mark — sidebar collapsed / compact chrome. */
 export function BrandMark({ large = false }: { large?: boolean }) {
+  const { t } = useTranslation()
   const size = large ? 72 : 40
   return (
     <img
       className={large ? "brand-mark brand-mark-lg" : "brand-mark"}
       src="/logo.svg"
-      alt=""
+      alt={t("appName")}
       width={size}
       height={size}
+    />
+  )
+}
+
+/** Logo Lang 3 (hell) — wordmark + slogan for dark surfaces. */
+export function BrandLockup({
+  size = "sidebar",
+}: {
+  size?: "sidebar" | "hero" | "login"
+}) {
+  const { t } = useTranslation()
+  return (
+    <img
+      className={`brand-lockup brand-lockup-${size}`}
+      src="/brand/logo-lang-3-light.svg"
+      alt={t("appName")}
     />
   )
 }
