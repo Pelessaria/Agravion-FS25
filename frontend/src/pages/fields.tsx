@@ -14,6 +14,7 @@ import {
   Search,
 } from "lucide-react"
 import { apiWorkspaceFields } from "../api"
+import { ContextPipe, ContextStat, PageStats } from "../components/context-stat"
 import { cropIcon } from "../crop-icons"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { demoFields } from "../demo-fields"
@@ -405,49 +406,32 @@ export function FieldsPage() {
 
   return (
     <section className="fields-page">
-      <div className="fields-mast">
-        <h1>{t("modules.fields")}</h1>
-        <div className="fields-stats">
-        <p>
-          <MapIcon className="fields-stat-icon" aria-hidden="true" />
-          <strong>{fields.length.toLocaleString(i18n.language)}</strong>
-          <span>{t("fields.count")}</span>
-        </p>
-        <p>
-          <Home className="fields-stat-icon" aria-hidden="true" />
-          <strong>{owned.toLocaleString(i18n.language)}</strong>
-          <span>{t("fields.owned")}</span>
-        </p>
-        <p>
-          <Building2 className="fields-stat-icon" aria-hidden="true" />
-          <strong>{ownedAll.toLocaleString(i18n.language)}</strong>
-          <span>{t("fields.allFarms")}</span>
-        </p>
-        <p className={harvestGrass > 0 ? "has-note" : undefined}>
-          <Scythe className="fields-stat-icon" />
-          <strong>{harvest.toLocaleString(i18n.language)}</strong>
-          <span>
-            <span>{t("fields.harvest")}</span>
-            {harvestGrass > 0 ? <em>{t("fields.harvestGrass", { count: harvestGrass })}</em> : null}
-          </span>
-        </p>
-        <p>
-          <LandPlot className="fields-stat-icon" aria-hidden="true" />
-          <strong>
-            {fields.length === 0 ? t("unavailable") : formatHa(knownArea, i18n.language)}
-            {missingArea && fields.length > 0 ? " +" : ""}
-          </strong>
-          <span>{t("fields.area")}</span>
-        </p>
-        <p>
-          <Clock3 className="fields-stat-icon" aria-hidden="true" />
-          <strong>
-            {source?.stateAt ? stamp(source.stateAt, t("unavailable")) : loading ? "…" : t("unavailable")}
-          </strong>
-          <span>{t("fields.asOf")}</span>
-        </p>
-        </div>
-      </div>
+      <PageStats>
+        <ContextStat symbol={<MapIcon className="icon" />} value={fields.length.toLocaleString(i18n.language)} label={t("fields.count")} />
+        <ContextPipe />
+        <ContextStat symbol={<Home className="icon" />} value={owned.toLocaleString(i18n.language)} label={t("fields.owned")} />
+        <ContextPipe />
+        <ContextStat symbol={<Building2 className="icon" />} value={ownedAll.toLocaleString(i18n.language)} label={t("fields.allFarms")} />
+        <ContextPipe />
+        <ContextStat
+          symbol={<Scythe className="icon" />}
+          value={harvest.toLocaleString(i18n.language)}
+          label={t("fields.harvest")}
+          note={harvestGrass > 0 ? t("fields.harvestGrass", { count: harvestGrass }) : undefined}
+        />
+        <ContextPipe />
+        <ContextStat
+          symbol={<LandPlot className="icon" />}
+          value={`${fields.length === 0 ? t("unavailable") : formatHa(knownArea, i18n.language)}${missingArea && fields.length > 0 ? " +" : ""}`}
+          label={t("fields.area")}
+        />
+        <ContextPipe />
+        <ContextStat
+          symbol={<Clock3 className="icon" />}
+          value={source?.stateAt ? stamp(source.stateAt, t("unavailable")) : loading ? "…" : t("unavailable")}
+          label={t("fields.asOf")}
+        />
+      </PageStats>
 
       {emptyKind ? (
         <EmptyState title={t(`fields.${emptyKind}Title`)} body={t(`fields.${emptyKind}Body`)} />

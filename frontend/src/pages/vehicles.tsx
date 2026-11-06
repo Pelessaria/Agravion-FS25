@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { Boxes, Clock3, LayoutGrid, LocateFixed, Puzzle, Tractor, Truck, Wheat, Wrench } from "lucide-react"
 import { apiWorkspaceVehicles } from "../api"
+import { ContextPipe, ContextStat, PageStats } from "../components/context-stat"
 import { EmptyState, MissingWorkspace, PermissionBlock } from "../components/ui"
 import { useWorkspaceRoute } from "../use-workspace"
 import { useStore } from "../store"
@@ -160,26 +161,17 @@ export function VehiclesPage() {
 
   return (
     <section className="equipment-page">
-      <div className="fields-mast">
-        <h1>{t("modules.equipment")}</h1>
-        <div className="fields-stats">
-          <p>
-            <Tractor className="fields-stat-icon" aria-hidden="true" />
-            <strong>{rows.length.toLocaleString(i18n.language)}</strong>
-            <span>{t("vehicles.fleet")}</span>
-          </p>
-          <p>
-            <Clock3 className="fields-stat-icon" aria-hidden="true" />
-            <strong>{fleetHours.toLocaleString(i18n.language, { maximumFractionDigits: 0 })} h</strong>
-            <span>{t("vehicles.fleetHours")}</span>
-          </p>
-          <p>
-            <Puzzle className="fields-stat-icon" aria-hidden="true" />
-            <strong>{fleetMods.toLocaleString(i18n.language)}</strong>
-            <span>{t("vehicles.fleetMods")}</span>
-          </p>
-        </div>
-      </div>
+      <PageStats>
+        <ContextStat symbol={<Tractor className="icon" />} value={rows.length.toLocaleString(i18n.language)} label={t("vehicles.fleet")} />
+        <ContextPipe />
+        <ContextStat
+          symbol={<Clock3 className="icon" />}
+          value={`${fleetHours.toLocaleString(i18n.language, { maximumFractionDigits: 0 })} h`}
+          label={t("vehicles.fleetHours")}
+        />
+        <ContextPipe />
+        <ContextStat symbol={<Puzzle className="icon" />} value={fleetMods.toLocaleString(i18n.language)} label={t("vehicles.fleetMods")} />
+      </PageStats>
 
       <div className="equip-toolbar">
         <nav className="access-tabs equipment-tabs" role="tablist" aria-label={t("vehicles.category")}>

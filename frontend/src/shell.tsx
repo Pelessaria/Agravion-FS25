@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ComponentType } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
@@ -30,6 +30,7 @@ import {
   X,
 } from "lucide-react"
 import { apiWorkspaceFarms, apiWorkspaceLiveMap, type LiveMapResponse } from "./api"
+import { ContextExtra, ContextStat, ContextStatsToggle, PageStatsProvider } from "./components/context-stat"
 import { FarmSwitcher } from "./components/farm-switcher"
 import { BrandLockup, BrandMark, Toasts, useTimeLabel } from "./components/ui"
 import { seedNotifications, type AppNotification } from "./demo-notifications"
@@ -81,26 +82,6 @@ function worldPlayerCount(live: LiveMapResponse | null, fallback: number | null)
   }
   if (fallback != null && fallback > names.size) return fallback
   return names.size
-}
-
-function ContextStat({
-  symbol,
-  value,
-  label,
-  className,
-}: {
-  symbol: ReactNode
-  value: string
-  label: string
-  className?: string
-}) {
-  return (
-    <span className={["context-stat", className].filter(Boolean).join(" ")} title={`${label}: ${value}`}>
-      {symbol}
-      <strong>{value}</strong>
-      <small>{label}</small>
-    </span>
-  )
 }
 
 function initials(name: string) {
@@ -258,8 +239,13 @@ export function Shell() {
       ? "—"
       : new Intl.NumberFormat(current.language, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(farm.money)
   const linkLabel = workspace ? (workspace.disabled ? t("card.disabled") : t(`link.${workspace.linkState}`)) : ""
+  const [statsOpen, setStatsOpen] = useState(() => localStorage.getItem("agravion.pageStats") !== "0")
+  useEffect(() => {
+    localStorage.setItem("agravion.pageStats", statsOpen ? "1" : "0")
+  }, [statsOpen])
 
   return (
+    <PageStatsProvider>
     <div className={collapsed ? "shell collapsed" : "shell"}>
       <a className="skip" href="#content">
         {t("skip")}
@@ -627,6 +613,12 @@ export function Shell() {
                 label={t("workspace.gameVersion")}
               />
             </div>
+            <ContextStatsToggle
+              open={statsOpen}
+              label={statsOpen ? t("context.statsHide") : t("context.statsShow")}
+              onToggle={() => setStatsOpen((open) => !open)}
+            />
+            <ContextExtra open={statsOpen} />
           </div>
         ) : null}
         <main id="content" className="content">
@@ -635,5 +627,6 @@ export function Shell() {
       </div>
       <Toasts />
     </div>
+    </PageStatsProvider>
   )
 }

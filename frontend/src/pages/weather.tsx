@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Clock3, Cloud, CloudRain, Droplets, Snowflake, Wind } from "lucide-react"
 import { apiWorkspaceLiveMap, type LiveForecastDay, type LiveForecastHour, type LiveMapResponse } from "../api"
+import { ContextStat, PageStats } from "../components/context-stat"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { useStore } from "../store"
 import { useWorkspaceRoute } from "../use-workspace"
@@ -130,18 +131,13 @@ export function WeatherPage() {
 
   return (
     <div className="page weather-page">
-      <div className="fields-mast">
-        <h1>{t("modules.weather")}</h1>
-        <div className="fields-stats">
-          <p>
-            <Clock3 className="fields-stat-icon" aria-hidden="true" />
-            <strong>
-              {payload?.writtenAt ? stamp(payload.writtenAt, t("unavailable")) : loading ? "…" : t("unavailable")}
-            </strong>
-            <span>{t("weather.asOf")}</span>
-          </p>
-        </div>
-      </div>
+      <PageStats>
+        <ContextStat
+          symbol={<Clock3 className="icon" />}
+          value={payload?.writtenAt ? stamp(payload.writtenAt, t("unavailable")) : loading ? "…" : t("unavailable")}
+          label={t("weather.asOf")}
+        />
+      </PageStats>
       {loading && !payload ? <p className="muted">{t("weather.loading")}</p> : null}
       {!loading && !ready ? <EmptyState title={t("weather.missingTitle")} body={t("weather.missingBody")} /> : null}
       {ready && payload ? (

@@ -1,23 +1,13 @@
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
-import { Clock3, Map as MapIcon, Tag, Users, Wallet } from "lucide-react"
 import { RequiredModsPanel } from "../components/required-mods"
-import { EmptyState, MissingValue, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
+import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { APP_MODULES, moduleIsReady } from "../modules"
 import { useStore } from "../store"
 import { useWorkspaceRoute } from "../use-workspace"
 
-function money(value: number | null, locale: string) {
-  if (value === null) return null
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
 export function WorkspaceHomePage() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const stamp = useTimeLabel()
   const { activity, liveMode, moduleAccess, selectedFarm } = useStore()
   const { workspace, allowed } = useWorkspaceRoute()
@@ -51,63 +41,6 @@ export function WorkspaceHomePage() {
   return (
     <section className="ws-dash">
       {notice ? <p className="notice">{t(`notice.${notice}`)}</p> : null}
-      <div className="fields-mast">
-        <div className="fields-stats">
-          <p>
-            <Users className="fields-stat-icon" aria-hidden="true" />
-            <strong>
-              <MissingValue
-                text={
-                  workspace.playersOnline == null && workspace.playerCapacity == null
-                    ? null
-                    : `${workspace.playersOnline ?? "—"} / ${workspace.playerCapacity ?? "—"}`
-                }
-              />
-            </strong>
-            <span>{t("workspace.players")}</span>
-          </p>
-          <p>
-            <Tag className="fields-stat-icon" aria-hidden="true" />
-            <strong>
-              <MissingValue text={workspace.gameVersion ?? null} />
-            </strong>
-            <span>{t("workspace.gameVersion")}</span>
-          </p>
-          <p>
-            <MapIcon className="fields-stat-icon" aria-hidden="true" />
-            <strong>
-              <MissingValue text={workspace.mapName} />
-            </strong>
-            <span>{t("workspace.map")}</span>
-          </p>
-          <p>
-            <Clock3 className="fields-stat-icon" aria-hidden="true" />
-            <strong>
-              <MissingValue text={workspace.gameTime} />
-            </strong>
-            <span>{t("workspace.gameTime")}</span>
-          </p>
-          {farm ? (
-            <p>
-              <Wallet className="fields-stat-icon" aria-hidden="true" />
-              <strong>
-                <MissingValue text={money(farm.money, i18n.language)} />
-              </strong>
-              <span>{t("workspace.balance")}</span>
-            </p>
-          ) : null}
-          <p>
-            <Clock3 className="fields-stat-icon" aria-hidden="true" />
-            <strong>
-              <MissingValue
-                text={workspace.lastSyncAt ? stamp(workspace.lastSyncAt, t("unavailable")) : null}
-              />
-            </strong>
-            <span>{t("workspace.asOf")}</span>
-          </p>
-        </div>
-      </div>
-
       <div className="ws-dash-grid">
         <section className="panel">
           <h2>{t("workspace.shortcuts")}</h2>

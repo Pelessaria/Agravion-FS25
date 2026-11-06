@@ -1219,7 +1219,7 @@ h1, h2, h3, p { margin: 0; }
 .setup-steps li::marker { color: var(--text-faint); }
 .backdrop { display: none; }
 
-.main { min-width: 0; display: flex; flex-direction: column; }
+.main { min-width: 0; min-height: 100vh; display: flex; flex-direction: column; }
 .header {
   min-height: 56px;
   display: flex;
@@ -1405,10 +1405,43 @@ h1, h2, h3, p { margin: 0; }
 }
 .menu-lang > span { color: var(--text-faint); font-size: var(--small); }
 .context {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
   padding: 10px max(48px, calc((100% - var(--page)) / 2));
   background: color-mix(in srgb, var(--accent) 6%, transparent);
   border-bottom: 1px solid var(--line);
+}
+.context-toggle {
+  grid-column: 2;
+  grid-row: 1;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+}
+.context-toggle:hover { color: var(--text); border-color: var(--line-strong); }
+.context-toggle .icon { width: 16px; height: 16px; }
+.context-toggle:not(.is-open) .icon { transform: rotate(180deg); }
+.context-extra {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-width: 0;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.context-extra.is-collapsed { display: none; }
+.context-extra-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
 }
 .context-bar {
   width: 100%;
@@ -1456,6 +1489,11 @@ h1, h2, h3, p { margin: 0; }
   line-height: 1.15;
   white-space: nowrap;
 }
+.context-stat small em {
+  display: block;
+  font-style: normal;
+  color: var(--text-muted);
+}
 .context-stat.is-paused .icon,
 .context-stat.is-paused strong { color: var(--warning); }
 .content {
@@ -1465,6 +1503,8 @@ h1, h2, h3, p { margin: 0; }
 }
 .content:has(.live-page),
 .content:has(.fields-page) {
+  flex: 1;
+  min-height: 0;
   width: calc(100% - 20px);
   padding-top: 8px;
   padding-bottom: 10px;
@@ -2976,8 +3016,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   display: grid;
   gap: 8px;
   min-width: 0;
-  height: calc(100vh - 78px);
-  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr);
 }
 .fields-mast {
   display: flex;
@@ -4274,7 +4314,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   display: grid;
   gap: 0;
   min-width: 0;
-  height: calc(100vh - 78px);
+  height: 100%;
   grid-template-rows: auto minmax(0, 1fr);
   background: #111519;
 }

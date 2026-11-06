@@ -417,6 +417,8 @@ export const en = {
     farm: "Farm",
     balance: "Balance",
     sync: "Sync",
+    statsHide: "Collapse figures",
+    statsShow: "Show figures",
   },
   workspace: {
     back: "Control Center",

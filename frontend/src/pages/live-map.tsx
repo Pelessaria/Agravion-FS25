@@ -12,6 +12,7 @@ import {
   type LivePlayer,
   type LiveVehicle,
 } from "../api"
+import { ContextPipe, ContextStat, PageStats } from "../components/context-stat"
 import { VehicleGauges } from "../components/equip-gauge"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { cropIcon } from "../crop-icons"
@@ -998,12 +999,15 @@ export function LiveMapPage() {
           </button>
         )}
       </aside>
-      <div className="live-stats-bar">
-        <span><Tractor className="icon" /><strong>{vehicleCount}</strong><small>{t("live.vehicles")}</small></span>
-        <span><Wrench className="icon" /><strong>{implementCount}</strong><small>{t("live.implements")}</small></span>
-        <span><Warehouse className="icon" /><strong>{places.length}</strong><small>{t("live.buildings")}</small></span>
-        <span><LandPlot className="icon" /><strong>{fields?.fields.length ?? 0}</strong><small>{t("modules.fields")}</small></span>
-      </div>
+      <PageStats>
+        <ContextStat symbol={<Tractor className="icon" />} value={String(vehicleCount)} label={t("live.vehicles")} />
+        <ContextPipe />
+        <ContextStat symbol={<Wrench className="icon" />} value={String(implementCount)} label={t("live.implements")} />
+        <ContextPipe />
+        <ContextStat symbol={<Warehouse className="icon" />} value={String(places.length)} label={t("live.buildings")} />
+        <ContextPipe />
+        <ContextStat symbol={<LandPlot className="icon" />} value={String(fields?.fields.length ?? 0)} label={t("modules.fields")} />
+      </PageStats>
       </div>
     </div>
   )

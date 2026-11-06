@@ -415,6 +415,8 @@ export const de = {
     farm: "Hof",
     balance: "Kontostand",
     sync: "Sync",
+    statsHide: "Kennzahlen einklappen",
+    statsShow: "Kennzahlen ausklappen",
   },
   workspace: {
     back: "Instanzverwaltung",

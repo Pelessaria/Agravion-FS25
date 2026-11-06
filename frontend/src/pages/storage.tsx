@@ -4,6 +4,7 @@ import type { TFunction } from "i18next"
 import { useTranslation } from "react-i18next"
 import { Clock3, Cylinder, Layers, LocateFixed, Package, Warehouse } from "lucide-react"
 import { apiWorkspaceFields, apiWorkspaceStorage, type StorageFill, type StoragePlace, type StorageResponse } from "../api"
+import { ContextPipe, ContextStat, PageStats } from "../components/context-stat"
 import { cropIconExact } from "../crop-icons"
 import { effectiveMapSize, projectPoint, terrainFrame, type MapFrame } from "../field-format"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
@@ -281,40 +282,27 @@ export function StoragePage() {
 
   return (
     <section className="stock-page">
-      <div className="fields-mast">
-        <h1>{t("modules.storage")}</h1>
-        {emptyKind || (loading && !payload) ? null : (
-          <div className="fields-stats">
-            <p>
-              <Warehouse className="fields-stat-icon" aria-hidden="true" />
-              <strong>{own.length.toLocaleString(language)}</strong>
-              <span>{t("stock.placeCount")}</span>
-            </p>
-            <p>
-              <Layers className="fields-stat-icon" aria-hidden="true" />
-              <strong>{bulkRows.length.toLocaleString(language)}</strong>
-              <span>{t("stock.goodCount")}</span>
-            </p>
-            <p>
-              <Cylinder className="fields-stat-icon" aria-hidden="true" />
-              <strong>{hasFree ? bulk(freeLiters, language) : t("unavailable")}</strong>
-              <span>{t("stock.freeSpace")}</span>
-            </p>
-            <p>
-              <Package className="fields-stat-icon" aria-hidden="true" />
-              <strong>{baleRows.reduce((sum, row) => sum + row.count, 0).toLocaleString(language)}</strong>
-              <span>{t("stock.bales")}</span>
-            </p>
-            <p>
-              <Clock3 className="fields-stat-icon" aria-hidden="true" />
-              <strong>
-                {payload?.writtenAt ? stamp(payload.writtenAt, t("unavailable")) : t("unavailable")}
-              </strong>
-              <span>{t("stock.asOf")}</span>
-            </p>
-          </div>
-        )}
-      </div>
+      {emptyKind || (loading && !payload) ? null : (
+        <PageStats>
+          <ContextStat symbol={<Warehouse className="icon" />} value={own.length.toLocaleString(language)} label={t("stock.placeCount")} />
+          <ContextPipe />
+          <ContextStat symbol={<Layers className="icon" />} value={bulkRows.length.toLocaleString(language)} label={t("stock.goodCount")} />
+          <ContextPipe />
+          <ContextStat symbol={<Cylinder className="icon" />} value={hasFree ? bulk(freeLiters, language) : t("unavailable")} label={t("stock.freeSpace")} />
+          <ContextPipe />
+          <ContextStat
+            symbol={<Package className="icon" />}
+            value={baleRows.reduce((sum, row) => sum + row.count, 0).toLocaleString(language)}
+            label={t("stock.bales")}
+          />
+          <ContextPipe />
+          <ContextStat
+            symbol={<Clock3 className="icon" />}
+            value={payload?.writtenAt ? stamp(payload.writtenAt, t("unavailable")) : t("unavailable")}
+            label={t("stock.asOf")}
+          />
+        </PageStats>
+      )}
 
       {loading && !payload ? (
         <p className="hint">{t("stock.loading")}</p>
