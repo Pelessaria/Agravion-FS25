@@ -27,6 +27,9 @@ final class ConnectorSnapshotService
     /** Seconds between vehicles/manifest FTP pulls when the cron is healthy. */
     public const STATE_SYNC_INTERVAL_SEC = 60;
 
+    /** Live-map page pulls only live_map.xml this often (connector writes ~2 s when busy). */
+    public const LIVE_SYNC_INTERVAL_SEC = 2;
+
     /** Seconds to wait before retrying one DDS that did not become a PNG. */
     private const CONVERT_COOLDOWN_SEC = 120;
 
@@ -311,13 +314,48 @@ final class ConnectorSnapshotService
     }
 
     /**
+     * FTP-pull only live_map.xml so the live page can refresh without the full state cycle.
+     */
+    public function refreshLiveFileIfDue(Workspace $workspace, ?int $intervalSec = null): void
+    {
+        $intervalSec ??= self::LIVE_SYNC_INTERVAL_SEC;
+        $marker = $this->localStateDir($workspace).'/.live_sync';
+        if ($intervalSec > 0 && is_file($marker)) {
+            $age = time() - (int) filemtime($marker);
+            if ($age >= 0 && $age < $intervalSec) {
+                return;
+            }
+        }
+
+        $access = $this->hostAccess($workspace);
+        $base = $access !== null ? $this->connectorBase($access) : null;
+        if ($access === null || $base === null) {
+            return;
+        }
+
+        try {
+            $client = new HostFileClient($access);
+            $remote = $client->read($base.'/state/live_map.xml', 4);
+            $this->storeLocalIfChanged($this->localStateDir($workspace).'/live_map.xml', $remote);
+            File::ensureDirectoryExists(dirname($marker));
+            File::put($marker, (string) time());
+        } catch (Throwable) {
+            // Keep the last cached live_map.xml; the page still renders.
+        }
+    }
+
+    /**
      * Local live-map cache. When the connector has not written live_map.xml yet,
      * vehicle positions from the existing vehicle snapshot are used instead.
      *
      * @return array<string, mixed>
      */
-    public function readLive(Workspace $workspace): array
+    public function readLive(Workspace $workspace, bool $fresh = false): array
     {
+        if ($fresh) {
+            $this->refreshLiveFileIfDue($workspace);
+        }
+
         $path = $this->localStateDir($workspace).'/live_map.xml';
         if (! is_file($path)) {
             return $this->liveFromVehicles($workspace);

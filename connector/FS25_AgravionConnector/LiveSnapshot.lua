@@ -3,15 +3,17 @@
 
   Vehicles that have a map marker, players who are on foot, and placeable
   hotspots. Clock and the current weather come from the running mission.
-  The file is a snapshot, not a stream: the dashboard pulls it on its
-  existing minute cycle.
+  Sampling mirrors FS25_FNT_Livemap: ~2 s while the farm is busy (players
+  online or unpaused), ~30 s while idle. The dashboard pulls live_map.xml
+  on the live-map page; other state stays on the slower cron.
 
   Dedicated-server sandbox: no io reads, no os.*, no continue.
 ]]
 
 LiveSnapshot = {}
 
-LiveSnapshot.EVERY_MS = 15000
+LiveSnapshot.EVERY_MS = 2000
+LiveSnapshot.EVERY_IDLE_MS = 30000
 
 local function log(msg)
     print("AgravionConnector: " .. tostring(msg))
@@ -77,6 +79,7 @@ local function each(list, visit)
     end
 end
 
+-- Same convention as FNT Livemap: yaw of the node forward axis (0,0,1).
 local function headingOf(node)
     if node == nil or localDirectionToWorld == nil then
         return nil
@@ -84,6 +87,9 @@ local function headingOf(node)
     local dx, _, dz = localDirectionToWorld(node, 0, 0, 1)
     if dx == nil or dz == nil then
         return nil
+    end
+    if MathUtil ~= nil and MathUtil.getYRotationFromDirection ~= nil then
+        return MathUtil.getYRotationFromDirection(dx, dz)
     end
     return math.atan2(dx, dz)
 end
@@ -539,12 +545,37 @@ local function clockAndWeather()
     return clock
 end
 
+local function farmIsBusy()
+    local mission = g_currentMission
+    if mission == nil then
+        return false
+    end
+    if mission.paused ~= true then
+        return true
+    end
+    local users = mission.userManager ~= nil and mission.userManager.getUsers ~= nil and mission.userManager:getUsers() or nil
+    if type(users) ~= "table" then
+        return false
+    end
+    for _, user in pairs(users) do
+        local id = nil
+        if user ~= nil and user.getId ~= nil then
+            id = user:getId()
+        end
+        if id ~= nil and id ~= 1 then
+            return true
+        end
+    end
+    return false
+end
+
 function LiveSnapshot.writeIfDue(connector)
     if connector == nil or connector.stateDir == nil or connector.writeTextFile == nil then
         return
     end
-    connector.liveAccumMs = (connector.liveAccumMs or LiveSnapshot.EVERY_MS) + (connector.TICK_MS or 5000)
-    if connector.liveAccumMs < LiveSnapshot.EVERY_MS then
+    local interval = farmIsBusy() and LiveSnapshot.EVERY_MS or LiveSnapshot.EVERY_IDLE_MS
+    connector.liveAccumMs = (connector.liveAccumMs or interval) + (connector.TICK_MS or 1000)
+    if connector.liveAccumMs < interval then
         return
     end
     connector.liveAccumMs = 0

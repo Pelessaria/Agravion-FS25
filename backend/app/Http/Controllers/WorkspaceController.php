@@ -200,7 +200,7 @@ class WorkspaceController extends Controller
             ]);
         }
 
-        return response()->json($connector->readLive($row));
+        return response()->json($connector->readLive($row, true));
     }
 
     public function pdaMap(string $workspace, ConnectorSnapshotService $connector): BinaryFileResponse|Response

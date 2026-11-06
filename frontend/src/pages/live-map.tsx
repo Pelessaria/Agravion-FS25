@@ -207,7 +207,8 @@ export function LiveMapPage() {
     void loadLive(true)
     void loadFleet()
     const fieldsTimer = window.setInterval(() => void loadFields(), 60_000)
-    const liveTimer = window.setInterval(() => void loadLive(false), 20_000)
+    // Match connector live write (~2 s busy); FTP pull is throttled server-side to 2 s.
+    const liveTimer = window.setInterval(() => void loadLive(false), 2_000)
     return () => {
       cancelled = true
       window.clearInterval(fieldsTimer)
@@ -967,20 +968,19 @@ function LiveCanvas({
               : null}
             {draw.map((marker) => {
               const on = marker.key === selected
-              const rotation = marker.heading == null ? 0 : (-marker.heading * 180) / Math.PI
+              // Giants yaw (FNT: MathUtil.getYRotationFromDirection) → SVG degrees.
+              // Arrow path points to -Y (map north); no sign flip — the old `-heading` inverted travel.
+              const rotation = marker.heading == null ? 0 : (marker.heading * 180) / Math.PI
               const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
               const piled = (marker.count ?? 0) > 1
               const base = piled ? 36 : marker.role === "tool" || marker.role === "trailer" || marker.role === "pallet" ? 22 : marker.role === "building" || marker.role === "player" ? 20 : 30
               const mark = toMap(on ? base + 4 : base)
               const ring = marker.farmColor || (marker.role === "player" ? "#f4f1e8" : "#8e9890")
-              const showArrow = marker.active && marker.heading != null && !piled
+              const showArrow = marker.heading != null && !piled
               return (
                 <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.role} is-on` : `live-marker is-${marker.role}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`scale(${mark})`}>
-                    {showArrow ? (
-                      <path className="live-heading" transform={`rotate(${rotation})`} d="M0,-1.78 L0.46,-1.02 L-0.46,-1.02 Z" style={{ fill: ring, stroke: "#101410", strokeWidth: 0.08 }} />
-                    ) : null}
-                    <circle r="1.16" style={{ fill: ring }} />
+                    <circle r="1.16" className="live-marker-ring" style={{ stroke: ring }} />
                     <circle r="0.94" className="live-marker-plate" />
                     {marker.icon ? (
                       <image href={marker.icon} x="-0.86" y="-0.86" width="1.72" height="1.72" clipPath="url(#live-icon-clip)" />
@@ -989,6 +989,9 @@ function LiveCanvas({
                         <MarkerGlyph role={marker.role} />
                       </g>
                     )}
+                    {showArrow ? (
+                      <path className="live-heading" transform={`rotate(${rotation})`} d="M0,-1.78 L0.46,-1.02 L-0.46,-1.02 Z" />
+                    ) : null}
                     {on ? <circle r="1.16" className="live-marker-rim" /> : null}
                   </g>
                   {piled ? (
