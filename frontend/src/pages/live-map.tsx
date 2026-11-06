@@ -11,7 +11,7 @@ import {
   type LivePlayer,
   type LiveVehicle,
 } from "../api"
-import { VehicleStatusRows } from "../components/equip-gauge"
+import { VehicleGauges } from "../components/equip-gauge"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
 import { cropIcon } from "../crop-icons"
 import { cropColor, projectPoint, effectiveMapSize, frameFromContentBox, measureMapContent, terrainFrame, type MapFrame } from "../field-format"
@@ -19,6 +19,7 @@ import { clampCamera, readMapView, sheetFor, writeMapView, type MapCamera } from
 import { useStore } from "../store"
 import type { FieldsResponse, Vehicle } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
+import { vehicleBrand, vehicleDisplayName } from "../vehicle-label"
 
 function withAlpha(hex: string, alpha: number) {
   const raw = hex.replace("#", "")
@@ -629,38 +630,69 @@ export function LiveMapPage() {
                 <ChevronRight className="icon" />
               </button>
             </div>
-            <header>
-              <strong>{focusPiece.name}</strong>
-              <span className={focusVehicle && vehicleOccupied(focusVehicle) ? "is-driver" : ""}>
-                {focusVehicle?.ai
-                  ? t("live.ai")
-                  : focusVehicle && vehicleOccupied(focusVehicle)
-                    ? focusVehicle.driver || t("live.occupied")
-                    : focusPiece.id === train.center.id
-                      ? t("live.parked")
+            <section className="live-sheet">
+              <div className="live-sheet-id">
+                <div>
+                  {focusFleet?.brandIconUrl ? (
+                    <img className="live-sheet-brand" src={focusFleet.brandIconUrl} alt={vehicleBrand(focusFleet) ?? ""} />
+                  ) : focusFleet && vehicleBrand(focusFleet) ? (
+                    <p className="live-sheet-brand-name">{vehicleBrand(focusFleet)}</p>
+                  ) : null}
+                  <strong>
+                    {focusFleet ? (
+                      <Link to={`/w/${workspace.id}/equipment/${focusFleet.id}`}>{vehicleDisplayName(focusPiece.name)}</Link>
+                    ) : (
+                      vehicleDisplayName(focusPiece.name)
+                    )}
+                  </strong>
+                  <span>
+                    {focusFleet
+                      ? t(focusFleet.category === "harvester" ? "vehicles.selfpropelled" : `vehicles.${focusFleet.category}`)
                       : t(`live.role.${focusPiece.role}`)}
-              </span>
-            </header>
-            <dl>
-              {focusFleet?.hours != null ? (
-                <div>
-                  <dt>{t("vehicles.hours")}</dt>
-                  <dd>{focusFleet.hours.toLocaleString(i18n.language, { maximumFractionDigits: 1 })} h</dd>
+                    <i>·</i>
+                    <em className={focusVehicle && vehicleOccupied(focusVehicle) ? "is-driver" : ""}>
+                      {focusVehicle?.ai
+                        ? t("live.ai")
+                        : focusVehicle && vehicleOccupied(focusVehicle)
+                          ? focusVehicle.driver || t("live.occupied")
+                          : t("live.parked")}
+                    </em>
+                  </span>
                 </div>
+              </div>
+              {focusFleet ? <VehicleGauges vehicle={focusFleet} language={i18n.language} label={(key) => t(key)} /> : null}
+              {focusFleet ? (
+                <dl className="live-sheet-facts">
+                  <div>
+                    <dt>{t("vehicles.hours")}</dt>
+                    <dd>
+                      {focusFleet.hours == null
+                        ? t("unavailable")
+                        : `${focusFleet.hours.toLocaleString(i18n.language, { maximumFractionDigits: 1 })} h`}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t("vehicles.farm")}</dt>
+                    <dd>
+                      {payload?.farms?.find((farm) => farm.id === focusFleet.farmId)?.name ||
+                        (focusFleet.farmId == null ? t("unavailable") : String(focusFleet.farmId))}
+                    </dd>
+                  </div>
+                  {focusFleet.plate ? (
+                    <div>
+                      <dt>{t("vehicles.plate")}</dt>
+                      <dd>{focusFleet.plate}</dd>
+                    </div>
+                  ) : null}
+                  {focusFleet.fill ? (
+                    <div>
+                      <dt>{t("vehicles.fill")}</dt>
+                      <dd>{i18n.language === "en" ? focusFleet.fill.en : focusFleet.fill.de}</dd>
+                    </div>
+                  ) : null}
+                </dl>
               ) : null}
-              {focusFleet?.fill ? (
-                <div>
-                  <dt>{t("vehicles.fill")}</dt>
-                  <dd>{i18n.language === "en" ? focusFleet.fill.en : focusFleet.fill.de}</dd>
-                </div>
-              ) : null}
-            </dl>
-            {focusFleet ? <VehicleStatusRows vehicle={focusFleet} language={i18n.language} label={(key) => t(key)} /> : null}
-            {focusFleet ? (
-              <Link className="btn btn-secondary live-inspect-open" to={`/w/${workspace.id}/equipment/${focusFleet.id}`}>
-                {t("modules.equipment")}
-              </Link>
-            ) : null}
+            </section>
           </aside>
         ) : null}
         <div className="live-toolbar">
