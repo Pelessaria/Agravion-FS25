@@ -33,9 +33,11 @@
   --text: #f3f4f5;
   --text-muted: #c4c8cb;
   --text-faint: #8d9398;
+  /* Brand chrome — overridden by accent-theme.ts (presets / custom). */
   --accent: #a52e35;
   --accent-2: #d4787e;
   --accent-ink: #fff6f6;
+  --accent-bright: #c45c63;
   --ok: #4caf50;
   --ok-2: #9fd4a3;
   --online: var(--ok);
@@ -43,7 +45,7 @@
   --warning: #ff8f5a;
   --danger: #ff6d88;
   --shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px rgba(0, 0, 0, 0.45);
-  --brand: linear-gradient(135deg, #c45c63 0%, #a52e35 100%);
+  --brand: linear-gradient(135deg, var(--accent-bright) 0%, var(--accent) 100%);
   --radius: 18px;
   --radius-sm: 12px;
   --sidebar: 248px;
@@ -1448,7 +1450,7 @@ h1, h2, h3, p { margin: 0; }
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #c45c63, #a52e35);
+  background: linear-gradient(90deg, var(--accent-bright), var(--accent));
 }
 .hbar-track.empty {
   background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.03) 0 6px, rgba(255, 255, 255, 0.07) 6px 12px);
@@ -2138,6 +2140,74 @@ h1.title-with-no { display: flex; }
 .danger-card { border-color: color-mix(in srgb, var(--danger) 38%, var(--line)); }
 .settings-card .lang { width: fit-content; }
 .settings-card .lang button { min-width: 7.5rem; }
+.accent-theme {
+  display: grid;
+  gap: 14px;
+}
+.accent-preset-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.accent-swatch {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 4.5rem;
+  padding: 8px 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.accent-swatch:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--line-strong)); color: var(--text); }
+.accent-swatch[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line-strong));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+  color: var(--text);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.accent-swatch-chip {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.accent-swatch-chip.is-custom {
+  background:
+    conic-gradient(from 210deg, #a52e35, #4caf50, #3b6fd4, #c9a227, #d96a2b, #7b4fc4, #a52e35);
+}
+.accent-custom-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.accent-custom-row input[type="color"] {
+  width: 44px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+.accent-custom-row input[type="text"] {
+  width: min(9.5rem, 100%);
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.accent-custom-row input[type="text"]:focus {
+  border-color: var(--accent);
+  outline: none;
+}
 
 .update-status {
   display: grid;
@@ -2302,7 +2372,7 @@ tbody tr { cursor: pointer; }
 }
 .people-tools { display: grid; gap: 10px; }
 .people-tools .btn-primary {
-  background: color-mix(in srgb, var(--accent) 78%, #1a0c0e);
+  background: color-mix(in srgb, var(--accent) 78%, #121416);
   color: #fff;
   box-shadow: none;
   font-weight: 600;
@@ -2350,7 +2420,7 @@ tbody tr { cursor: pointer; }
 }
 .person.selected .avatar {
   color: #fff;
-  background: color-mix(in srgb, var(--accent) 70%, #2a1216);
+  background: color-mix(in srgb, var(--accent) 70%, #1a1e22);
   border-color: transparent;
 }
 .access-intro { display: grid; gap: 4px; }
@@ -2395,7 +2465,7 @@ tbody tr { cursor: pointer; }
   height: 48px;
   font-size: 0.9rem;
   color: #fff;
-  background: color-mix(in srgb, var(--accent) 65%, #1f0e12);
+  background: color-mix(in srgb, var(--accent) 65%, #161a1e);
   border-color: transparent;
 }
 .person-head h2 { font-size: 1.2rem; letter-spacing: -0.03em; font-weight: 600; }
@@ -2897,7 +2967,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   min-width: 1.1rem;
   padding: 0 5px;
   border-radius: 99px;
-  background: color-mix(in srgb, var(--accent) 28%, #261618);
+  background: color-mix(in srgb, var(--accent) 28%, #1c2024);
   font-size: 0.72rem;
 }
 .fields-filter-toggle .icon { width: 14px; height: 14px; }

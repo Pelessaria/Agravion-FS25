@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react"
 import { useTranslation } from "react-i18next"
 import { Camera, CheckCircle2, CircleAlert, LoaderCircle, RefreshCw, ShieldCheck } from "lucide-react"
+import { AccentThemeSettings } from "../components/accent-theme-settings"
 import {
   applyUpdate,
   checkForUpdates,
@@ -550,6 +551,13 @@ export function SettingsPage() {
                 {t("english")}
               </button>
             </div>
+          </section>
+          <section className="panel settings-card">
+            <div className="settings-card-head">
+              <h2>{t("settings.accentTitle")}</h2>
+              <p className="hint">{t("settings.accentLead")}</p>
+            </div>
+            <AccentThemeSettings />
           </section>
           {!store.liveMode ? (
             <p className="hint">{t("settings.viewAsMoved")}</p>
