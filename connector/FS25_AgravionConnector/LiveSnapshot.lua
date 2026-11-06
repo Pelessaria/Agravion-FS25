@@ -247,6 +247,57 @@ local function appendVehicles(connector, parts, fingerprint)
     end)
 end
 
+-- FS25 on-foot pose (same layout as FNT LivemapGame.playerPosition).
+local function playerPose(player)
+    if player == nil then
+        return nil, nil, nil
+    end
+    local moving = player.positionalInterpolator
+    if moving ~= nil and moving.positionInterpolator ~= nil then
+        local pos = moving.positionInterpolator
+        local x = num(pos.positionX)
+        local z = num(pos.positionZ)
+        local heading = nil
+        if moving.yawInterpolator ~= nil then
+            heading = num(moving.yawInterpolator.value)
+        elseif num(moving.yaw) ~= nil then
+            heading = num(moving.yaw)
+        end
+        return x, z, heading
+    end
+    if player.getPosition ~= nil then
+        local ok, x, _, z = pcall(function()
+            return player:getPosition()
+        end)
+        if ok then
+            return num(x), num(z), nil
+        end
+    end
+    local node = player.rootNode or player.graphicsRootNode
+    if node ~= nil and getWorldTranslation ~= nil then
+        local x, _, z = getWorldTranslation(node)
+        return num(x), num(z), headingOf(node)
+    end
+    return nil, nil, nil
+end
+
+local function playerNickname(user, connection)
+    local name = safeMethod(user, "getNickname")
+    if type(name) == "string" and name ~= "" then
+        return name
+    end
+    if user ~= nil and type(user.nickname) == "string" and user.nickname ~= "" then
+        return user.nickname
+    end
+    if connection ~= nil and type(connection.nickname) == "string" and connection.nickname ~= "" then
+        return connection.nickname
+    end
+    if connection ~= nil and type(connection.userName) == "string" and connection.userName ~= "" then
+        return connection.userName
+    end
+    return nil
+end
+
 local function appendPlayers(connector, parts, fingerprint)
     local mission = g_currentMission
     local users = mission ~= nil and mission.userManager ~= nil and safeMethod(mission.userManager, "getUsers") or nil
@@ -255,7 +306,8 @@ local function appendPlayers(connector, parts, fingerprint)
             if user == nil then
                 return
             end
-            local userId = num(user.id) or num(safeMethod(user, "getId"))
+            local userId = num(safeMethod(user, "getId")) or num(user.id)
+            -- Dedicated-server user (id 1) is not a playable farm hand.
             if userId == nil or userId <= 1 then
                 return
             end
@@ -267,21 +319,24 @@ local function appendPlayers(connector, parts, fingerprint)
             if player == nil then
                 return
             end
+            -- In a vehicle: the vehicle marker already carries the driver name.
             if safeMethod(player, "getCurrentVehicle") ~= nil then
                 return
             end
-            local motion = player.positionalInterpolator
-            local x = motion ~= nil and num(motion.positionX) or nil
-            local z = motion ~= nil and num(motion.positionZ) or nil
+            local x, z, heading = playerPose(player)
             if x == nil or z == nil then
                 return
             end
-            local heading = motion ~= nil and num(motion.yaw) or nil
-            local name = user.nickname or connection.nickname
+            local name = playerNickname(user, connection)
+            local farmId = num(player.farmId) or num(safeMethod(player, "getFarmId"))
+            if farmId ~= nil and farmId <= 0 then
+                farmId = nil
+            end
             parts[#parts + 1] = string.format(
-                "<player%s%s%s%s%s />",
+                "<player%s%s%s%s%s%s />",
                 attr(connector, "id", userId),
                 attr(connector, "name", name),
+                attr(connector, "farmId", farmId),
                 attr(connector, "x", round(x, 1)),
                 attr(connector, "z", round(z, 1)),
                 attr(connector, "heading", heading ~= nil and round(heading, 3) or nil)

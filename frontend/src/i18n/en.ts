@@ -1078,6 +1078,7 @@ export const en = {
     allFarms: "All farms",
     ai: "AI",
     occupied: "Occupied",
+    onFoot: "On foot",
     attachments: "Attached",
     cluster: "{{count}} vehicles",
     clusterHint: "Choose an entry to move there.",

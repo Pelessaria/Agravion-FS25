@@ -235,6 +235,7 @@ export type LiveVehicle = {
 export type LivePlayer = {
   id: string
   name: string | null
+  farmId?: number | null
   x: number
   z: number
   heading: number | null

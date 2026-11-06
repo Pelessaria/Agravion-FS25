@@ -400,10 +400,10 @@ export function LiveMapPage() {
     })),
     ...visiblePlayers.map((player) => ({
       key: `p:${player.id}`,
-      farmId: null as number | null,
+      farmId: player.farmId ?? null,
       kind: "player" as const,
-      name: player.name || player.id,
-      detail: t("live.players"),
+      name: player.name || t("live.players"),
+      detail: t("live.onFoot"),
       iconUrl: null,
       role: "player" as const,
     })),
@@ -730,7 +730,9 @@ function MarkerGlyph({ role }: { role: MarkerRole }) {
 }
 
 function showsHeading(role: MarkerRole, active: boolean, heading: number | null, piled: boolean) {
-  if (piled || heading == null || !active) return false
+  if (piled || heading == null) return false
+  if (role === "player") return true
+  if (!active) return false
   return role === "tractor" || role === "harvester" || role === "vehicle"
 }
 
@@ -890,13 +892,13 @@ function LiveCanvas({
         heading: player.heading,
         kind: "player",
         role: "player",
-        farmColor: null,
-        label: player.name || player.id,
+        farmColor: placeColor(player.farmId ?? null),
+        label: player.name || t("live.players"),
         icon: null,
-        active: false,
-        occupied: false,
+        active: true,
+        occupied: true,
         attachments: null,
-        priority: rolePriority("player"),
+        priority: 90,
         busy: null,
       })
     }
@@ -939,11 +941,11 @@ function LiveCanvas({
       })
     }
     return next
-  }, [frame, pin, placeColor, places, players, vehicleIcon, vehicleRole, vehicles])
+  }, [frame, pin, placeColor, places, players, t, vehicleIcon, vehicleRole, vehicles])
 
   const draw = useMemo(() => {
-    // Occupied (player-driven) vehicles stay unclustered and draw on top.
-    const kept = markers.filter((marker) => marker.key === selected || marker.kind === "pin" || marker.occupied)
+    // Occupied vehicles and on-foot players stay unclustered and draw on top.
+    const kept = markers.filter((marker) => marker.key === selected || marker.kind === "pin" || marker.occupied || marker.kind === "player")
     const pool = markers.filter((marker) => marker.key !== selected && marker.kind !== "pin" && !marker.occupied)
     const used = new Array(pool.length).fill(false)
     const placed: Marker[] = [...kept]
@@ -1206,7 +1208,8 @@ function LiveCanvas({
               ]
                 .filter(Boolean)
                 .join(" ")
-              const showCaption = (on || marker.occupied) && Boolean(marker.label || marker.attachments || marker.busy)
+              const showCaption =
+                (on || marker.occupied || marker.kind === "player") && Boolean(marker.label || marker.attachments || marker.busy)
               return (
                 <g key={marker.key} data-marker={marker.key} className={`live-marker ${stateClass}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`scale(${mark})`}>

@@ -90,6 +90,7 @@ final class ConnectorLiveParser
             $empty['players'][] = [
                 'id' => self::text($node['id'] ?? null) ?? '',
                 'name' => self::text($node['name'] ?? null),
+                'farmId' => self::positiveInt($node['farmId'] ?? null),
                 'x' => $x,
                 'z' => $z,
                 'heading' => self::floatAttr($node['heading'] ?? null),
