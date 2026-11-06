@@ -86,52 +86,41 @@ type TrainPiece = {
   role: MarkerRole
 }
 
-/** Order a hitch along the lead's forward axis: ahead, then the powered vehicle, then behind. */
+/** Hitch from the connector's attachment names, ordered ahead of / behind the powered vehicle. */
 function hitchTrain(
   clicked: LiveVehicle,
   all: LiveVehicle[],
   roleOf: (vehicle: LiveVehicle) => MarkerRole,
   iconOf: (vehicle: LiveVehicle) => string | null,
 ): { center: LiveVehicle; front: TrainPiece[]; rear: TrainPiece[] } {
-  const piece = (vehicle: LiveVehicle): TrainPiece => ({
-    id: vehicle.id,
-    name: vehicle.name || vehicle.id,
-    icon: iconOf(vehicle),
-    role: roleOf(vehicle),
-  })
-  const mates = (origin: LiveVehicle) => {
-    if (origin.heading == null) return [] as { vehicle: LiveVehicle; along: number }[]
-    const fx = Math.sin(origin.heading)
-    const fz = Math.cos(origin.heading)
-    const found: { vehicle: LiveVehicle; along: number }[] = []
-    for (const other of all) {
-      if (other.id === origin.id) continue
-      const dx = other.x - origin.x
-      const dz = other.z - origin.z
-      const along = dx * fx + dz * fz
-      const lateral = dx * fz - dz * fx
-      if (Math.abs(along) < 0.6 || Math.abs(along) > 28 || Math.abs(lateral) > 8) continue
-      if (!implementRole(roleOf(other))) continue
-      found.push({ vehicle: other, along })
-    }
-    return found
-  }
   const nearestPower = all
-    .filter((other) => other.id !== clicked.id && poweredRole(roleOf(other)) && Math.hypot(other.x - clicked.x, other.z - clicked.z) < 28)
+    .filter((other) => other.id !== clicked.id && poweredRole(roleOf(other)) && Math.hypot(other.x - clicked.x, other.z - clicked.z) < 18)
     .sort((a, b) => Number(vehicleOccupied(b)) - Number(vehicleOccupied(a)) || rolePriority(roleOf(b)) - rolePriority(roleOf(a)))[0]
   const center = poweredRole(roleOf(clicked)) ? clicked : nearestPower ?? clicked
-  const line = mates(center)
-  const toPieces = (rows: { vehicle: LiveVehicle; along: number }[]) =>
-    [...rows].sort((a, b) => b.along - a.along).map((row) => piece(row.vehicle))
-  let front = toPieces(line.filter((row) => row.along > 0))
-  let rear = toPieces(line.filter((row) => row.along < 0))
-  if (front.length === 0 && rear.length === 0 && clicked.attachments) {
-    rear = clicked.attachments
-      .split("·")
-      .map((name) => name.trim())
-      .filter(Boolean)
-      .map((name) => ({ id: `name:${name}`, name, icon: null, role: "tool" as const }))
+  const names = (center.attachments ?? "")
+    .split("·")
+    .map((name) => name.trim())
+    .filter(Boolean)
+  const used = new Set<string>([center.id])
+  const alongOf = (vehicle: LiveVehicle) => {
+    if (center.heading == null) return -1
+    const fx = Math.sin(center.heading)
+    const fz = Math.cos(center.heading)
+    return (vehicle.x - center.x) * fx + (vehicle.z - center.z) * fz
   }
+  const rows = names.map((name) => {
+    const match = all
+      .filter((vehicle) => !used.has(vehicle.id) && (vehicle.name ?? "").trim() === name)
+      .sort((a, b) => Math.hypot(a.x - center.x, a.z - center.z) - Math.hypot(b.x - center.x, b.z - center.z))[0]
+    if (match) used.add(match.id)
+    const along = match ? alongOf(match) : -1
+    const piece: TrainPiece = match
+      ? { id: match.id, name: match.name || name, icon: iconOf(match), role: roleOf(match) }
+      : { id: `name:${name}`, name, icon: null, role: "tool" }
+    return { piece, along }
+  })
+  const front = rows.filter((row) => row.along > 0.4).sort((a, b) => b.along - a.along).map((row) => row.piece)
+  const rear = rows.filter((row) => row.along <= 0.4).sort((a, b) => b.along - a.along).map((row) => row.piece)
   return { center, front, rear }
 }
 
