@@ -2726,10 +2726,9 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   --fields-stat-label: 0.72rem;
   --fields-stat-label-lh: 1.15;
   --fields-stat-stack-gap: 2px;
-  --fields-stat-rail: calc(
-    (var(--fields-stat-label) * var(--fields-stat-label-lh)) +
-    var(--fields-stat-stack-gap) +
-    1.45rem
+  --fields-stat-stack: calc(
+    (var(--fields-stat-label) * var(--fields-stat-label-lh) * 2) +
+    var(--fields-stat-stack-gap)
   );
   display: flex;
   flex-wrap: wrap;
@@ -2773,9 +2772,8 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 /*
  * Icon + Zahl bleiben auf der gemeinsamen Zeile.
- * Rechts daneben: „Erntebereit“ über „davon …“;
- * „davon …“ sitzt auf Höhe der Labels (Felder, Im Besitz, …).
- * Icons + Pipes werden so hoch wie beide Textzeilen.
+ * Rechts daneben: „Erntebereit“ über „davon …“.
+ * Icons größer (quadratisch), Pipes nur so hoch wie die beiden Labels.
  */
 .fields-stats p.has-note > span {
   position: relative;
@@ -2803,9 +2801,9 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   padding-top: calc((var(--fields-stat-label) * var(--fields-stat-label-lh)) + var(--fields-stat-stack-gap));
 }
 .fields-stats:has(.has-note) .fields-stat-icon {
-  width: 18px;
-  height: var(--fields-stat-rail);
-  transform: translateY(calc(-1 * (var(--fields-stat-label) * var(--fields-stat-label-lh) + var(--fields-stat-stack-gap))));
+  width: 22px;
+  height: 22px;
+  transform: translateY(calc(-0.5 * (var(--fields-stat-label) * var(--fields-stat-label-lh) + var(--fields-stat-stack-gap))));
 }
 .fields-stats:has(.has-note) p + p {
   box-shadow: none;
@@ -2815,7 +2813,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   position: absolute;
   left: 0;
   top: calc(-1 * ((var(--fields-stat-label) * var(--fields-stat-label-lh)) + var(--fields-stat-stack-gap)));
-  bottom: 0;
+  height: var(--fields-stat-stack);
   width: 1px;
   background: color-mix(in srgb, var(--accent) 45%, transparent);
 }
