@@ -4606,7 +4606,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   overflow: hidden;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.28);
 }
-.live-carousel-dot img, .live-carousel-dot .icon { width: 46px; height: 46px; object-fit: contain; }
+.live-carousel-dot img, .live-carousel-dot .icon { width: 46px; height: 46px; object-fit: contain; object-position: center; }
 .live-carousel-dot.is-main {
   width: 96px;
   height: 96px;
@@ -4947,7 +4947,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   z-index: 6;
   left: 78px;
   right: 18px;
-  bottom: 58px;
+  bottom: 108px;
   width: min(460px, calc(100% - 96px));
   max-height: min(460px, 68%);
   overflow: auto;

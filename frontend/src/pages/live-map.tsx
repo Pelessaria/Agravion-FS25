@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
-import { Boxes, ChevronLeft, ChevronRight, Loader2, Minus, Plus, Search, Tractor, Truck, UserRound, Warehouse, Wheat, Wrench } from "lucide-react"
+import { Boxes, ChevronLeft, ChevronRight, LandPlot, Loader2, Minus, Plus, Search, Tractor, Truck, UserRound, Warehouse, Wheat, Wrench } from "lucide-react"
 import {
   apiWorkspaceFields,
   apiWorkspaceLiveFleet,
@@ -202,6 +202,99 @@ function onListIconError(event: SyntheticEvent<HTMLImageElement>) {
   wrap?.querySelector(".icon-fallback")?.classList.remove("is-hidden")
 }
 
+const iconTrimCache = new Map<string, string>()
+const iconTrimJobs = new Map<string, Promise<string>>()
+
+function trimVehicleIcon(url: string): Promise<string> {
+  const known = iconTrimCache.get(url)
+  if (known) return Promise.resolve(known)
+  const pending = iconTrimJobs.get(url)
+  if (pending) return pending
+  const job = new Promise<string>((resolve) => {
+    const finish = (next: string) => {
+      iconTrimCache.set(url, next)
+      resolve(next)
+    }
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const width = img.naturalWidth
+        const height = img.naturalHeight
+        if (width < 8 || height < 8) {
+          finish(url)
+          return
+        }
+        const source = document.createElement("canvas")
+        source.width = width
+        source.height = height
+        const ctx = source.getContext("2d", { willReadFrequently: true })
+        if (!ctx) {
+          finish(url)
+          return
+        }
+        ctx.drawImage(img, 0, 0)
+        const data = ctx.getImageData(0, 0, width, height).data
+        let minX = width
+        let minY = height
+        let maxX = -1
+        let maxY = -1
+        const step = 2
+        for (let y = 0; y < height; y += step) {
+          const row = y * width
+          for (let x = 0; x < width; x += step) {
+            if (data[(row + x) * 4 + 3] <= 24) continue
+            if (x < minX) minX = x
+            if (y < minY) minY = y
+            if (x > maxX) maxX = x
+            if (y > maxY) maxY = y
+          }
+        }
+        if (maxX < 0) {
+          finish(url)
+          return
+        }
+        maxX = Math.min(width - 1, maxX + step)
+        maxY = Math.min(height - 1, maxY + step)
+        const contentW = maxX - minX + 1
+        const contentH = maxY - minY + 1
+        const centerX = (minX + maxX) / 2 / width
+        const centerY = (minY + maxY) / 2 / height
+        const alreadyCentered =
+          Math.abs(centerX - 0.5) < 0.04 &&
+          Math.abs(centerY - 0.5) < 0.04 &&
+          contentW / width > 0.9 &&
+          contentH / height > 0.9
+        if (alreadyCentered) {
+          finish(url)
+          return
+        }
+        const pad = Math.round(Math.max(contentW, contentH) * 0.08)
+        const cropX = Math.max(0, minX - pad)
+        const cropY = Math.max(0, minY - pad)
+        const cropW = Math.min(width - cropX, maxX - minX + 1 + pad * 2)
+        const cropH = Math.min(height - cropY, maxY - minY + 1 + pad * 2)
+        const side = Math.max(cropW, cropH)
+        const out = document.createElement("canvas")
+        out.width = side
+        out.height = side
+        const outCtx = out.getContext("2d")
+        if (!outCtx) {
+          finish(url)
+          return
+        }
+        outCtx.drawImage(source, cropX, cropY, cropW, cropH, (side - cropW) / 2, (side - cropH) / 2, cropW, cropH)
+        out.toBlob((blob) => finish(blob ? URL.createObjectURL(blob) : url), "image/png")
+      } catch {
+        finish(url)
+      }
+    }
+    img.onerror = () => finish(url)
+    img.src = url
+  })
+  iconTrimJobs.set(url, job)
+  return job
+}
+
 function CarouselDot({ piece, main, on }: { piece: TrainPiece; main?: boolean; on?: boolean }) {
   return (
     <span className={["live-carousel-dot", main ? "is-main" : "", on ? "is-on" : ""].filter(Boolean).join(" ")} title={piece.name}>
@@ -222,6 +315,7 @@ export function LiveMapPage() {
   const [payload, setPayload] = useState<LiveMapResponse | null>(null)
   const [fields, setFields] = useState<FieldsResponse | null>(null)
   const [fleet, setFleet] = useState<Vehicle[]>([])
+  const [trimmedIcons, setTrimmedIcons] = useState<Record<string, string>>({})
   const [bootLoading, setBootLoading] = useState(liveMode)
   const [pdaReadyFor, setPdaReadyFor] = useState<string | null>(null)
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
@@ -441,7 +535,14 @@ export function LiveMapPage() {
     return map
   }, [fleet, workspace?.id])
   const fleetMatch = useCallback((id: string) => fleetById.get(id) ?? null, [fleetById])
-  const vehicleIconOf = useCallback((vehicle: LiveVehicle) => fleetById.get(vehicle.id)?.iconUrl ?? null, [fleetById])
+  const vehicleIconOf = useCallback(
+    (vehicle: LiveVehicle) => {
+      const url = fleetById.get(vehicle.id)?.iconUrl ?? null
+      if (!url) return null
+      return trimmedIcons[url] ?? url
+    },
+    [fleetById, trimmedIcons],
+  )
   const selectedVehicle = vehicles.find((vehicle) => `v:${vehicle.id}` === selected) ?? null
 
   const mapUrl = workspace && fields?.pdaMap && liveMode ? `/api/workspaces/${workspace.id}/pda-map` : null
@@ -451,15 +552,27 @@ export function LiveMapPage() {
   const mapBusy = bootLoading || pdaPending
   const hasMapFrame = Boolean(reported && reported.worldX > 0 && reported.worldZ > 0 && reported.scaleX > 0 && reported.scaleZ > 0)
 
-  // Warm browser cache so SVG <image> markers paint quickly once fleet icons exist.
+  // Store icons sit low in their frame. Crop to the painted pixels and center them in a square.
   useEffect(() => {
-    const urls = [...new Set([...fleetById.values()].map((item) => item.iconUrl).filter(Boolean))] as string[]
-    for (const url of urls) {
-      const img = new Image()
-      img.decoding = "async"
-      img.src = url
+    const urls = [...new Set(fleet.flatMap((item) => (item.iconUrl ? [item.iconUrl] : [])))]
+    let cancelled = false
+    let cursor = 0
+    const apply = (url: string, next: string) => {
+      if (cancelled || next === url) return
+      setTrimmedIcons((prev) => (prev[url] === next ? prev : { ...prev, [url]: next }))
     }
-  }, [fleetById])
+    const worker = async () => {
+      while (cursor < urls.length) {
+        const url = urls[cursor]
+        cursor += 1
+        apply(url, await trimVehicleIcon(url))
+      }
+    }
+    void Promise.all([worker(), worker(), worker()])
+    return () => {
+      cancelled = true
+    }
+  }, [fleet])
 
   useEffect(() => {
     if (!bootLoading) return
@@ -870,7 +983,7 @@ export function LiveMapPage() {
         <span><Tractor className="icon" /><strong>{vehicleCount}</strong><small>{t("live.vehicles")}</small></span>
         <span><Wrench className="icon" /><strong>{implementCount}</strong><small>{t("live.implements")}</small></span>
         <span><Warehouse className="icon" /><strong>{places.length}</strong><small>{t("live.buildings")}</small></span>
-        <span><strong>{fields?.fields.length ?? 0}</strong><small>{t("modules.fields")}</small></span>
+        <span><LandPlot className="icon" /><strong>{fields?.fields.length ?? 0}</strong><small>{t("modules.fields")}</small></span>
       </div>
       </div>
     </div>
