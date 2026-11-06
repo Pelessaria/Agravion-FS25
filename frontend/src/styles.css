@@ -797,9 +797,9 @@ h1, h2, h3, p { margin: 0; }
   border-radius: inherit;
   background: var(--status-color);
 }
-.status-fuel { --status-color: #6aad7a; }
-.status-wear { --status-color: #c9954a; }
-.status-adblue { --status-color: #5a96b0; }
+.status-fuel { --status-color: #3f9e5c; }
+.status-wear { --status-color: #d4893a; }
+.status-adblue { --status-color: #3b8fc4; }
 .equip-sheet > .status-list {
   margin: 18px 28px 0;
   padding-top: 14px;
