@@ -5,6 +5,7 @@ import { Boxes, ChevronLeft, ChevronRight, Loader2, Minus, Plus, Search, Tractor
 import {
   apiWorkspaceFields,
   apiWorkspaceLiveFleet,
+  apiWorkspaceVehicles,
   apiWorkspaceLiveMap,
   type LiveMapResponse,
   type LivePlace,
@@ -306,7 +307,13 @@ export function LiveMapPage() {
     }
     const loadFleet = async () => {
       try {
-        // Local connector icons/categories only — no dedicated-server feed roundtrip.
+        const next = await apiWorkspaceVehicles(workspace.id)
+        if (!cancelled) setFleet(next.vehicles ?? [])
+        return
+      } catch {
+        // Icons still come from the local fleet if the equipment feed is down.
+      }
+      try {
         const next = await apiWorkspaceLiveFleet(workspace.id)
         if (!cancelled) setFleet(next.vehicles ?? [])
       } catch {
@@ -318,11 +325,13 @@ export function LiveMapPage() {
     void loadLive(true)
     void loadFleet()
     const fieldsTimer = window.setInterval(() => void loadFields(), 60_000)
+    const fleetTimer = window.setInterval(() => void loadFleet(), 30_000)
     // Match connector live write (~2 s busy); FTP pull runs afterResponse server-side.
     const liveTimer = window.setInterval(() => void loadLive(false), 2_000)
     return () => {
       cancelled = true
       window.clearInterval(fieldsTimer)
+      window.clearInterval(fleetTimer)
       window.clearInterval(liveTimer)
     }
   }, [access, allowed, liveMode, workspace])
