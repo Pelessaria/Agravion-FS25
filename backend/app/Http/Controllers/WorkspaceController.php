@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Workspace;
+use App\Services\Fs25\BrandName;
 use App\Services\Fs25\ConnectorDeployService;
 use App\Services\Fs25\ConnectorSnapshotService;
 use App\Services\Fs25\HostAccessService;
@@ -442,6 +443,31 @@ class WorkspaceController extends Controller
         $row = $this->findWorkspace($workspace);
         // Local cache only — never FTP from an <img> request.
         $path = $icons->localPath($row, $modKey) ?? $connector->cachedIconPath($row, $modKey);
+
+        return $this->iconFileResponse($path);
+    }
+
+    public function brandIcon(
+        string $workspace,
+        string $brandKey,
+        ConnectorSnapshotService $connector,
+        ModIconCacheService $icons,
+    ): BinaryFileResponse|Response {
+        $row = $this->findWorkspace($workspace);
+        $key = BrandName::iconKey($brandKey, null) ?? '';
+        if ($key === '') {
+            return response('Icon not found.', 404)->header('Content-Type', 'text/plain; charset=UTF-8');
+        }
+        $cacheKey = $icons->brandCacheKey($key);
+        $path = $icons->localPath($row, $cacheKey)
+            ?? $icons->localDdsPath($row, $cacheKey)
+            ?? $connector->cachedBrandIconPath($row, $key);
+
+        return $this->iconFileResponse($path);
+    }
+
+    private function iconFileResponse(?string $path): BinaryFileResponse|Response
+    {
         if ($path === null || ! is_file($path)) {
             return response('Icon not found.', 404)->header('Content-Type', 'text/plain; charset=UTF-8');
         }

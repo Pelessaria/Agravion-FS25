@@ -19,6 +19,7 @@ final class ConnectorVehiclesParser
      *   storeKey: string|null,
      *   modKey: string|null,
      *   brand: string|null,
+     *   brandKey: string|null,
      *   fuel: float|null,
      *   fuelCapacity: float|null,
      *   defLevel: float|null,
@@ -50,6 +51,10 @@ final class ConnectorVehiclesParser
             $storeKey = self::attr($attrBlob, 'storeKey') ?? StoreKey::fromFilename($filename);
             $modKey = self::attr($attrBlob, 'modKey');
             $brand = self::attr($attrBlob, 'brand');
+            $brandKey = self::attr($attrBlob, 'brandKey');
+            if ($brandKey === null && is_string($brand) && $brand !== '') {
+                $brandKey = strtolower((string) preg_replace('/[^a-zA-Z0-9._-]+/', '', $brand));
+            }
             $fuel = self::floatAttr($attrBlob, 'fuel');
             $fuelCapacity = self::floatAttr($attrBlob, 'fuelCapacity');
             $defLevel = self::floatAttr($attrBlob, 'defLevel');
@@ -72,6 +77,7 @@ final class ConnectorVehiclesParser
                 'storeKey' => $storeKey,
                 'modKey' => $modKey,
                 'brand' => $brand,
+                'brandKey' => $brandKey,
                 'fuel' => $fuel,
                 'fuelCapacity' => $fuelCapacity,
                 'defLevel' => $defLevel,

@@ -216,6 +216,22 @@ final class WorkspaceFeedService
                         || $iconCache->localDdsPath($workspace, $modKey) !== null)) {
                     $modIconUrl = $iconCache->publicUrl($workspace, $modKey);
                 }
+                $brand = BrandName::resolve(
+                    isset($vehicle['brand']) && is_string($vehicle['brand']) ? $vehicle['brand'] : null,
+                    is_string($filename) ? $filename : null,
+                    is_string($modKey) ? $modKey : null,
+                    isset($vehicle['name']) && is_string($vehicle['name']) ? $vehicle['name'] : null,
+                );
+                $brandKey = BrandName::iconKey(
+                    isset($vehicle['brandKey']) && is_string($vehicle['brandKey']) ? $vehicle['brandKey'] : null,
+                    isset($vehicle['brand']) && is_string($vehicle['brand']) ? $vehicle['brand'] : null,
+                );
+                $brandIconUrl = null;
+                if (is_string($brandKey) && $brandKey !== ''
+                    && ($iconCache->brandLocalPath($workspace, $brandKey) !== null
+                        || $iconCache->brandLocalDdsPath($workspace, $brandKey) !== null)) {
+                    $brandIconUrl = $iconCache->brandPublicUrl($workspace, $brandKey);
+                }
                 $vehicles[] = [
                     'id' => $unique
                         ? 'feed-'.$workspace->public_id.'-'.$unique
@@ -232,15 +248,12 @@ final class WorkspaceFeedService
                     'farmId' => $vehicle['farmId'] ?? null,
                     'storeKey' => $storeKey,
                     'modKey' => $modKey,
-                    'brand' => BrandName::resolve(
-                        isset($vehicle['brand']) && is_string($vehicle['brand']) ? $vehicle['brand'] : null,
-                        is_string($filename) ? $filename : null,
-                        is_string($modKey) ? $modKey : null,
-                        isset($vehicle['name']) && is_string($vehicle['name']) ? $vehicle['name'] : null,
-                    ),
+                    'brand' => $brand,
+                    'brandKey' => $brandKey,
                     'filename' => is_string($filename) && $filename !== '' ? $filename : null,
                     'iconUrl' => $iconUrl,
                     'modIconUrl' => $modIconUrl,
+                    'brandIconUrl' => $brandIconUrl,
                     'x' => $vehicle['x'] ?? null,
                     'y' => $vehicle['y'] ?? null,
                     'z' => $vehicle['z'] ?? null,

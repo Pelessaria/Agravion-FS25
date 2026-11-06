@@ -165,6 +165,10 @@ export interface Vehicle {
   modKey?: string | null
   /** Store brand (CLAAS, Fendt, …) when known. */
   brand?: string | null
+  /** Lowercase brand.name key for icons/brands/<key>. */
+  brandKey?: string | null
+  /** Brand logo URL when locally cached. */
+  brandIconUrl?: string | null
   /** Original vehicle XML path from savegame / connector. */
   filename?: string | null
   x: number | null

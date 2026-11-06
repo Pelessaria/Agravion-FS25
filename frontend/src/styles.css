@@ -591,8 +591,8 @@ h1, h2, h3, p { margin: 0; }
 .equip-card.is-ops .equip-card-media::after {
   background: linear-gradient(180deg, transparent 78%, rgba(10, 12, 14, 0.22) 100%);
 }
-.equip-card-media img,
-.equip-sheet-media img {
+.equip-card-media img.equip-card-vehicle,
+.equip-sheet-media img.equip-sheet-vehicle {
   position: absolute;
   right: 6px;
   bottom: 6px;
@@ -603,7 +603,7 @@ h1, h2, h3, p { margin: 0; }
   object-position: right bottom;
   padding: 0;
 }
-.equip-card.is-ops .equip-card-media img {
+.equip-card.is-ops .equip-card-media img.equip-card-vehicle {
   inset: 18px 16px 14px;
   right: auto;
   bottom: auto;
@@ -611,6 +611,38 @@ h1, h2, h3, p { margin: 0; }
   height: calc(100% - 32px);
   max-width: none;
   object-position: center;
+}
+.equip-card-brand-logo {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  width: auto;
+  height: 24px;
+  max-width: 46%;
+  object-fit: contain;
+  object-position: left bottom;
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, black 38%, transparent);
+  border: 1px solid color-mix(in srgb, white 10%, transparent);
+  pointer-events: none;
+}
+.equip-sheet-brand-logo {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  z-index: 2;
+  width: auto;
+  height: 32px;
+  max-width: 40%;
+  object-fit: contain;
+  object-position: left top;
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, black 42%, transparent);
+  border: 1px solid color-mix(in srgb, white 10%, transparent);
+  pointer-events: none;
 }
 .equip-card.is-ops .equip-card-media .icon-fallback {
   width: 44px;
@@ -693,6 +725,21 @@ h1, h2, h3, p { margin: 0; }
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-faint);
+}
+.equip-sheet-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+}
+.equip-sheet-brand-row .equip-sheet-brand-logo {
+  position: static;
+  height: 28px;
+  max-width: 160px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
 }
 .equip-card-title {
   font-size: 0.98rem;

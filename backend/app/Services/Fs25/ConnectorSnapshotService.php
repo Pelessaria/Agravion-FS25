@@ -173,12 +173,20 @@ final class ConnectorSnapshotService
             $detail = $detail ?? $e->getMessage();
         }
 
-        foreach (['fields_geometry.xml', 'fields_state.xml', 'fruits_manifest.xml', 'storage_state.xml', 'live_map.xml'] as $file) {
+        foreach ([
+            'fields_geometry.xml',
+            'fields_state.xml',
+            'fruits_manifest.xml',
+            'storage_state.xml',
+            'live_map.xml',
+            'brands_manifest.xml',
+            'brands_probe.xml',
+        ] as $file) {
             try {
                 $remote = $client->read($base.'/state/'.$file);
                 $this->storeLocalIfChanged($this->localStateDir($workspace).'/'.$file, $remote);
             } catch (Throwable) {
-                // Field files are optional until the connector that writes them is installed.
+                // Field / brand files are optional until the connector that writes them is installed.
             }
         }
 
@@ -536,47 +544,48 @@ final class ConnectorSnapshotService
         }
 
         $manifestPath = $this->localManifestPath($workspace);
-        if (! is_file($manifestPath)) {
-            return $this->syncResult(skipped: 'manifest_failed', detail: 'Lokales icons_manifest.xml fehlt');
-        }
-
-        $entries = ConnectorIconsParser::parse((string) file_get_contents($manifestPath));
         $jobs = [];
-        foreach ($entries as $icon) {
-            if (($icon['kind'] ?? 'store') !== 'store') {
-                continue;
-            }
-            $key = trim((string) $icon['key']);
-            $iconFile = trim(str_replace('\\', '/', (string) $icon['iconFile']));
-            if ($key === '' || $iconFile === '') {
-                continue;
-            }
-            $remote = str_starts_with($iconFile, $base.'/')
-                ? $iconFile
-                : rtrim($base, '/').'/'.ltrim($iconFile, '/');
-            $ext = strtolower(pathinfo($iconFile, PATHINFO_EXTENSION) ?: 'dds');
-            if (! in_array($ext, ['dds', 'png', 'jpg', 'jpeg', 'webp'], true)) {
-                $ext = 'dds';
-                if (! str_contains(strtolower($iconFile), '.dds')) {
-                    $remote = preg_replace('/\.[^.]+$/', '', $remote).'.dds';
+        if (is_file($manifestPath)) {
+            $entries = ConnectorIconsParser::parse((string) file_get_contents($manifestPath));
+            foreach ($entries as $icon) {
+                if (($icon['kind'] ?? 'store') !== 'store') {
+                    continue;
                 }
+                $key = trim((string) $icon['key']);
+                $iconFile = trim(str_replace('\\', '/', (string) $icon['iconFile']));
+                if ($key === '' || $iconFile === '') {
+                    continue;
+                }
+                $remote = str_starts_with($iconFile, $base.'/')
+                    ? $iconFile
+                    : rtrim($base, '/').'/'.ltrim($iconFile, '/');
+                $ext = strtolower(pathinfo($iconFile, PATHINFO_EXTENSION) ?: 'dds');
+                if (! in_array($ext, ['dds', 'png', 'jpg', 'jpeg', 'webp'], true)) {
+                    $ext = 'dds';
+                    if (! str_contains(strtolower($iconFile), '.dds')) {
+                        $remote = preg_replace('/\.[^.]+$/', '', $remote).'.dds';
+                    }
+                }
+                $jobs[$key] = [
+                    'key' => $key,
+                    'ext' => $ext,
+                    'remote' => $remote,
+                ];
             }
-            $jobs[$key] = [
-                'key' => $key,
-                'ext' => $ext,
-                'remote' => $remote,
-            ];
         }
 
         // Vehicles whose copy failed are absent from the manifest. Still ask for
         // icons/store/<storeKey>.dds so a later successful copy is picked up.
         $jobs = $this->mergeVehicleStoreJobs($workspace, $base, $jobs);
         $jobs = $this->mergeStorageStoreJobs($workspace, $base, $jobs);
+        $jobs = $this->mergeBrandIconJobs($workspace, $base, $jobs);
 
         if ($jobs === []) {
             return $this->syncResult(
                 skipped: 'no_icons',
-                detail: 'icons_manifest.xml ohne store-Einträge'
+                detail: is_file($manifestPath)
+                    ? 'icons_manifest.xml ohne store-Einträge'
+                    : 'Lokales icons_manifest.xml / brands_manifest.xml fehlt'
             );
         }
 
@@ -664,10 +673,65 @@ final class ConnectorSnapshotService
         return $jobs;
     }
 
+    /**
+     * Brand logos live under icons/brands/; cache keys are brand__<key>.
+     *
+     * @param  array<string, array{key: string, ext: string, remote: string}>  $jobs
+     * @return array<string, array{key: string, ext: string, remote: string}>
+     */
+    private function mergeBrandIconJobs(Workspace $workspace, string $base, array $jobs): array
+    {
+        $path = $this->localStateDir($workspace).'/brands_manifest.xml';
+        if (! is_file($path)) {
+            return $jobs;
+        }
+
+        try {
+            $entries = ConnectorBrandsParser::parse((string) file_get_contents($path));
+        } catch (Throwable) {
+            return $jobs;
+        }
+
+        $cache = new ModIconCacheService;
+        foreach ($entries as $icon) {
+            $brandKey = trim((string) ($icon['key'] ?? ''));
+            $iconFile = trim(str_replace('\\', '/', (string) ($icon['iconFile'] ?? '')));
+            if ($brandKey === '' || $iconFile === '') {
+                continue;
+            }
+            $cacheKey = $cache->brandCacheKey($brandKey);
+            if (isset($jobs[$cacheKey])) {
+                continue;
+            }
+            $remote = str_starts_with($iconFile, $base.'/')
+                ? $iconFile
+                : rtrim($base, '/').'/'.ltrim($iconFile, '/');
+            $ext = strtolower(pathinfo($iconFile, PATHINFO_EXTENSION) ?: 'dds');
+            if (! in_array($ext, ['dds', 'png', 'jpg', 'jpeg', 'webp'], true)) {
+                $ext = 'dds';
+            }
+            $jobs[$cacheKey] = [
+                'key' => $cacheKey,
+                'ext' => $ext,
+                'remote' => $remote,
+            ];
+        }
+
+        return $jobs;
+    }
+
     public function cachedIconPath(Workspace $workspace, string $key): ?string
     {
         return (new ModIconCacheService)->localPath($workspace, $key)
             ?? (new ModIconCacheService)->localDdsPath($workspace, $key);
+    }
+
+    public function cachedBrandIconPath(Workspace $workspace, string $brandKey): ?string
+    {
+        $cache = new ModIconCacheService;
+        $key = $cache->brandCacheKey($brandKey);
+
+        return $cache->localPath($workspace, $key) ?? $cache->localDdsPath($workspace, $key);
     }
 
     /**

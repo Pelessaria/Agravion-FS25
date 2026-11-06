@@ -75,6 +75,28 @@ final class ModIconCacheService
             .'/connector/icons/'.rawurlencode($key);
     }
 
+    /** Cache key used on disk for brand logos (avoids colliding with store keys). */
+    public function brandCacheKey(string $brandKey): string
+    {
+        return 'brand__'.$this->safeKey(strtolower($brandKey));
+    }
+
+    public function brandPublicUrl(Workspace $workspace, string $brandKey): string
+    {
+        return '/api/workspaces/'.rawurlencode($workspace->public_id)
+            .'/connector/brands/'.rawurlencode($brandKey);
+    }
+
+    public function brandLocalPath(Workspace $workspace, string $brandKey): ?string
+    {
+        return $this->localPath($workspace, $this->brandCacheKey($brandKey));
+    }
+
+    public function brandLocalDdsPath(Workspace $workspace, string $brandKey): ?string
+    {
+        return $this->localDdsPath($workspace, $this->brandCacheKey($brandKey));
+    }
+
     public function cacheDir(Workspace $workspace): string
     {
         return storage_path('app/connector/'.$workspace->public_id.'/icons');
@@ -87,7 +109,7 @@ final class ModIconCacheService
         File::put($dir.'/'.$this->safeKey($key).'.png', $pngBytes);
     }
 
-    private function safeKey(string $key): string
+    public function safeKey(string $key): string
     {
         return preg_replace('/[^a-zA-Z0-9._-]+/', '_', $key) ?? 'icon';
     }

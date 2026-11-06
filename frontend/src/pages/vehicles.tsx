@@ -57,6 +57,10 @@ function CategoryIcon({ category }: { category: EquipmentFilter }) {
   return <Icon className="icon" aria-hidden="true" />
 }
 
+function onBrandIconError(event: SyntheticEvent<HTMLImageElement>) {
+  event.currentTarget.remove()
+}
+
 function onIconError(event: SyntheticEvent<HTMLImageElement>) {
   const wrap = event.currentTarget.parentElement
   event.currentTarget.remove()
@@ -245,9 +249,18 @@ export function VehiclesPage() {
               >
                 <span className="equip-card-media">
                   {vehicle.iconUrl ? (
-                    <img src={vehicle.iconUrl} alt="" onError={onIconError} />
+                    <img className="equip-card-vehicle" src={vehicle.iconUrl} alt="" onError={onIconError} />
                   ) : null}
                   <Tractor className={`icon icon-fallback${vehicle.iconUrl ? " is-hidden" : ""}`} />
+                  {vehicle.brandIconUrl ? (
+                    <img
+                      className="equip-card-brand-logo"
+                      src={vehicle.brandIconUrl}
+                      alt={brand ?? ""}
+                      title={brand ?? undefined}
+                      onError={onBrandIconError}
+                    />
+                  ) : null}
                   <span className="equip-card-cat">
                     <CategoryIcon category={category} />
                     <span>{t(categoryLabelKey(category === "selfpropelled" ? "harvester" : category))}</span>
@@ -267,7 +280,6 @@ export function VehiclesPage() {
                   </button>
                 </span>
                 <span className="equip-card-body">
-                  {brand ? <span className="equip-card-brand">{brand}</span> : null}
                   <strong className="equip-card-title">{title}</strong>
                   <span className="equip-card-meta">
                     <span className="equip-card-meta-item">

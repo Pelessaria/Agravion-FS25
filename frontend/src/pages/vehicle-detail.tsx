@@ -23,6 +23,10 @@ function shortFilename(path: string | null | undefined) {
   return parts[parts.length - 1] || normalized
 }
 
+function onBrandIconError(event: SyntheticEvent<HTMLImageElement>) {
+  event.currentTarget.remove()
+}
+
 function onIconError(event: SyntheticEvent<HTMLImageElement>) {
   const wrap = event.currentTarget.parentElement
   event.currentTarget.remove()
@@ -80,11 +84,22 @@ export function VehicleDetailPage() {
       <article className="equip-sheet">
         <div className="equip-sheet-main">
           <div className="equip-sheet-media" aria-hidden="true">
-            {vehicle.iconUrl ? <img src={vehicle.iconUrl} alt="" onError={onIconError} /> : null}
+            {vehicle.iconUrl ? (
+              <img className="equip-sheet-vehicle" src={vehicle.iconUrl} alt="" onError={onIconError} />
+            ) : null}
             <Tractor className={`icon icon-fallback${vehicle.iconUrl ? " is-hidden" : ""}`} />
+            {vehicle.brandIconUrl ? (
+              <img
+                className="equip-sheet-brand-logo"
+                src={vehicle.brandIconUrl}
+                alt={brand ?? ""}
+                title={brand ?? undefined}
+                onError={onBrandIconError}
+              />
+            ) : null}
           </div>
           <div className="equip-sheet-id">
-            {brand ? <p className="equip-sheet-brand">{brand}</p> : null}
+            {!vehicle.brandIconUrl && brand ? <p className="equip-sheet-brand">{brand}</p> : null}
             <h1>{vehicleDisplayName(vehicle.name)}</h1>
             <p className="equip-kicker">
               {t(categoryKey)}
@@ -100,7 +115,18 @@ export function VehicleDetailPage() {
           <div>
             <dt>{t("vehicles.brand")}</dt>
             <dd>
-              <MissingValue text={brand} />
+              {vehicle.brandIconUrl ? (
+                <img
+                  className="equip-sheet-brand-logo"
+                  src={vehicle.brandIconUrl}
+                  alt={brand ?? ""}
+                  title={brand ?? undefined}
+                  onError={onBrandIconError}
+                  style={{ position: "static", height: 22, maxWidth: 140, padding: 0, border: 0, background: "transparent" }}
+                />
+              ) : (
+                <MissingValue text={brand} />
+              )}
             </dd>
           </div>
           <div>

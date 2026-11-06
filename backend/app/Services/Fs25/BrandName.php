@@ -88,6 +88,22 @@ final class BrandName
         return null;
     }
 
+    /** Stable lowercase key for icons/brands/<key>.dds (connector brand.name). */
+    public static function iconKey(?string $brandKey, ?string $brand): ?string
+    {
+        foreach ([$brandKey, $brand] as $raw) {
+            if (! is_string($raw)) {
+                continue;
+            }
+            $key = strtolower((string) preg_replace('/[^a-zA-Z0-9._-]+/', '', $raw));
+            if ($key !== '') {
+                return $key;
+            }
+        }
+
+        return null;
+    }
+
     private static function match(string $source): ?string
     {
         $folded = strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', $source));

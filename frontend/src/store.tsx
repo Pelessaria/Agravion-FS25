@@ -194,6 +194,8 @@ function normalizeVehicle(vehicle: Vehicle): Vehicle {
     modKey: vehicle.modKey ?? null,
     filename: vehicle.filename ?? null,
     brand: vehicle.brand ?? null,
+    brandKey: vehicle.brandKey ?? null,
+    brandIconUrl: vehicle.brandIconUrl ?? null,
     fuel: vehicle.fuel ?? null,
     fuelCapacity: vehicle.fuelCapacity ?? null,
     defLevel: vehicle.defLevel ?? null,

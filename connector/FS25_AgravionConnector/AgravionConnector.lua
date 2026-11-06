@@ -12,7 +12,7 @@
 
 AgravionConnector = {}
 AgravionConnector.MOD_NAME = "FS25_AgravionConnector"
-AgravionConnector.VERSION = "0.1.27.0"
+AgravionConnector.VERSION = "0.1.28.0"
 AgravionConnector.SCHEMA = "1"
 AgravionConnector.TICK_MS = 5000
 AgravionConnector.HELLO_EVERY_MS = 60000
@@ -297,6 +297,7 @@ function AgravionConnector:collectVehiclesFullXml()
             end
             if brand ~= nil and brand ~= "" then
                 table.insert(attrs, string.format('brand="%s"', self:xmlEscape(brand)))
+                table.insert(attrs, string.format('brandKey="%s"', self:xmlEscape(string.lower(brand))))
                 table.insert(identity, "b=" .. tostring(brand))
             end
             if fuel ~= nil and fuelCapacity ~= nil and fuelCapacity > 0 then
@@ -1116,14 +1117,15 @@ function AgravionConnector:iconExtFromPath(path)
     return "png"
 end
 
---- One-shot probe: can we copy basegame brand logos (brand.image / imageShopOverview)?
---- Writes state/brands_probe.xml with present/copied flags. Basegame first (isMod=false).
-function AgravionConnector:writeBrandsProbe()
+--- Copy every brand logo (basegame + mod) into icons/brands/ and write brands_manifest.xml.
+function AgravionConnector:writeBrandIcons()
     ensureDir(self.brandIconsDir)
     local rows = {}
+    local manifestRows = {}
     local baseOk = 0
     local baseFail = 0
-    local modSkip = 0
+    local modOk = 0
+    local modFail = 0
     local total = 0
 
     local function addBrand(brand)
@@ -1152,36 +1154,53 @@ function AgravionConnector:writeBrandsProbe()
         local copied = false
         local usedSrc = ""
         local dest = ""
-        if isMod then
-            modSkip = modSkip + 1
-        else
-            local raws = {}
-            if overview ~= "" then
-                table.insert(raws, overview)
-            end
-            if image ~= "" and image ~= overview then
-                table.insert(raws, image)
-            end
-            for _, raw in ipairs(raws) do
-                local candidates = self:buildStoreImageCandidates(raw)
-                for _, candidate in ipairs(candidates) do
-                    if self:fileLooksPresent(candidate) then
-                        present = true
-                        usedSrc = candidate
-                        local ext = self:iconExtFromPath(candidate)
-                        dest = self.brandIconsDir .. string.lower(name) .. "." .. ext
-                        if self:copyIconFile(candidate, dest) then
-                            copied = true
-                            break
-                        end
+        local rel = ""
+        local key = string.lower(name)
+        local raws = {}
+        if overview ~= "" then
+            table.insert(raws, overview)
+        end
+        if image ~= "" and image ~= overview then
+            table.insert(raws, image)
+        end
+        for _, raw in ipairs(raws) do
+            local candidates = self:buildStoreImageCandidates(raw)
+            for _, candidate in ipairs(candidates) do
+                if self:fileLooksPresent(candidate) then
+                    present = true
+                    usedSrc = candidate
+                    local ext = self:iconExtFromPath(candidate)
+                    dest = self.brandIconsDir .. key .. "." .. ext
+                    rel = "icons/brands/" .. key .. "." .. ext
+                    if self:copyIconFile(candidate, dest) then
+                        copied = true
+                        break
                     end
-                end
-                if copied then
-                    break
                 end
             end
             if copied then
+                break
+            end
+        end
+        if copied then
+            if isMod then
+                modOk = modOk + 1
+            else
                 baseOk = baseOk + 1
+            end
+            table.insert(
+                manifestRows,
+                string.format(
+                    '  <brand key="%s" name="%s" isMod="%s" iconFile="%s" />\n',
+                    self:xmlEscape(key),
+                    self:xmlEscape(name),
+                    tostring(isMod),
+                    self:xmlEscape(rel)
+                )
+            )
+        else
+            if isMod then
+                modFail = modFail + 1
             else
                 baseFail = baseFail + 1
             end
@@ -1228,17 +1247,38 @@ function AgravionConnector:writeBrandsProbe()
         end
         return tostring(a.name) < tostring(b.name)
     end)
+    table.sort(manifestRows)
+
+    local gen = self:nextGeneration()
+    local manifest = string.format(
+        [[<?xml version="1.0" encoding="utf-8"?>
+<brandsManifest schema="%s" generation="%s" writtenAtUtc="%s" version="%s" total="%s" baseCopied="%s" baseFailed="%s" modCopied="%s" modFailed="%s">
+%s</brandsManifest>
+]],
+        self.SCHEMA,
+        tostring(gen),
+        self:xmlEscape(utcNow()),
+        self:xmlEscape(self.VERSION),
+        tostring(total),
+        tostring(baseOk),
+        tostring(baseFail),
+        tostring(modOk),
+        tostring(modFail),
+        table.concat(manifestRows, "")
+    )
+    self:writeTextFile(self.stateDir .. "brands_manifest.xml", manifest)
 
     local parts = {
         '<?xml version="1.0" encoding="utf-8"?>',
         string.format(
-            '<brandsProbe writtenAt="%s" version="%s" total="%s" baseCopied="%s" baseFailed="%s" modSkipped="%s" copyFile="%s">',
+            '<brandsProbe writtenAt="%s" version="%s" total="%s" baseCopied="%s" baseFailed="%s" modCopied="%s" modFailed="%s" copyFile="%s">',
             self:xmlEscape(utcNow()),
             self:xmlEscape(self.VERSION),
             tostring(total),
             tostring(baseOk),
             tostring(baseFail),
-            tostring(modSkip),
+            tostring(modOk),
+            tostring(modFail),
             tostring(copyFile ~= nil)
         ),
     }
@@ -1263,11 +1303,12 @@ function AgravionConnector:writeBrandsProbe()
     self:writeTextFile(self.stateDir .. "brands_probe.xml", table.concat(parts, "\n") .. "\n")
     log(
         string.format(
-            "brands_probe written total=%s baseCopied=%s baseFailed=%s modSkipped=%s",
+            "brand icons total=%s baseCopied=%s baseFailed=%s modCopied=%s modFailed=%s",
             tostring(total),
             tostring(baseOk),
             tostring(baseFail),
-            tostring(modSkip)
+            tostring(modOk),
+            tostring(modFail)
         )
     )
 end
@@ -1509,7 +1550,7 @@ function AgravionConnector:tick(dt)
             self.vehiclesPrimed = true
         end
         if self.vehiclesPrimed and not self.brandsProbed then
-            self:writeBrandsProbe()
+            self:writeBrandIcons()
             self.brandsProbed = true
         end
     end)

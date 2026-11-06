@@ -34,6 +34,7 @@ Route::middleware('auth:web')->group(function () {
     Route::get('/workspaces/{workspace}/precision-layer/{layer}', [WorkspaceController::class, 'precisionLayer']);
     Route::post('/workspaces/{workspace}/connector/icons/sync', [WorkspaceController::class, 'syncConnectorIcons']);
     Route::get('/workspaces/{workspace}/connector/icons/{modKey}', [WorkspaceController::class, 'connectorIcon']);
+    Route::get('/workspaces/{workspace}/connector/brands/{brandKey}', [WorkspaceController::class, 'brandIcon']);
     Route::get('/system/connector/package', [WorkspaceController::class, 'connectorPackage']);
     Route::get('/system/connector/package/meta', [WorkspaceController::class, 'connectorPackageMeta']);
     Route::post('/workspaces/{workspace}/connector/deploy', [WorkspaceController::class, 'deployConnector']);
