@@ -246,6 +246,8 @@ export type LivePlace = {
   name: string | null
   type: string | null
   farmId: number | null
+  storeKey?: string | null
+  iconUrl?: string | null
   x: number
   z: number
 }

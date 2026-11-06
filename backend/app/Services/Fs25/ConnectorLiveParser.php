@@ -107,6 +107,8 @@ final class ConnectorLiveParser
                 'name' => self::text($node['name'] ?? null),
                 'type' => self::text($node['type'] ?? null),
                 'farmId' => self::positiveInt($node['farmId'] ?? null),
+                'storeKey' => self::text($node['storeKey'] ?? null),
+                'iconUrl' => null,
                 'x' => $x,
                 'z' => $z,
             ];

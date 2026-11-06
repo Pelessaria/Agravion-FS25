@@ -4788,6 +4788,12 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
+.live-field.is-crop {
+  stroke: rgba(255, 255, 255, 0.38);
+}
+.live-field-crop {
+  pointer-events: none;
+}
 .live-field-no {
   fill: #f7f4ea;
   font-weight: 700;

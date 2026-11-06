@@ -425,13 +425,42 @@ local function buildingKind(placeable)
     return nil
 end
 
-local function appendPlace(connector, parts, fingerprint, count, id, name, kind, farmId, x, z)
+local function placeStoreKey(connector, placeable)
+    if placeable == nil or connector == nil or connector.storeKeyFromFilename == nil then
+        return nil
+    end
+    local filename = placeable.configFileName or placeable.xmlFilename
+    if type(filename) ~= "string" or filename == "" then
+        return nil
+    end
+    local storeKey = connector:storeKeyFromFilename(filename)
+    local image = nil
+    if connector.placeableStoreImage ~= nil then
+        image = connector:placeableStoreImage(placeable, filename)
+    end
+    if image == nil and connector.vehicleStoreImage ~= nil then
+        image = connector:vehicleStoreImage(placeable, filename)
+    end
+    if connector.pendingPlaceableIcons == nil then
+        connector.pendingPlaceableIcons = {}
+    end
+    if storeKey ~= nil and image ~= nil and connector.pendingPlaceableIcons[storeKey] == nil then
+        connector.pendingPlaceableIcons[storeKey] = {
+            src = image,
+            filename = filename,
+        }
+    end
+    return storeKey
+end
+
+local function appendPlace(connector, parts, fingerprint, count, id, name, kind, farmId, x, z, storeKey)
     parts[#parts + 1] = string.format(
-        "<place%s%s%s%s%s%s />",
+        "<place%s%s%s%s%s%s%s />",
         attr(connector, "id", id),
         attr(connector, "name", name),
         attr(connector, "type", kind),
         attr(connector, "farmId", farmId),
+        attr(connector, "storeKey", storeKey),
         attr(connector, "x", round(x, 1)),
         attr(connector, "z", round(z, 1))
     )
@@ -480,7 +509,19 @@ local function appendPlaces(connector, parts, fingerprint)
                         return
                     end
                     seen[key] = true
-                    count = appendPlace(connector, parts, fingerprint, count, id, name, kind, farmIdOf(placeable), x, z)
+                    count = appendPlace(
+                        connector,
+                        parts,
+                        fingerprint,
+                        count,
+                        id,
+                        name,
+                        kind,
+                        farmIdOf(placeable),
+                        x,
+                        z,
+                        placeStoreKey(connector, placeable)
+                    )
                     wrote = true
                 end)
             end
@@ -502,7 +543,19 @@ local function appendPlaces(connector, parts, fingerprint)
             end
             seen[key] = true
             local name = safeMethod(placeable, "getName")
-            count = appendPlace(connector, parts, fingerprint, count, id, name, kind, farmIdOf(placeable), x, z)
+            count = appendPlace(
+                connector,
+                parts,
+                fingerprint,
+                count,
+                id,
+                name,
+                kind,
+                farmIdOf(placeable),
+                x,
+                z,
+                placeStoreKey(connector, placeable)
+            )
         end)
     end)
 end

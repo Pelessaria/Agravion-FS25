@@ -12,11 +12,21 @@ import {
   type LiveVehicle,
 } from "../api"
 import { EmptyState, MissingWorkspace, PermissionBlock, useTimeLabel } from "../components/ui"
-import { projectPoint, effectiveMapSize, frameFromContentBox, measureMapContent, terrainFrame, type MapFrame } from "../field-format"
+import { cropIcon } from "../crop-icons"
+import { cropColor, projectPoint, effectiveMapSize, frameFromContentBox, measureMapContent, terrainFrame, type MapFrame } from "../field-format"
 import { clampCamera, readMapView, sheetFor, writeMapView, type MapCamera } from "../map-camera"
 import { useStore } from "../store"
 import type { FieldsResponse, Vehicle } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
+
+function withAlpha(hex: string, alpha: number) {
+  const raw = hex.replace("#", "")
+  if (!/^[0-9a-fA-F]{6}$/.test(raw)) return hex
+  const r = Number.parseInt(raw.slice(0, 2), 16)
+  const g = Number.parseInt(raw.slice(2, 4), 16)
+  const b = Number.parseInt(raw.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
 
 const PERIOD_TO_MONTH = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2]
 
@@ -152,6 +162,7 @@ export function LiveMapPage() {
   const [contentBox, setContentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [hiddenFarms, setHiddenFarms] = useState<number[]>([])
   const [showFields, setShowFields] = useState(true)
+  const [showCrops, setShowCrops] = useState(true)
   const [showBuildings, setShowBuildings] = useState(pin != null && !vehicleParam)
   const [buildingFilter, setBuildingFilter] = useState<BuildingFilter>("all")
   const [resetToken, setResetToken] = useState(0)
@@ -282,7 +293,15 @@ export function LiveMapPage() {
 
   const shapes = useMemo(() => {
     const rows = fields?.fields ?? []
-    const next: { id: number; points: string; x: number; y: number }[] = []
+    const next: {
+      id: number
+      points: string
+      x: number
+      y: number
+      color: string
+      fruitName: string | null
+      iconUrl: string | null
+    }[] = []
     for (const field of rows) {
       if (field.points.length < 3) continue
       let sumX = 0
@@ -300,6 +319,9 @@ export function LiveMapPage() {
         points,
         x: sumX / field.points.length,
         y: sumY / field.points.length,
+        color: cropColor(field),
+        fruitName: field.fruitName,
+        iconUrl: field.iconUrl,
       })
     }
     return next
@@ -417,7 +439,7 @@ export function LiveMapPage() {
       kind: "building" as const,
       name: place.name || place.type || place.id,
       detail: place.type || t("live.buildings"),
-      iconUrl: null,
+      iconUrl: place.iconUrl ?? null,
       role: "building" as const,
     })),
   ].filter((row) => (tab === "all" ? row.kind !== "building" : row.kind === tab))
@@ -475,6 +497,7 @@ export function LiveMapPage() {
           pin={pin}
           selected={selected}
           showFields={showFields}
+          showCrops={showCrops}
           resetToken={resetToken}
           vehicleRole={roleOf}
           vehicleIcon={vehicleIconOf}
@@ -496,6 +519,9 @@ export function LiveMapPage() {
           <div>
             <button type="button" className={showFields ? "is-on" : ""} onClick={() => setShowFields((value) => !value)}>
               {t("live.fieldsLayer")}
+            </button>
+            <button type="button" className={showCrops ? "is-on" : ""} onClick={() => setShowCrops((value) => !value)}>
+              {t("live.cropsLayer")}
             </button>
             <button type="button" className={showBuildings ? "is-on" : ""} onClick={() => setShowBuildings((value) => !value)}>
               {t("live.buildings")}
@@ -750,6 +776,7 @@ function LiveCanvas({
   pin,
   selected,
   showFields,
+  showCrops,
   resetToken,
   viewUserId,
   viewScope,
@@ -763,13 +790,22 @@ function LiveCanvas({
 }: {
   mapUrl: string | null
   frame: MapFrame
-  shapes: { id: number; points: string; x: number; y: number }[]
+  shapes: {
+    id: number
+    points: string
+    x: number
+    y: number
+    color: string
+    fruitName: string | null
+    iconUrl: string | null
+  }[]
   vehicles: LiveVehicle[]
   players: LivePlayer[]
   places: LivePlace[]
   pin: { x: number; z: number; name: string } | null
   selected: string | null
   showFields: boolean
+  showCrops: boolean
   resetToken: number
   viewUserId: string | null
   viewScope: string
@@ -919,7 +955,7 @@ function LiveCanvas({
         role: "building",
         farmColor: placeColor(place.farmId),
         label: place.name || place.type || place.id,
-        icon: null,
+        icon: place.iconUrl ?? null,
         active: false,
         occupied: false,
         attachments: null,
@@ -1172,23 +1208,48 @@ function LiveCanvas({
                 <circle cx="0.5" cy="0.5" r="0.5" />
               </clipPath>
             </defs>
-            {showFields
+            {showFields || showCrops
               ? shapes.map((shape) => {
                   const labelSize = (11 * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
+                  const iconSize = (14 * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
+                  const pack = cropIcon(shape.fruitName)
+                  const game = shape.iconUrl && !brokenIcons.has(shape.iconUrl) ? shape.iconUrl : null
+                  const fruitIcon = showCrops ? game ?? pack : null
                   return (
                     <g key={`shape-${shape.id}`}>
-                      <polygon className="live-field" points={shape.points} />
-                      <text
-                        className="live-field-no"
-                        x={shape.x}
-                        y={shape.y}
-                        fontSize={labelSize}
-                        strokeWidth={labelSize * 0.16}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                      >
-                        {shape.id}
-                      </text>
+                      <polygon
+                        className={showCrops ? "live-field is-crop" : "live-field"}
+                        points={shape.points}
+                        style={showCrops ? { fill: withAlpha(shape.color, 0.42) } : undefined}
+                      />
+                      {showFields ? (
+                        <text
+                          className="live-field-no"
+                          x={shape.x}
+                          y={fruitIcon ? shape.y + iconSize * 0.55 : shape.y}
+                          fontSize={labelSize}
+                          strokeWidth={labelSize * 0.16}
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                        >
+                          {shape.id}
+                        </text>
+                      ) : null}
+                      {fruitIcon ? (
+                        <image
+                          className="live-field-crop"
+                          href={fruitIcon}
+                          x={shape.x - iconSize / 2}
+                          y={shape.y - (showFields ? iconSize * 0.95 : iconSize / 2)}
+                          width={iconSize}
+                          height={iconSize}
+                          preserveAspectRatio="xMidYMid meet"
+                          onError={() => {
+                            if (!shape.iconUrl || fruitIcon !== shape.iconUrl) return
+                            setBrokenIcons((prev) => new Set(prev).add(shape.iconUrl!))
+                          }}
+                        />
+                      ) : null}
                     </g>
                   )
                 })
@@ -1224,6 +1285,8 @@ function LiveCanvas({
                 .join(" ")
               // Only player names on the map (occupied vehicle or on foot).
               const showCaption = (marker.occupied || marker.kind === "player") && Boolean(marker.label)
+              // Keep the name above the plate (mark is the plate radius in map units).
+              const captionY = -(mark * 1.12 + toMap(6))
               return (
                 <g key={marker.key} data-marker={marker.key} className={`live-marker ${stateClass}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`scale(${mark})`}>
@@ -1259,8 +1322,8 @@ function LiveCanvas({
                     </g>
                   ) : null}
                   {showCaption ? (
-                    <g className="live-caption" transform={`translate(0 ${-toMap(22)}) scale(${toMap(11)})`}>
-                      <text textAnchor="middle" y="0">
+                    <g className="live-caption" transform={`translate(0 ${captionY}) scale(${toMap(11)})`}>
+                      <text textAnchor="middle" dominantBaseline="auto" y="0">
                         {marker.label}
                       </text>
                     </g>

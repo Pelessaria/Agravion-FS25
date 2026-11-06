@@ -1070,6 +1070,7 @@ export const en = {
     },
     stats: "Live stats",
     fieldsLayer: "Fields",
+    cropsLayer: "Crops",
     resetView: "Reset",
     farms: "Farms",
     objectCount: "{{count}} objects",

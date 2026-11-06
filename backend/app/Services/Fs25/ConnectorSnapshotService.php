@@ -396,6 +396,7 @@ final class ConnectorSnapshotService
 
         $parsed = ConnectorLiveParser::parse((string) file_get_contents($path));
         $parsed['writtenAt'] = gmdate('c', (int) filemtime($path));
+        $this->enrichLivePlaceIcons($workspace, $parsed['places']);
 
         return [
             'ok' => true,
@@ -403,6 +404,46 @@ final class ConnectorSnapshotService
             'source' => 'live',
             ...$parsed,
         ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $places
+     */
+    private function enrichLivePlaceIcons(Workspace $workspace, array &$places): void
+    {
+        if ($places === []) {
+            return;
+        }
+
+        $icons = new ModIconCacheService;
+        $byId = [];
+        foreach ($this->readStorage($workspace)['places'] as $place) {
+            if (! is_array($place)) {
+                continue;
+            }
+            $id = isset($place['id']) ? (string) $place['id'] : '';
+            $url = is_string($place['iconUrl'] ?? null) ? $place['iconUrl'] : null;
+            if ($id !== '' && $url !== null) {
+                $byId[$id] = $url;
+            }
+        }
+
+        foreach ($places as &$place) {
+            if (! is_array($place)) {
+                continue;
+            }
+            $id = isset($place['id']) ? (string) $place['id'] : '';
+            if ($id !== '' && isset($byId[$id])) {
+                $place['iconUrl'] = $byId[$id];
+                continue;
+            }
+            $storeKey = $place['storeKey'] ?? null;
+            if (is_string($storeKey) && $storeKey !== ''
+                && ($icons->localPath($workspace, $storeKey) !== null || $icons->localDdsPath($workspace, $storeKey) !== null)) {
+                $place['iconUrl'] = $icons->publicUrl($workspace, $storeKey);
+            }
+        }
+        unset($place);
     }
 
     /**

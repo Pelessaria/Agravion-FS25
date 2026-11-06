@@ -1068,6 +1068,7 @@ export const de = {
     },
     stats: "Live-Statistik",
     fieldsLayer: "Felder",
+    cropsLayer: "Früchte",
     resetView: "Zurücksetzen",
     farms: "Höfe anzeigen",
     objectCount: "{{count}} Objekte",
