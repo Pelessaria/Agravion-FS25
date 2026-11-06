@@ -870,7 +870,6 @@ function LiveCanvas({
       const point = projectPoint(vehicle.x, vehicle.z, frame)
       const occupied = vehicleOccupied(vehicle)
       const role = vehicleRole(vehicle)
-      const vehicleName = vehicle.name || vehicle.id
       const driverName = vehicle.driver?.trim() || null
       next.push({
         key: `v:${vehicle.id}`,
@@ -880,14 +879,14 @@ function LiveCanvas({
         kind: "vehicle",
         role,
         farmColor: placeColor(vehicle.farmId),
-        // Occupied: player name first; vehicle name as subtitle.
-        label: occupied ? driverName || t("live.occupied") : vehicleName,
+        // Map captions: player name only — never the vehicle name.
+        label: occupied ? driverName || t("live.occupied") : vehicle.name || vehicle.id,
         icon: vehicleIcon(vehicle),
         active: vehicleActive(vehicle),
         occupied,
         attachments: vehicle.attachments?.trim() || null,
         priority: occupied ? 100 : rolePriority(role),
-        busy: occupied ? vehicleName : vehicle.ai ? "ai" : null,
+        busy: null,
       })
     }
     for (const player of players) {
@@ -951,9 +950,10 @@ function LiveCanvas({
   }, [frame, pin, placeColor, places, players, t, vehicleIcon, vehicleRole, vehicles])
 
   const draw = useMemo(() => {
-    // Occupied vehicles and on-foot players stay unclustered and draw on top.
-    const kept = markers.filter((marker) => marker.key === selected || marker.kind === "pin" || marker.occupied || marker.kind === "player")
-    const pool = markers.filter((marker) => marker.key !== selected && marker.kind !== "pin" && !marker.occupied)
+    // On-foot players / pin / selection stay alone. Occupied vehicles stay in the
+    // pool so nearby implements collapse into the same +N cluster as stacked gear.
+    const kept = markers.filter((marker) => marker.key === selected || marker.kind === "pin" || marker.kind === "player")
+    const pool = markers.filter((marker) => marker.key !== selected && marker.kind !== "pin" && marker.kind !== "player")
     const used = new Array(pool.length).fill(false)
     const placed: Marker[] = [...kept]
     const stageOf = (marker: Marker) => ({
@@ -969,21 +969,27 @@ function LiveCanvas({
         for (let j = i + 1; j < pool.length; j += 1) {
           if (used[j] || pool[j].kind !== "vehicle") continue
           const other = stageOf(pool[j])
-          if (Math.hypot(origin.x - other.x, origin.y - other.y) * Math.max(zoom, 1) > 48) continue
+          // Slightly looser than vehicle stacks so hitch implements join the tractor.
+          if (Math.hypot(origin.x - other.x, origin.y - other.y) * Math.max(zoom, 1) > 56) continue
           used[j] = true
           group.push(pool[j])
         }
       }
-      const lead = [...group].sort((a, b) => b.priority - a.priority || Number(b.active) - Number(a.active))[0]
+      const lead = [...group].sort(
+        (a, b) => Number(b.occupied) - Number(a.occupied) || b.priority - a.priority || Number(b.active) - Number(a.active),
+      )[0]
       if (group.length > 1) {
         placed.push({
           ...lead,
           key: `c:${group.map((item) => item.key).sort().join("|")}`,
           count: group.length,
           members: group,
-          active: false,
-          occupied: false,
+          // Keep player pulse / heading when the lead is occupied.
+          active: lead.occupied ? true : false,
+          occupied: lead.occupied,
           priority: Math.max(...group.map((item) => item.priority)),
+          attachments: null,
+          busy: null,
         })
       } else {
         placed.push(lead)
@@ -1206,7 +1212,8 @@ function LiveCanvas({
                         : 28
               const mark = toMap(on || marker.occupied ? base + 4 : base)
               const ring = marker.farmColor || (marker.role === "player" ? "#f4f1e8" : "#8e9890")
-              const showArrow = showsHeading(marker.role, marker.active, marker.heading, piled)
+              // Occupied stacks keep a heading arrow even with attached implements in the +N badge.
+              const showArrow = showsHeading(marker.role, marker.active || marker.occupied, marker.heading, piled && !marker.occupied)
               const icon = marker.icon && !brokenIcons.has(marker.icon) ? marker.icon : null
               const stateClass = [
                 on ? "is-on" : "",
@@ -1215,8 +1222,8 @@ function LiveCanvas({
               ]
                 .filter(Boolean)
                 .join(" ")
-              const showCaption =
-                (on || marker.occupied || marker.kind === "player") && Boolean(marker.label || marker.attachments || marker.busy)
+              // Only player names on the map (occupied vehicle or on foot).
+              const showCaption = (marker.occupied || marker.kind === "player") && Boolean(marker.label)
               return (
                 <g key={marker.key} data-marker={marker.key} className={`live-marker ${stateClass}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`scale(${mark})`}>
@@ -1256,16 +1263,6 @@ function LiveCanvas({
                       <text textAnchor="middle" y="0">
                         {marker.label}
                       </text>
-                      {marker.busy && marker.busy !== "ai" && marker.busy !== "moving" ? (
-                        <text className="live-caption-sub" textAnchor="middle" y="1.25">
-                          {marker.busy}
-                        </text>
-                      ) : null}
-                      {marker.attachments ? (
-                        <text className="live-caption-sub" textAnchor="middle" y={marker.busy && marker.busy !== "ai" && marker.busy !== "moving" ? 2.4 : 1.25}>
-                          {marker.attachments}
-                        </text>
-                      ) : null}
                     </g>
                   ) : null}
                 </g>
