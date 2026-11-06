@@ -25,7 +25,7 @@ import { useStore } from "../store"
 import type { LinkState, Workspace } from "../types"
 
 const STATUS_COLOR: Record<LinkState | "disabled", string> = {
-  online: "#c0454c",
+  online: "#4caf50",
   offline: "#7aa2ff",
   unpaired: "#ff8f5a",
   error: "#ff6d88",
