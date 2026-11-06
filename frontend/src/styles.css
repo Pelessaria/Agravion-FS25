@@ -4543,31 +4543,34 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .live-stats strong { font-size: 1.25rem; }
 .live-stats small { color: var(--text-faint); font-size: 0.7rem; }
-.live-marker .live-marker-plate { fill: rgba(18, 23, 26, 0.92); }
-.live-marker .live-marker-ring {
+.live-marker .live-marker-shadow { fill: rgba(0, 0, 0, 0.32); }
+.live-marker .live-marker-plate { fill: #161c1f; }
+.live-marker.is-player .live-marker-plate { fill: #f3f0e6; }
+.live-marker .live-marker-ring,
+.live-marker .live-marker-halo,
+.live-marker .live-marker-rim {
   fill: none;
-  stroke-width: 0.11;
 }
-.live-marker .live-marker-rim { fill: none; stroke: rgba(255, 255, 255, 0.55); stroke-width: 0.08; }
-.live-marker.is-idle { opacity: 0.78; }
-.live-marker.is-active .live-marker-ring { stroke-width: 0.14; }
-.live-marker.is-occupied { opacity: 1; }
-.live-marker.is-occupied .live-marker-ring {
-  stroke-width: 0.16;
-  animation: live-ring-pulse 1.15s ease-in-out infinite;
+.live-marker .live-marker-ring { stroke-width: 0.09; }
+.live-marker .live-marker-halo {
+  stroke-width: 0.07;
+  stroke-opacity: 0.45;
+  animation: live-halo 2.6s ease-in-out infinite;
 }
-@keyframes live-ring-pulse {
-  0%, 100% { stroke-opacity: 1; }
-  50% { stroke-opacity: 0.28; }
+@keyframes live-halo {
+  0%, 100% { stroke-opacity: 0.5; }
+  50% { stroke-opacity: 0.12; }
 }
-.live-heading {
-  fill: #f5f7f7;
-  stroke: #101418;
-  stroke-width: 0.08;
-  filter: drop-shadow(0 0.04px 0.06px #000);
+.live-beak {
+  fill: #f7f8f7;
+  stroke: #12171a;
+  stroke-width: 0.05;
+  stroke-linejoin: round;
 }
-.live-marker.is-on .live-marker-rim { stroke: rgba(255, 255, 255, 0.85); stroke-width: 0.14; }
-.live-marker.is-on { filter: drop-shadow(0 0 0.35px rgba(255, 255, 255, 0.35)); opacity: 1; }
+.live-marker .live-marker-rim { stroke: #fff; stroke-width: 0.07; }
+.live-marker.is-idle { opacity: 0.8; }
+.live-marker.is-occupied,
+.live-marker.is-on { opacity: 1; }
 .live-cluster {
   position: absolute;
   z-index: 5;
@@ -4759,17 +4762,17 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
 }
 .live-legend li { display: flex; align-items: center; gap: 5px; }
 .live-dot { width: 8px; height: 8px; border-radius: 99px; flex: 0 0 auto; }
-.live-dot.is-tractor, .live-marker.is-tractor { background: #e4b84a; fill: #e4b84a; }
-.live-dot.is-harvester, .live-marker.is-harvester { background: #e07a3d; fill: #e07a3d; }
-.live-dot.is-trailer, .live-marker.is-trailer { background: #7eb6d6; fill: #7eb6d6; }
-.live-dot.is-tool, .live-marker.is-tool { background: #8fbf8a; fill: #8fbf8a; }
-.live-dot.is-pallet, .live-marker.is-pallet { background: #c4b49a; fill: #c4b49a; }
-.live-dot.is-building, .live-marker.is-building { background: #f3efe6; fill: #f3efe6; }
-.live-dot.is-player, .live-marker.is-player { background: #f7f7f7; fill: #f7f7f7; }
-.live-dot.is-vehicle, .live-marker.is-vehicle { background: #d7c27a; fill: #d7c27a; }
-.live-marker .live-glyph { stroke: #f3f6f6; }
+.live-dot.is-tractor { background: #e4b84a; }
+.live-dot.is-harvester { background: #e07a3d; }
+.live-dot.is-trailer { background: #7eb6d6; }
+.live-dot.is-tool { background: #8fbf8a; }
+.live-dot.is-pallet { background: #c4b49a; }
+.live-dot.is-building { background: #f3efe6; }
+.live-dot.is-player { background: #f7f7f7; }
+.live-dot.is-vehicle { background: #d7c27a; }
+.live-marker .live-glyph { stroke: #f3f6f6; fill: none; }
 .live-marker.is-building .live-glyph { stroke: #d5ddd6; }
-.live-marker.is-player .live-glyph { stroke: #f3f6f4; }
+.live-marker.is-player .live-glyph { stroke: #1c2420; }
 .live-marker.is-tool .live-glyph { stroke: #9ddec0; }
 .live-marker.is-trailer .live-glyph { stroke: #9fd0ef; }
 .live-marker.is-harvester .live-glyph { stroke: #f0a36a; }
@@ -4802,10 +4805,10 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   pointer-events: none;
 }
 .live-marker { cursor: pointer; }
-.live-count circle { fill: #101418; stroke: #f4f1e8; stroke-width: 0.12; }
+.live-count rect { fill: #12171a; stroke: rgba(244, 241, 232, 0.9); stroke-width: 0.08; }
 .live-count text {
   fill: #f4f1e8;
-  font-size: 0.72px;
+  font-size: 0.78px;
   font-weight: 700;
   pointer-events: none;
 }
@@ -4826,20 +4829,15 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   pointer-events: none;
 }
 .live-caption-bg {
-  fill: rgba(10, 14, 12, 0.86);
-  stroke: rgba(247, 241, 228, 0.28);
-  stroke-width: 0.07;
+  fill: rgba(14, 18, 16, 0.94);
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 0.05;
 }
-.live-caption-user {
-  fill: none;
-  stroke: #f4f1e8;
-  stroke-width: 0.16;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
+.live-caption-caret { fill: rgba(14, 18, 16, 0.94); }
+.live-caption-user { fill: #f4f1e8; }
 .live-caption text {
   fill: #f7f8f7;
-  font-size: 1.05px;
+  font-size: 0.92px;
   font-weight: 650;
   pointer-events: none;
 }

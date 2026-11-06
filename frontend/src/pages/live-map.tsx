@@ -767,6 +767,39 @@ function showsHeading(role: MarkerRole, active: boolean, heading: number | null,
   return role === "tractor" || role === "harvester" || role === "vehicle"
 }
 
+function markerScreenPx(marker: Marker, on: boolean) {
+  const piled = (marker.count ?? 0) > 1
+  const implement = marker.role === "tool" || marker.role === "trailer" || marker.role === "pallet"
+  if (marker.role === "building") return on ? 20 : 16
+  if (marker.role === "player") return on ? 24 : 20
+  if (piled) return 28
+  if (implement) return on ? 20 : 16
+  if (marker.occupied) return 30
+  if (marker.active) return 24
+  return on ? 22 : 18
+}
+
+function PlayerChip({ label }: { label: string }) {
+  const pad = 0.46
+  const icon = 1.2
+  const h = 1.7
+  const textW = Math.max(label.length * 0.58, 1.3)
+  const w = pad + icon + textW + pad
+  return (
+    <>
+      <rect className="live-caption-bg" x={-w / 2} y={-h} width={w} height={h} rx={0.42} />
+      <path className="live-caption-caret" d="M-0.26,0 L0.26,0 L0,0.28 Z" />
+      <g className="live-caption-user" transform={`translate(${-w / 2 + pad + 0.5} ${-h / 2})`}>
+        <circle cy="-0.24" r="0.22" />
+        <path d="M-0.44,0.46 C-0.4,0.02 -0.18,-0.1 0,-0.1 C0.18,-0.1 0.4,0.02 0.44,0.46 Z" />
+      </g>
+      <text x={-w / 2 + pad + icon} y={-h / 2 + 0.34} textAnchor="start">
+        {label}
+      </text>
+    </>
+  )
+}
+
 function LiveCanvas({
   mapUrl,
   frame,
@@ -1260,21 +1293,9 @@ function LiveCanvas({
               const rotation = marker.heading == null ? 0 : headingToSvgDegrees(marker.heading)
               const toMap = (screenPx: number) => (screenPx * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
               const piled = (marker.count ?? 0) > 1
-              const implement = marker.role === "tool" || marker.role === "trailer" || marker.role === "pallet"
-              const base = piled
-                ? 36
-                : implement
-                  ? 22
-                  : marker.role === "building" || marker.role === "player"
-                    ? 20
-                    : marker.occupied
-                      ? 34
-                      : marker.active
-                        ? 32
-                        : 28
-              const mark = toMap(on || marker.occupied ? base + 4 : base)
-              const ring = marker.farmColor || (marker.role === "player" ? "#f4f1e8" : "#8e9890")
-              // Occupied stacks keep a heading arrow even with attached implements in the +N badge.
+              const building = marker.role === "building"
+              const mark = toMap(markerScreenPx(marker, on))
+              const ring = marker.farmColor || (marker.role === "player" ? "#24302c" : "#d7dfda")
               const showArrow = showsHeading(marker.role, marker.active || marker.occupied, marker.heading, piled && !marker.occupied)
               const icon = marker.icon && !brokenIcons.has(marker.icon) ? marker.icon : null
               const stateClass = [
@@ -1284,66 +1305,58 @@ function LiveCanvas({
               ]
                 .filter(Boolean)
                 .join(" ")
-              // Only player names on the map (occupied vehicle or on foot).
               const showCaption = (marker.occupied || marker.kind === "player") && Boolean(marker.label)
-              // Keep the name above the plate (mark is the plate radius in map units).
-              const captionY = -(mark * 1.12 + toMap(6))
+              const captionY = -(mark * 0.86 + toMap(2))
+              const countLabel = `+${marker.count ?? 0}`
+              const countW = Math.max(1.7, countLabel.length * 0.72 + 0.7)
               return (
                 <g key={marker.key} data-marker={marker.key} className={`live-marker ${stateClass}`} transform={`translate(${marker.x} ${marker.y})`}>
-                  <g transform={`scale(${mark})`}>
-                    <circle r="0.94" className="live-marker-plate" />
-                    <circle r="0.94" className="live-marker-ring" style={{ stroke: ring }} />
+                  <g className="live-puck" transform={`scale(${mark})`}>
+                    <ellipse className="live-marker-shadow" cx="0" cy="0.28" rx="0.72" ry="0.22" />
+                    {showArrow ? (
+                      <path className="live-beak" transform={`rotate(${rotation})`} d="M-0.2,-0.86 L0,-1.28 L0.2,-0.86 Z" />
+                    ) : null}
+                    {building ? (
+                      <rect className="live-marker-plate" x="-0.7" y="-0.7" width="1.4" height="1.4" rx="0.34" />
+                    ) : (
+                      <circle className="live-marker-plate" r="0.76" />
+                    )}
+                    {building ? (
+                      <rect className="live-marker-ring" x="-0.7" y="-0.7" width="1.4" height="1.4" rx="0.34" style={{ stroke: ring }} />
+                    ) : (
+                      <circle className="live-marker-ring" r="0.76" style={{ stroke: ring }} />
+                    )}
                     {icon ? (
                       <image
                         href={icon}
-                        x="-0.72"
-                        y="-0.72"
-                        width="1.44"
-                        height="1.44"
+                        x="-0.5"
+                        y="-0.5"
+                        width="1"
+                        height="1"
                         clipPath="url(#live-icon-clip)"
                         preserveAspectRatio="xMidYMid meet"
                         onError={() => setBrokenIcons((prev) => new Set(prev).add(icon))}
                       />
                     ) : (
-                      <g className="live-glyph">
+                      <g className="live-glyph" transform="scale(0.8)">
                         <MarkerGlyph role={marker.role} />
                       </g>
                     )}
-                    {showArrow ? (
-                      <path className="live-heading" transform={`rotate(${rotation})`} d="M0,-1.78 L0.46,-1.02 L-0.46,-1.02 Z" />
-                    ) : null}
-                    {on ? <circle r="0.94" className="live-marker-rim" /> : null}
+                    {marker.occupied ? <circle className="live-marker-halo" r="1.02" style={{ stroke: ring }} /> : null}
+                    {on ? <circle className="live-marker-rim" r="0.96" /> : null}
+                    <circle r="1.15" fill="transparent" />
                   </g>
                   {piled ? (
-                    <g className="live-count" transform={`translate(${toMap(14)} ${toMap(-14)}) scale(${toMap(16)})`}>
-                      <circle r="1.05" />
-                      <text textAnchor="middle" y="0.32">
-                        {`+${marker.count}`}
+                    <g className="live-count" transform={`translate(${mark * 0.58} ${-mark * 0.58}) scale(${toMap(11)})`}>
+                      <rect x={-countW / 2} y="-0.62" width={countW} height="1.24" rx="0.62" />
+                      <text textAnchor="middle" y="0.36">
+                        {countLabel}
                       </text>
                     </g>
                   ) : null}
                   {showCaption ? (
-                    <g className="live-caption" transform={`translate(0 ${captionY}) scale(${toMap(11)})`}>
-                      {(() => {
-                        const label = marker.label
-                        const padX = 0.48
-                        const iconW = 1.4
-                        const h = 1.9
-                        const textW = Math.max(label.length * 0.58, 1.4)
-                        const w = padX + iconW + textW + padX
-                        return (
-                          <>
-                            <rect className="live-caption-bg" x={-w / 2} y={-h} width={w} height={h} rx={0.48} />
-                            <g className="live-caption-user" transform={`translate(${-w / 2 + padX + 0.55} ${-h / 2})`}>
-                              <circle cy="-0.3" r="0.26" />
-                              <path d="M-0.48,0.62 C-0.48,0.08 0.48,0.08 0.48,0.62" />
-                            </g>
-                            <text x={-w / 2 + padX + iconW} y={-h / 2 + 0.36} textAnchor="start">
-                              {label}
-                            </text>
-                          </>
-                        )
-                      })()}
+                    <g className="live-caption" transform={`translate(0 ${captionY}) scale(${toMap(12)})`}>
+                      <PlayerChip label={marker.label} />
                     </g>
                   ) : null}
                 </g>
