@@ -528,8 +528,8 @@ h1, h2, h3, p { margin: 0; }
 .equip-summary { margin: 0 0 18px; }
 .equip-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 .equip-card {
   display: flex;
@@ -542,7 +542,7 @@ h1, h2, h3, p { margin: 0; }
   color: inherit;
   background: #161b20;
   border: 1px solid color-mix(in srgb, white 8%, transparent);
-  border-radius: 16px;
+  border-radius: 14px;
   overflow: hidden;
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
@@ -573,7 +573,7 @@ h1, h2, h3, p { margin: 0; }
 }
 .equip-card-media {
   position: relative;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
   width: 100%;
   min-height: 0;
   border-bottom: 1px solid var(--line);
@@ -584,11 +584,11 @@ h1, h2, h3, p { margin: 0; }
 .equip-card-media img,
 .equip-sheet-media img {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
+  right: 6px;
+  bottom: 6px;
   width: auto;
-  height: 78%;
-  max-width: 58%;
+  height: 74%;
+  max-width: 56%;
   object-fit: contain;
   object-position: right bottom;
   padding: 0;
@@ -604,48 +604,48 @@ h1, h2, h3, p { margin: 0; }
 .equip-mod-icon .icon-fallback.is-hidden { display: none; }
 .equip-card-cat {
   position: absolute;
-  top: 10px;
-  left: 12px;
+  top: 8px;
+  left: 8px;
   z-index: 1;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   width: auto;
   height: auto;
-  padding: 4px 8px 4px 6px;
-  border-radius: 8px;
+  padding: 3px 7px 3px 5px;
+  border-radius: 7px;
   color: #f4f5f7;
   background: color-mix(in srgb, black 55%, transparent);
   border: 1px solid color-mix(in srgb, white 12%, transparent);
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.equip-card-cat .icon { width: 14px; height: 14px; }
+.equip-card-cat .icon { width: 12px; height: 12px; }
 .equipment-tabs .access-tab { gap: 8px; padding-inline: 12px; }
 .equipment-tabs .icon { width: 16px; height: 16px; }
 .equip-card-caption {
   position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 12px;
+  left: 10px;
+  right: 10px;
+  bottom: 9px;
   z-index: 1;
   display: grid;
   gap: 1px;
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
 }
 .equip-card-brand {
-  font-size: 0.68rem;
+  font-size: 0.6rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: color-mix(in srgb, white 74%, transparent);
 }
 .equip-card-title {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.18;
   letter-spacing: -0.02em;
   color: white;
   display: -webkit-box;
@@ -657,7 +657,7 @@ h1, h2, h3, p { margin: 0; }
   display: grid;
   gap: 0;
   min-width: 0;
-  padding: 16px 18px 18px;
+  padding: 12px 12px 14px;
   background: #14191e;
 }
 .equip-gauges {
@@ -667,26 +667,31 @@ h1, h2, h3, p { margin: 0; }
 }
 .equip-card-body .equip-gauges {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
   justify-items: center;
   align-items: start;
-  gap: 8px 12px;
-  margin-top: 16px;
-  padding-top: 16px;
+  gap: 6px 8px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid color-mix(in srgb, white 8%, transparent);
 }
 .equip-sheet > .equip-gauges { margin: 18px 28px 0; }
 .equip-gauge {
   display: grid;
   justify-items: center;
-  gap: 4px;
-  min-width: 72px;
+  gap: 3px;
+  min-width: 64px;
 }
+.equip-card-body .equip-gauge { min-width: 0; }
 .equip-gauge-ring {
   position: relative;
   width: 58px;
   height: 58px;
   overflow: visible;
+}
+.equip-card-body .equip-gauge-ring {
+  width: 48px;
+  height: 48px;
 }
 .equip-gauge-ring svg {
   width: 100%;
@@ -717,6 +722,9 @@ h1, h2, h3, p { margin: 0; }
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
+.equip-card-body .equip-gauge-pct { font-size: 0.66rem; }
+.equip-card-body .equip-gauge-label { font-size: 0.58rem; }
+.equip-card-body .equip-gauge-amt { font-size: 0.7rem; }
 .equip-gauge-label {
   font-size: 0.66rem;
   font-weight: 600;
@@ -732,8 +740,8 @@ h1, h2, h3, p { margin: 0; }
 }
 .equip-card-facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 14px 18px;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 10px 10px;
   width: 100%;
   margin: 0;
   text-align: center;
@@ -758,7 +766,7 @@ h1, h2, h3, p { margin: 0; }
 }
 .equip-card-facts em .icon { width: 13px; height: 13px; }
 .equip-card-facts strong {
-  font-size: 1.02rem;
+  font-size: 0.92rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text);
@@ -3531,6 +3539,9 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   .switch span { transition: none; }
 }
 
+@media (max-width: 1280px) {
+  .equip-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 980px) {
   .equip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .equip-sheet-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
