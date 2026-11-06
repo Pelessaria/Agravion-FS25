@@ -4303,6 +4303,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   width: min(332px, calc(100% - 36px));
 }
 .live-side.is-collapsed {
+  top: 64px;
   width: auto;
   bottom: auto;
 }

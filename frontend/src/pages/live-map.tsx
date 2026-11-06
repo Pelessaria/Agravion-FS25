@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { Boxes, ChevronLeft, ChevronRight, Minus, Plus, Search, Tractor, Truck, UserRound, Warehouse, Wheat, Wrench } from "lucide-react"
@@ -316,8 +316,19 @@ export function LiveMapPage() {
     }
     return map
   }, [fleet, workspace?.id])
-  const fleetMatch = (id: string) => fleetById.get(id) ?? null
+  const fleetMatch = useCallback((id: string) => fleetById.get(id) ?? null, [fleetById])
+  const vehicleIconOf = useCallback((vehicle: LiveVehicle) => fleetById.get(vehicle.id)?.iconUrl ?? null, [fleetById])
   const selectedVehicle = vehicles.find((vehicle) => `v:${vehicle.id}` === selected) ?? null
+
+  // Warm browser cache so SVG <image> markers paint quickly once fleet icons exist.
+  useEffect(() => {
+    const urls = [...new Set([...fleetById.values()].map((item) => item.iconUrl).filter(Boolean))] as string[]
+    for (const url of urls) {
+      const img = new Image()
+      img.decoding = "async"
+      img.src = url
+    }
+  }, [fleetById])
 
   if (!workspace) return <MissingWorkspace />
   if (!allowed || !access) return <PermissionBlock />
@@ -416,6 +427,7 @@ export function LiveMapPage() {
           showFields={showFields}
           resetToken={resetToken}
           vehicleRole={roleOf}
+          vehicleIcon={vehicleIconOf}
           placeColor={(farmId) => farmColor(farmId)}
           onSelect={setSelected}
           onContentBox={setContentBox}
@@ -634,6 +646,7 @@ function LiveCanvas({
   viewUserId,
   viewScope,
   vehicleRole,
+  vehicleIcon,
   placeColor,
   onSelect,
   onContentBox,
@@ -651,6 +664,7 @@ function LiveCanvas({
   viewUserId: string | null
   viewScope: string
   vehicleRole: (vehicle: LiveVehicle) => MarkerRole
+  vehicleIcon: (vehicle: LiveVehicle) => string | null
   placeColor: (farmId: number | null) => string | null
   onSelect: (id: string) => void
   onContentBox: (box: { x: number; y: number; w: number; h: number } | null) => void
@@ -666,6 +680,7 @@ function LiveCanvas({
   const [mapFailed, setMapFailed] = useState(false)
   const [view, setView] = useState({ w: 0, h: 0 })
   const [cluster, setCluster] = useState<Marker[] | null>(null)
+  const [brokenIcons, setBrokenIcons] = useState<ReadonlySet<string>>(() => new Set())
   const resetSeen = useRef(resetToken)
   const sheetRef = useRef(sheetFor(view, frame))
   const viewRef = useRef(view)
@@ -746,7 +761,7 @@ function LiveCanvas({
         role: vehicleRole(vehicle),
         farmColor: placeColor(vehicle.farmId),
         label: vehicle.name || vehicle.id,
-        icon: null,
+        icon: vehicleIcon(vehicle),
         active: vehicleActive(vehicle),
         priority: rolePriority(vehicleRole(vehicle)),
         busy: vehicle.ai ? "ai" : vehicle.driver || (vehicle.controlled ? "moving" : null),
@@ -804,7 +819,7 @@ function LiveCanvas({
       })
     }
     return next
-  }, [frame, pin, placeColor, places, players, vehicleRole, vehicles])
+  }, [frame, pin, placeColor, places, players, vehicleIcon, vehicleRole, vehicles])
 
   const draw = useMemo(() => {
     const kept = markers.filter((marker) => marker.key === selected || marker.kind === "pin")
@@ -920,7 +935,21 @@ function LiveCanvas({
                       onSelect(member.key)
                     }}
                   >
-                    <RoleIcon role={member.role} />
+                    <span className="live-obj-icon">
+                      {member.icon && !brokenIcons.has(member.icon) ? (
+                        <img
+                          src={member.icon}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          onError={() => setBrokenIcons((prev) => new Set(prev).add(member.icon!))}
+                        />
+                      ) : null}
+                      <RoleIcon
+                        role={member.role}
+                        className={member.icon && !brokenIcons.has(member.icon) ? "icon-fallback is-hidden" : "icon-fallback"}
+                      />
+                    </span>
                     <span>
                       <strong>{member.label}</strong>
                       <small>
@@ -996,6 +1025,11 @@ function LiveCanvas({
             <div className="fields-terrain" />
           )}
           <svg className="live-sheet" style={{ left: sheet.left, top: sheet.top, width: sheet.size, height: sheet.size }} viewBox="0 0 100 100">
+            <defs>
+              <clipPath id="live-icon-clip" clipPathUnits="objectBoundingBox">
+                <circle cx="0.5" cy="0.5" r="0.5" />
+              </clipPath>
+            </defs>
             {showFields
               ? shapes.map((shape) => {
                   const labelSize = (11 * 100) / (Math.max(sheet.size, 1) * Math.max(zoom, 1))
@@ -1028,14 +1062,28 @@ function LiveCanvas({
               const mark = toMap(on ? base + 4 : base)
               const ring = marker.farmColor || (marker.role === "player" ? "#f4f1e8" : "#8e9890")
               const showArrow = marker.heading != null && !piled
+              const icon = marker.icon && !brokenIcons.has(marker.icon) ? marker.icon : null
               return (
                 <g key={marker.key} data-marker={marker.key} className={on ? `live-marker is-${marker.role} is-on` : `live-marker is-${marker.role}`} transform={`translate(${marker.x} ${marker.y})`}>
                   <g transform={`scale(${mark})`}>
                     <circle r="1.16" className="live-marker-ring" style={{ stroke: ring }} />
                     <circle r="0.94" className="live-marker-plate" />
-                    <g className="live-glyph">
-                      <MarkerGlyph role={marker.role} />
-                    </g>
+                    {icon ? (
+                      <image
+                        href={icon}
+                        x="-0.86"
+                        y="-0.86"
+                        width="1.72"
+                        height="1.72"
+                        clipPath="url(#live-icon-clip)"
+                        preserveAspectRatio="xMidYMid meet"
+                        onError={() => setBrokenIcons((prev) => new Set(prev).add(icon))}
+                      />
+                    ) : (
+                      <g className="live-glyph">
+                        <MarkerGlyph role={marker.role} />
+                      </g>
+                    )}
                     {showArrow ? (
                       <path className="live-heading" transform={`rotate(${rotation})`} d="M0,-1.78 L0.46,-1.02 L-0.46,-1.02 Z" />
                     ) : null}
