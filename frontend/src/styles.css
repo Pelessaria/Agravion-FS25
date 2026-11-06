@@ -585,12 +585,11 @@ h1, h2, h3, p { margin: 0; }
 .equip-card.is-ops .equip-card-media {
   aspect-ratio: 4 / 3;
   background:
-    radial-gradient(78% 62% at 50% 72%, rgba(214, 176, 120, 0.16), transparent 64%),
-    radial-gradient(90% 70% at 50% 100%, rgba(120, 92, 58, 0.1), transparent 58%),
+    radial-gradient(68% 52% at 50% 78%, rgba(214, 176, 120, 0.055), transparent 72%),
     linear-gradient(180deg, #171b20 0%, #101418 100%);
 }
 .equip-card.is-ops .equip-card-media::after {
-  background: linear-gradient(180deg, transparent 70%, rgba(10, 12, 14, 0.28) 100%);
+  background: linear-gradient(180deg, transparent 78%, rgba(10, 12, 14, 0.22) 100%);
 }
 .equip-card-media img,
 .equip-sheet-media img {
@@ -744,65 +743,71 @@ h1, h2, h3, p { margin: 0; }
   flex: 0 0 auto;
   opacity: 0.85;
 }
-.equip-status {
+.status-list {
   display: grid;
-  gap: 7px;
-  margin-top: 8px;
-  padding-top: 10px;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 11px;
   border-top: 1px solid color-mix(in srgb, white 7%, transparent);
-}
-.equip-status-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(48px, 1.35fr) auto;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
 }
-.equip-status-label {
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+.status-item { min-width: 0; }
+.status-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+.status-labels span {
+  color: #c5cdd2;
+  font-size: 0.625rem;
+  font-weight: 650;
   text-transform: uppercase;
-  color: var(--text-muted);
+  letter-spacing: 0.09em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.equip-status-track {
-  display: block;
-  height: 3px;
-  border-radius: 99px;
-  background: color-mix(in srgb, white 10%, transparent);
-  overflow: hidden;
+.status-labels output {
+  color: #f1f3f4;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
 }
-.equip-status-track i {
+.statusbar {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 2px;
+  height: 9px;
+}
+.status-segment {
   display: block;
   height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #303940;
+}
+.status-segment-fill {
+  display: block;
+  width: 0;
+  height: 100%;
   border-radius: inherit;
-  background: color-mix(in srgb, currentColor 72%, white 8%);
+  background: var(--status-color);
+  transition: width 200ms ease;
 }
-.equip-status-value {
-  min-width: 2.6em;
-  text-align: right;
-  font-size: 0.72rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-  line-height: 1;
-}
-.equip-status-row.is-fuel { color: #7ea58a; }
-.equip-status-row.is-wear { color: #c4a06a; }
-.equip-status-row.is-def { color: #7e9aab; }
-.equip-sheet > .equip-status {
+.status-fuel { --status-color: #3ecf6e; }
+.status-wear { --status-color: #f0a832; }
+.status-adblue { --status-color: #3aa8d8; }
+.equip-sheet > .status-list {
   margin: 18px 28px 0;
   padding-top: 14px;
+  gap: 16px;
 }
-.equip-sheet .equip-status-row {
-  grid-template-columns: minmax(96px, 0.9fr) minmax(80px, 1.6fr) auto;
-  gap: 12px;
-}
-.equip-sheet .equip-status-track { height: 4px; }
-.equip-sheet .equip-status-value { min-width: 5.5em; font-size: 0.82rem; }
+.equip-sheet .status-labels { margin-bottom: 9px; }
+.equip-sheet .statusbar { height: 10px; }
 
 .equip-back {
   display: inline-flex;

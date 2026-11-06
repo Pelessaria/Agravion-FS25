@@ -2,6 +2,8 @@ import type { Vehicle } from "../types"
 
 type GaugeTone = "fuel" | "wear" | "def"
 
+const SEGMENT_COUNT = 10
+
 function amountLabel(value: number, max: number, language: string, unit: string) {
   const format = (n: number) => n.toLocaleString(language, { maximumFractionDigits: 0 })
   return `${format(value)} / ${format(max)} ${unit}`
@@ -53,7 +55,59 @@ function collectRows(vehicle: GaugeSource, language: string, label: (key: string
   return rows
 }
 
-/** Compact telemetry rows for fleet-style equipment cards. */
+function segmentFill(pct: number, index: number) {
+  const start = (index / SEGMENT_COUNT) * 100
+  const end = ((index + 1) / SEGMENT_COUNT) * 100
+  if (pct <= start) return 0
+  if (pct >= end) return 100
+  return ((pct - start) / (end - start)) * 100
+}
+
+function StatusMeter({
+  tone,
+  label,
+  pct,
+  amount,
+  showAmount,
+}: {
+  tone: GaugeTone
+  label: string
+  pct: number
+  amount: string
+  showAmount: boolean
+}) {
+  const rounded = Math.round(pct)
+  const display = showAmount ? amount : `${rounded}%`
+  const statusClass = tone === "def" ? "status-adblue" : `status-${tone}`
+
+  return (
+    <div className={`status-item ${statusClass}`} data-status={tone === "def" ? "adblue" : tone} data-value={rounded} title={amount}>
+      <div className="status-labels">
+        <span>{label}</span>
+        <output>{display}</output>
+      </div>
+      <div
+        className="statusbar"
+        role="meter"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={rounded}
+      >
+        {Array.from({ length: SEGMENT_COUNT }, (_, index) => {
+          const fill = segmentFill(pct, index)
+          return (
+            <span key={index} className="status-segment" aria-hidden="true">
+              <i className="status-segment-fill" style={{ width: `${fill}%` }} />
+            </span>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Segmented telemetry meters for fleet-style equipment cards. */
 export function VehicleStatusRows({
   vehicle,
   language,
@@ -68,22 +122,21 @@ export function VehicleStatusRows({
   const rows = collectRows(vehicle, language, label)
   if (rows.length === 0) return null
   return (
-    <span className="equip-status">
+    <div className="status-list">
       {rows.map((row) => {
         const pct = row.max > 0 ? Math.max(0, Math.min(100, (row.value / row.max) * 100)) : 0
         return (
-          <span key={row.key} className={`equip-status-row is-${row.tone}`} title={row.amount}>
-            <span className="equip-status-label">{row.label}</span>
-            <span className="equip-status-track" aria-hidden="true">
-              <i style={{ width: `${pct}%` }} />
-            </span>
-            <strong className="equip-status-value">
-              {showAmount ? row.amount : `${Math.round(pct)}%`}
-            </strong>
-          </span>
+          <StatusMeter
+            key={row.key}
+            tone={row.tone}
+            label={row.label}
+            pct={pct}
+            amount={row.amount}
+            showAmount={showAmount}
+          />
         )
       })}
-    </span>
+    </div>
   )
 }
 
