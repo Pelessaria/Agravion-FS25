@@ -9,6 +9,7 @@ import { farmDisplayName } from "../farm-label"
 import { useStore } from "../store"
 import { useWorkspaceRoute } from "../use-workspace"
 import type { Vehicle } from "../types"
+import { vehicleFallbackIcon } from "../vehicle-fallback-icon"
 import { modDisplayName, modZipLabel, vehicleBrand, vehicleDisplayName } from "../vehicle-label"
 
 function positionOf(vehicle: Vehicle) {
@@ -101,6 +102,7 @@ export function VehicleDetailPage() {
     vehicle.hours === null
       ? t("unavailable")
       : `${vehicle.hours.toLocaleString(i18n.language, { maximumFractionDigits: 1 })} h`
+  const art = vehicle.iconUrl ?? vehicleFallbackIcon(vehicle)
 
   return (
     <section className="equip-detail">
@@ -111,10 +113,10 @@ export function VehicleDetailPage() {
       <article className="equip-sheet">
         <div className="equip-sheet-main">
           <div className="equip-sheet-media" aria-hidden="true">
-            {vehicle.iconUrl ? (
-              <img className="equip-sheet-vehicle" src={vehicle.iconUrl} alt="" onError={onIconError} />
+            {art ? (
+              <img className={vehicle.iconUrl ? "equip-sheet-vehicle" : "equip-sheet-vehicle is-silhouette"} src={art} alt="" onError={onIconError} />
             ) : null}
-            <Tractor className={`icon icon-fallback${vehicle.iconUrl ? " is-hidden" : ""}`} />
+            <Tractor className={`icon icon-fallback${art ? " is-hidden" : ""}`} />
             {vehicle.brandIconUrl ? (
               <img
                 className="equip-sheet-brand-logo"

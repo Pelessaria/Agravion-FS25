@@ -612,6 +612,15 @@ h1, h2, h3, p { margin: 0; }
   max-width: none;
   object-position: center;
 }
+.equip-sheet-media img.equip-sheet-vehicle.is-silhouette {
+  inset: 18%;
+  right: auto;
+  bottom: auto;
+  width: 64%;
+  height: 64%;
+  max-width: none;
+  object-position: center;
+}
 .equip-card-brand-logo {
   position: absolute;
   left: 8px;

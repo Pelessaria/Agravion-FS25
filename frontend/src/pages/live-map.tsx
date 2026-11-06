@@ -20,6 +20,7 @@ import { clampCamera, readMapView, sheetFor, writeMapView, type MapCamera } from
 import { useStore } from "../store"
 import type { FieldsResponse, Vehicle } from "../types"
 import { useWorkspaceRoute } from "../use-workspace"
+import { vehicleFallbackIcon } from "../vehicle-fallback-icon"
 import { vehicleBrand, vehicleDisplayName } from "../vehicle-label"
 
 function withAlpha(hex: string, alpha: number) {
@@ -537,9 +538,15 @@ export function LiveMapPage() {
   const fleetMatch = useCallback((id: string) => fleetById.get(id) ?? null, [fleetById])
   const vehicleIconOf = useCallback(
     (vehicle: LiveVehicle) => {
-      const url = fleetById.get(vehicle.id)?.iconUrl ?? null
-      if (!url) return null
-      return trimmedIcons[url] ?? url
+      const match = fleetById.get(vehicle.id)
+      const url = match?.iconUrl ?? null
+      if (url) return trimmedIcons[url] ?? url
+      return vehicleFallbackIcon({
+        category: match?.category ?? null,
+        name: match?.name ?? vehicle.name,
+        filename: match?.filename,
+        storeKey: match?.storeKey,
+      })
     },
     [fleetById, trimmedIcons],
   )
@@ -629,7 +636,7 @@ export function LiveMapPage() {
         : vehicle.ai
           ? t("live.ai")
           : t("live.parked"),
-      iconUrl: fleetMatch(vehicle.id)?.iconUrl ?? null,
+      iconUrl: vehicleIconOf(vehicle),
       role: roleOf(vehicle),
     })),
     ...visiblePlayers.map((player) => ({

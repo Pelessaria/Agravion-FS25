@@ -8,6 +8,7 @@ import { useWorkspaceRoute } from "../use-workspace"
 import { useStore } from "../store"
 import { VehicleStatusRows } from "../components/equip-gauge"
 import type { Vehicle, VehicleCategory } from "../types"
+import { vehicleFallbackIcon } from "../vehicle-fallback-icon"
 import { isPallet, vehicleBrand, vehicleDisplayName } from "../vehicle-label"
 
 function liveVehicleId(workspaceId: string, vehicleId: string) {
@@ -227,6 +228,7 @@ export function VehiclesPage() {
                 ? null
                 : `${vehicle.hours.toLocaleString(i18n.language, { maximumFractionDigits: 0 })} h`
             const title = vehicleDisplayName(vehicle.name)
+            const art = vehicle.iconUrl ?? vehicleFallbackIcon(vehicle)
             const brand = vehicleBrand(vehicle)
             const detailPath = `/w/${id}/equipment/${vehicle.id}`
             const mapPath = equipmentMapTarget(id, vehicle)
@@ -248,10 +250,8 @@ export function VehiclesPage() {
                 onKeyDown={onCardKeyDown}
               >
                 <span className="equip-card-media">
-                  {vehicle.iconUrl ? (
-                    <img className="equip-card-vehicle" src={vehicle.iconUrl} alt="" onError={onIconError} />
-                  ) : null}
-                  <Tractor className={`icon icon-fallback${vehicle.iconUrl ? " is-hidden" : ""}`} />
+                  {art ? <img className="equip-card-vehicle" src={art} alt="" onError={onIconError} /> : null}
+                  <Tractor className={`icon icon-fallback${art ? " is-hidden" : ""}`} />
                   {vehicle.brandIconUrl ? (
                     <img
                       className="equip-card-brand-logo"
