@@ -2771,26 +2771,23 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   line-height: var(--fields-stat-label-lh);
 }
 /*
- * Icon + Zahl bleiben auf der gemeinsamen Zeile.
- * Rechts daneben: „Erntebereit“ über „davon …“.
- * Icons größer (quadratisch), Pipes nur so hoch wie die beiden Labels.
+ * Mit Subtext: Icon, Kennzahl und Pipe sind genau so hoch
+ * wie beide Textzeilen („Erntebereit“ + „davon …“) daneben.
  */
 .fields-stats p.has-note > span {
-  position: relative;
-  display: inline-block;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--fields-stat-stack-gap);
+  height: var(--fields-stat-stack);
   white-space: nowrap;
 }
 .fields-stats p.has-note > span > span {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + var(--fields-stat-stack-gap));
   color: var(--text-faint);
   font-size: var(--fields-stat-label);
   line-height: var(--fields-stat-label-lh);
-  white-space: nowrap;
 }
 .fields-stats p.has-note em {
-  display: block;
   font-style: normal;
   color: var(--text-muted);
   font-size: var(--fields-stat-label);
@@ -2798,12 +2795,20 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   white-space: nowrap;
 }
 .fields-stats:has(.has-note) {
-  padding-top: calc((var(--fields-stat-label) * var(--fields-stat-label-lh)) + var(--fields-stat-stack-gap));
+  align-items: flex-end;
+}
+.fields-stats:has(.has-note) p {
+  align-items: flex-end;
+  min-height: var(--fields-stat-stack);
 }
 .fields-stats:has(.has-note) .fields-stat-icon {
-  width: 22px;
-  height: 22px;
-  transform: translateY(calc(-0.5 * (var(--fields-stat-label) * var(--fields-stat-label-lh) + var(--fields-stat-stack-gap))));
+  width: var(--fields-stat-stack);
+  height: var(--fields-stat-stack);
+  transform: none;
+}
+.fields-stats:has(.has-note) strong {
+  font-size: var(--fields-stat-stack);
+  line-height: 1;
 }
 .fields-stats:has(.has-note) p + p {
   box-shadow: none;
@@ -2812,7 +2817,7 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   content: "";
   position: absolute;
   left: 0;
-  top: calc(-1 * ((var(--fields-stat-label) * var(--fields-stat-label-lh)) + var(--fields-stat-stack-gap)));
+  top: 0;
   height: var(--fields-stat-stack);
   width: 1px;
   background: color-mix(in srgb, var(--accent) 45%, transparent);
