@@ -1107,10 +1107,10 @@ function PlayerChip({ label }: { label: string }) {
       alive = false
     }
   }, [label])
-  const pad = 0.4
+  const pad = 0.5
   const iconBox = 0.92
-  const gap = 0.16
-  const bar = 0.18
+  const gap = 0.32
+  const bar = 0.16
   const h = 1.7
   const w = pad + iconBox + gap + bar + gap + textW + pad
   const left = -w / 2
