@@ -228,17 +228,27 @@ local function appendVehicles(connector, parts, fingerprint)
                 name = nil
             end
             local id = vehicle.uniqueId or safeMethod(vehicle, "getUniqueId")
+            -- Driver only while someone is actually in the seat. getOwnerConnection()
+            -- also returns the farm owner / last user when parked — that flooded the
+            -- map with the same player name on every vehicle.
             local driver = nil
-            local connection = safeMethod(vehicle, "getOwnerConnection")
-            if connection ~= nil then
-                driver = playerNickname(nil, connection)
-                if driver == nil and mission ~= nil and mission.userManager ~= nil then
-                    local users = safeMethod(mission.userManager, "getUsers")
-                    if type(users) == "table" then
-                        for _, user in pairs(users) do
-                            if safeMethod(user, "getConnection") == connection then
-                                driver = playerNickname(user, connection)
-                                break
+            if controlled then
+                local controllerName = safeMethod(vehicle, "getControllerName")
+                if type(controllerName) == "string" and controllerName ~= "" then
+                    driver = controllerName
+                else
+                    local connection = safeMethod(vehicle, "getOwnerConnection")
+                    if connection ~= nil then
+                        driver = playerNickname(nil, connection)
+                        if driver == nil and mission ~= nil and mission.userManager ~= nil then
+                            local users = safeMethod(mission.userManager, "getUsers")
+                            if type(users) == "table" then
+                                for _, user in pairs(users) do
+                                    if safeMethod(user, "getConnection") == connection then
+                                        driver = playerNickname(user, connection)
+                                        break
+                                    end
+                                end
                             end
                         end
                     end

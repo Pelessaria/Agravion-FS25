@@ -66,7 +66,8 @@ function vehicleActive(vehicle: LiveVehicle) {
 }
 
 function vehicleOccupied(vehicle: LiveVehicle) {
-  return Boolean(vehicle.driver) || vehicle.controlled === true
+  // Require the live controlled flag — a leftover driver name alone is not enough.
+  return vehicle.controlled === true
 }
 
 /** Giants yaw → SVG degrees. Map Y grows with world +Z (south), arrow tip is -Y (north). */
