@@ -1323,9 +1323,26 @@ function LiveCanvas({
                   ) : null}
                   {showCaption ? (
                     <g className="live-caption" transform={`translate(0 ${captionY}) scale(${toMap(11)})`}>
-                      <text textAnchor="middle" dominantBaseline="auto" y="0">
-                        {marker.label}
-                      </text>
+                      {(() => {
+                        const label = marker.label
+                        const padX = 0.48
+                        const iconW = 1.4
+                        const h = 1.9
+                        const textW = Math.max(label.length * 0.58, 1.4)
+                        const w = padX + iconW + textW + padX
+                        return (
+                          <>
+                            <rect className="live-caption-bg" x={-w / 2} y={-h} width={w} height={h} rx={0.48} />
+                            <g className="live-caption-user" transform={`translate(${-w / 2 + padX + 0.55} ${-h / 2})`}>
+                              <circle cy="-0.3" r="0.26" />
+                              <path d="M-0.48,0.62 C-0.48,0.08 0.48,0.08 0.48,0.62" />
+                            </g>
+                            <text x={-w / 2 + padX + iconW} y={-h / 2 + 0.36} textAnchor="start">
+                              {label}
+                            </text>
+                          </>
+                        )
+                      })()}
                     </g>
                   ) : null}
                 </g>

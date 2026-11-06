@@ -4822,13 +4822,25 @@ h1, h2, .code, .equip-card, .user-card { overflow-wrap: anywhere; }
   font-weight: 700;
   pointer-events: none;
 }
+.live-caption {
+  pointer-events: none;
+}
+.live-caption-bg {
+  fill: rgba(10, 14, 12, 0.86);
+  stroke: rgba(247, 241, 228, 0.28);
+  stroke-width: 0.07;
+}
+.live-caption-user {
+  fill: none;
+  stroke: #f4f1e8;
+  stroke-width: 0.16;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .live-caption text {
   fill: #f7f8f7;
-  font-size: 1.15px;
+  font-size: 1.05px;
   font-weight: 650;
-  paint-order: stroke;
-  stroke: rgba(8, 12, 10, 0.92);
-  stroke-width: 0.45px;
   pointer-events: none;
 }
 .live-caption-sub {
