@@ -249,6 +249,14 @@ export function Shell() {
   const dayValue =
     live?.day != null ? (monthIndex != null ? `${live.day} · ${t(`fields.month.${monthIndex}`)}` : String(live.day)) : "—"
   const playerTotal = worldPlayerCount(live, workspace?.playersOnline ?? null)
+  const playerCapacity = workspace?.playerCapacity ?? null
+  const playerValue =
+    playerTotal == null && playerCapacity == null ? "—" : `${playerTotal ?? "—"} / ${playerCapacity ?? "—"}`
+  const balanceValue =
+    farm?.money == null
+      ? "—"
+      : new Intl.NumberFormat(current.language, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(farm.money)
+  const linkLabel = workspace ? (workspace.disabled ? t("card.disabled") : t(`link.${workspace.linkState}`)) : ""
 
   return (
     <div className={collapsed ? "shell collapsed" : "shell"}>
@@ -370,6 +378,16 @@ export function Shell() {
                 ))}
               </select>
             </label>
+          ) : null}
+          {workspace ? (
+            <div className="side-instance" title={`${workspace.name} · ${linkLabel}`}>
+              <span className="ws-no">{workspace.number}</span>
+              <span className={`dot ${workspace.disabled ? "unknown" : workspace.linkState}`} />
+              <span className="side-instance-copy nav-label">
+                <strong>{workspace.name}</strong>
+                <span>{linkLabel}</span>
+              </span>
+            </div>
           ) : null}
           <p className="side-version">
             <span className="nav-label">{t("shell.product")}</span>
@@ -547,18 +565,6 @@ export function Shell() {
           <div className="context">
             <div className="context-bar" aria-label={t("context.bar")}>
               <ContextStat
-                symbol={<span className="ws-no">{workspace.number}</span>}
-                value={workspace.name}
-                label={t("context.instance")}
-              />
-              <span className="context-pipe" aria-hidden="true">|</span>
-              <ContextStat
-                symbol={<span className={`dot ${workspace.disabled ? "unknown" : workspace.linkState}`} />}
-                value={workspace.disabled ? t("card.disabled") : t(`link.${workspace.linkState}`)}
-                label={t("context.link")}
-              />
-              <span className="context-pipe" aria-hidden="true">|</span>
-              <ContextStat
                 symbol={live?.paused ? <Pause className="icon" /> : <Play className="icon" />}
                 value={live ? (live.paused ? t("context.paused") : t("context.active")) : "—"}
                 label={t("context.play")}
@@ -579,8 +585,14 @@ export function Shell() {
               <span className="context-pipe" aria-hidden="true">|</span>
               <ContextStat
                 symbol={<Users className="icon" />}
-                value={playerTotal == null ? "—" : String(playerTotal)}
+                value={playerValue}
                 label={t("context.players")}
+              />
+              <span className="context-pipe" aria-hidden="true">|</span>
+              <ContextStat
+                symbol={<Map className="icon" />}
+                value={workspace.mapName?.trim() || "—"}
+                label={t("context.map")}
               />
               {farm ? (
                 <>
@@ -589,6 +601,12 @@ export function Shell() {
                     symbol={<House className="icon" />}
                     value={farm.name?.trim() || t("farm.stubName", { id: farm.gameFarmId })}
                     label={t("context.farm")}
+                  />
+                  <span className="context-pipe" aria-hidden="true">|</span>
+                  <ContextStat
+                    symbol={<Wallet className="icon" />}
+                    value={balanceValue}
+                    label={t("context.balance")}
                   />
                 </>
               ) : null}

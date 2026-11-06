@@ -1102,6 +1102,36 @@ h1, h2, h3, p { margin: 0; }
   letter-spacing: 0.02em;
 }
 .shell.collapsed .side-version { align-items: center; }
+.side-instance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 2px 8px 0;
+}
+.side-instance .ws-no { margin-top: 0; flex: none; }
+.side-instance .dot { flex: none; }
+.side-instance-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.side-instance-copy strong {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-instance-copy span {
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+.shell.collapsed .side-instance { justify-content: center; padding-inline: 0; }
 
 .field-label-row {
   display: flex;

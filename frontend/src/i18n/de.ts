@@ -411,7 +411,9 @@ export const de = {
     day: "Tag",
     time: "Uhrzeit",
     players: "Spieler",
+    map: "Karte",
     farm: "Hof",
+    balance: "Kontostand",
     sync: "Sync",
   },
   workspace: {

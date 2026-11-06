@@ -413,7 +413,9 @@ export const en = {
     day: "Day",
     time: "Time",
     players: "Players",
+    map: "Map",
     farm: "Farm",
+    balance: "Balance",
     sync: "Sync",
   },
   workspace: {
