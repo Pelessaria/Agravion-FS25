@@ -627,12 +627,12 @@ h1, h2, h3, p { margin: 0; }
   bottom: 8px;
   z-index: 2;
   width: auto;
-  height: 24px;
-  max-width: 46%;
+  height: 34px;
+  max-width: 54%;
   object-fit: contain;
   object-position: left bottom;
-  padding: 3px 5px;
-  border-radius: 4px;
+  padding: 4px 6px;
+  border-radius: 5px;
   background: color-mix(in srgb, black 38%, transparent);
   border: 1px solid color-mix(in srgb, white 10%, transparent);
   pointer-events: none;
@@ -643,12 +643,12 @@ h1, h2, h3, p { margin: 0; }
   top: 16px;
   z-index: 2;
   width: auto;
-  height: 32px;
-  max-width: 40%;
+  height: 42px;
+  max-width: 46%;
   object-fit: contain;
   object-position: left top;
-  padding: 4px 6px;
-  border-radius: 5px;
+  padding: 5px 7px;
+  border-radius: 6px;
   background: color-mix(in srgb, black 42%, transparent);
   border: 1px solid color-mix(in srgb, white 10%, transparent);
   pointer-events: none;
@@ -743,8 +743,8 @@ h1, h2, h3, p { margin: 0; }
 }
 .equip-sheet-brand-row .equip-sheet-brand-logo {
   position: static;
-  height: 28px;
-  max-width: 160px;
+  height: 36px;
+  max-width: 180px;
   padding: 0;
   border: 0;
   background: transparent;
